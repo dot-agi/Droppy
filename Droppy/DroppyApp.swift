@@ -30,6 +30,12 @@ struct DroppyApp: App {
         }
         
         MenuBarExtra("Droppy", systemImage: "tray.and.arrow.down.fill", isInserted: $showInMenuBar) {
+            Button("Check for Updates...") {
+                UpdateChecker.shared.checkAndNotify()
+            }
+            
+            Divider()
+            
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
             }
@@ -53,6 +59,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup the notch overlay window
         NotchWindowController.shared.setupNotchWindow()
+        
+        // Check for updates in background (notify only if update available)
+        Task {
+            await UpdateChecker.shared.checkForUpdates()
+            if UpdateChecker.shared.updateAvailable {
+                UpdateChecker.shared.showUpdateAlert()
+            }
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
