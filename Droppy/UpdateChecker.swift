@@ -123,26 +123,29 @@ class UpdateChecker: ObservableObject {
             alert.informativeText += "\n\nWhat's new:\n\(releaseNotes!.prefix(200))..."
         }
         
+        alert.informativeText += "\n\nTo update via Homebrew, click the button below to copy the command and open Terminal."
+        
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Download Update")
+        alert.addButton(withTitle: "Update via Homebrew")
         alert.addButton(withTitle: "Later")
         
         let response = alert.runModal()
         
         if response == .alertFirstButtonReturn {
-            downloadUpdate()
+            updateViaHomebrew()
         }
     }
     
-    /// Open download URL
-    func downloadUpdate() {
-        if let url = downloadURL {
-            NSWorkspace.shared.open(url)
-        } else {
-            // Fallback to GitHub releases page
-            if let releasesURL = URL(string: "https://github.com/\(owner)/\(repo)/releases") {
-                NSWorkspace.shared.open(releasesURL)
-            }
+    /// Copy command and open Terminal
+    func updateViaHomebrew() {
+        // 1. Copy command to clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString("brew upgrade droppy", forType: .string)
+        
+        // 2. Open Terminal
+        if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+            NSWorkspace.shared.open(terminalURL)
         }
     }
     
