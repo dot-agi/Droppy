@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/iordv/Droppy/raw/main/Droppy/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Droppy Icon" width="128">
+  <img src="https://i.postimg.cc/PxdpGc3S/appstore.png" alt="Droppy Icon" width="128">
 </p>
 
 <h1 align="center">Droppy</h1>
