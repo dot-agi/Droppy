@@ -1,0 +1,55 @@
+name: Release Droppy
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          agvtool new-marketing-version $VERSION
+
+      - name: Build App
+        run: |
+          xcodebuild -scheme Droppy \
+            -configuration Release \
+            -derivedDataPath ./build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Create DMG
+        run: |
+          mkdir -p dmg_root
+          cp -R build/Build/Products/Release/Droppy.app dmg_root/
+          ln -s /Applications dmg_root/Applications
+          hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO Droppy.dmg
+
+      - name: Calculate Hash
+        id: hash
+        run: |
+          echo "SHA256=$(shasum -a 256 Droppy.dmg | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Droppy.dmg
+          body: |
+            ## Changes
+            - Auto-generated release from tag ${{ github.ref_name }}
+            
+            ### SHA256 Checksum
+            `${{ steps.hash.outputs.SHA256 }}`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
