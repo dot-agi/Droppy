@@ -59,10 +59,17 @@ struct ConversionOption: Identifiable {
     var icon: String { format.icon }
 }
 
-/// Utility class for converting files between formats using native macOS APIs and Gotenberg
+/// Utility class for converting files between formats using native macOS APIs and Cloudmersive
 class FileConverter {
     
-    /// Gotenberg server URL (local Docker container)
+    /// Cloudmersive API key - Free tier: 800 calls/month
+    /// Get your own key at: https://account.cloudmersive.com/signup
+    static let cloudmersiveAPIKey = "0d34f6fa-02f6-4ffc-a000-a1319d54d6eb"
+    
+    /// Cloudmersive API base URL
+    static let cloudmersiveBaseURL = "https://api.cloudmersive.com"
+    
+    /// Local Gotenberg URL (fallback if available)
     static let gotenbergURL = "http://localhost:3001"
     
     // MARK: - Available Conversions
@@ -93,7 +100,7 @@ class FileConverter {
             }
         }
         
-        // Document to PDF conversions (via Gotenberg)
+        // Document to PDF conversions (via Cloudmersive API)
         // Word documents
         if fileType.conforms(to: UTType("org.openxmlformats.wordprocessingml.document") ?? .data) ||
            fileType.conforms(to: UTType("com.microsoft.word.doc") ?? .data) ||
@@ -207,9 +214,99 @@ class FileConverter {
         }
     }
     
-    // MARK: - Document to PDF Conversion (via Gotenberg)
+    // MARK: - Document to PDF Conversion (via Cloudmersive API)
     
     private static func convertDocumentToPDF(from sourceURL: URL, to destinationURL: URL) async -> URL? {
+        // Determine the correct endpoint based on file type
+        let fileExtension = sourceURL.pathExtension.lowercased()
+        let endpoint: String
+        
+        switch fileExtension {
+        case "docx":
+            endpoint = "/convert/docx/to/pdf"
+        case "doc":
+            endpoint = "/convert/doc/to/pdf"
+        case "xlsx":
+            endpoint = "/convert/xlsx/to/pdf"
+        case "xls":
+            endpoint = "/convert/xls/to/pdf"
+        case "pptx":
+            endpoint = "/convert/pptx/to/pdf"
+        case "ppt":
+            endpoint = "/convert/ppt/to/pdf"
+        default:
+            // Try generic office conversion
+            endpoint = "/convert/autodetect/to/pdf"
+        }
+        
+        guard let url = URL(string: "\(cloudmersiveBaseURL)\(endpoint)") else {
+            print("FileConverter: Invalid Cloudmersive URL")
+            return nil
+        }
+        
+        // Read the source file
+        guard let fileData = try? Data(contentsOf: sourceURL) else {
+            print("FileConverter: Failed to read source file")
+            return nil
+        }
+        
+        // Create multipart form data request
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue(cloudmersiveAPIKey, forHTTPHeaderField: "Apikey")
+        request.timeoutInterval = 120 // Allow up to 120 seconds for cloud conversion
+        
+        // Build multipart body
+        var body = Data()
+        
+        // Add the file
+        let filename = sourceURL.lastPathComponent
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"inputFile\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Close boundary
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        // Make the request
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("FileConverter: Invalid response from Cloudmersive")
+                return nil
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                print("FileConverter: Cloudmersive returned status \(httpResponse.statusCode)")
+                if let errorMessage = String(data: data, encoding: .utf8) {
+                    print("FileConverter: Error: \(errorMessage)")
+                }
+                // Fall back to local Gotenberg if available
+                return await convertDocumentToPDFViaGotenberg(from: sourceURL, to: destinationURL)
+            }
+            
+            // Write the PDF to destination
+            try data.write(to: destinationURL)
+            print("FileConverter: Successfully converted to PDF via Cloudmersive")
+            return destinationURL
+            
+        } catch {
+            print("FileConverter: Cloudmersive request failed: \(error)")
+            // Fall back to local Gotenberg if available
+            return await convertDocumentToPDFViaGotenberg(from: sourceURL, to: destinationURL)
+        }
+    }
+    
+    // MARK: - Fallback: Local Gotenberg
+    
+    private static func convertDocumentToPDFViaGotenberg(from sourceURL: URL, to destinationURL: URL) async -> URL? {
         // Gotenberg LibreOffice endpoint for office documents
         guard let url = URL(string: "\(gotenbergURL)/forms/libreoffice/convert") else {
             print("FileConverter: Invalid Gotenberg URL")
@@ -227,7 +324,7 @@ class FileConverter {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60 // Allow up to 60 seconds for conversion
+        request.timeoutInterval = 60
         
         // Build multipart body
         var body = Data()
@@ -256,15 +353,12 @@ class FileConverter {
             
             guard httpResponse.statusCode == 200 else {
                 print("FileConverter: Gotenberg returned status \(httpResponse.statusCode)")
-                if let errorMessage = String(data: data, encoding: .utf8) {
-                    print("FileConverter: Error: \(errorMessage)")
-                }
                 return nil
             }
             
             // Write the PDF to destination
             try data.write(to: destinationURL)
-            print("FileConverter: Successfully converted to PDF via Gotenberg")
+            print("FileConverter: Successfully converted to PDF via Gotenberg (fallback)")
             return destinationURL
             
         } catch {
