@@ -1,0 +1,42 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -scheme Droppy -configuration Release -derivedDataPath ./build
+
+2026-01-02 19:54:57.611 xcodebuild[1515:14439287] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006000-000438D922A3801E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006000-000438D922A3801E, name:My Mac }
+{ platform:macOS, name:Any Mac }
+ComputePackagePrebuildTargetDependencyGraph
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'Droppy' in project 'Droppy' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+Build description signature: 40ea385d68c94032b6d5547129c48d52
+Build description path: /Users/jordyspruit/Desktop/Droppy/build/Build/Intermediates.noindex/XCBuildData/40ea385d68c94032b6d5547129c48d52.xcbuilddata
+error: Could not parse Swift versions from: 
+error: Unable to discover `swiftc` command line tool info: Could not parse Swift versions from:  (in target 'Droppy' from project 'Droppy')
+warning: missing creator for mutated node: ('/Users/jordyspruit/Desktop/Droppy/build/Build/Products/Release/Droppy.app/Contents/MacOS/Droppy') (in target 'Droppy' from project 'Droppy')
+** BUILD FAILED **
+
+
+The following build commands failed:
+	Building project Droppy with scheme Droppy and configuration Release
+(1 failure)
