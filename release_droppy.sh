@@ -1,14 +1,24 @@
 #!/bin/bash
 
+
+# Strict error handling
+set -e
+
 # Configuration
 MAIN_REPO="/Users/jordyspruit/Desktop/Droppy"
 TAP_REPO="/Users/jordyspruit/Desktop/homebrew-tap"
-DMG_NAME="Droppy.dmg"
+# DMG_NAME defined later based on version
 
 # Check arguments
 if [ -z "$1" ]; then
     echo "Usage: ./release_droppy.sh [VERSION_NUMBER] [PATH_TO_RELEASE_NOTES]"
     echo "Example: ./release_droppy.sh 1.2 ./notes.txt"
+    exit 1
+fi
+
+# Ensure git is clean
+if [ -n "$(git status --porcelain)" ]; then
+    echo "❌ Error: Git working directory is not clean. Please commit or stash changes first."
     exit 1
 fi
 
@@ -154,7 +164,7 @@ echo "$CASK_CONTENT" > "Casks/droppy.rb"
 
 git add .
 git commit -m "Update Droppy to v$VERSION"
-git push --force origin main
+git push --force origin HEAD:main
 
 # 8. Confirmation
 if [ "$3" == "-y" ] || [ "$3" == "--yes" ]; then

@@ -54,24 +54,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update Homebrew Tap
-        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'test')
-        env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          SHA256: ${{ steps.hash.outputs.SHA256 }}
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git clone https://x-access-token:${TAP_TOKEN}@github.com/iordv/homebrew-tap.git homebrew-tap
-          cd homebrew-tap
-          
-          # Update version and sha256 using sed
-          # Note: MacOS sed used in github actions requires an empty string for -i
-          sed -i '' "s/version \".*\"/version \"$VERSION\"/" Casks/droppy.rb
-          sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" Casks/droppy.rb
-          
-          git add Casks/droppy.rb
-          git commit -m "Update Droppy to v$VERSION"
-          git push
+      # - name: Update Homebrew Tap
+      #   if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'test')
+      #   env:
+      #     TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      #     SHA256: ${{ steps.hash.outputs.SHA256 }}
+      #   run: |
+      #     VERSION=${GITHUB_REF#refs/tags/v}
+      #     git config --global user.name "github-actions[bot]"
+      #     git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      #     
+      #     git clone https://x-access-token:${TAP_TOKEN}@github.com/iordv/homebrew-tap.git homebrew-tap
+      #     cd homebrew-tap
+      #     
+      #     # Update version and sha256 using sed
+      #     # Note: MacOS sed used in github actions requires an empty string for -i
+      #     sed -i '' "s/version \".*\"/version \"$VERSION\"/" Casks/droppy.rb
+      #     sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" Casks/droppy.rb
+      #     
+      #     git add Casks/droppy.rb
+      #     git commit -m "Update Droppy to v$VERSION"
+      #     git push
