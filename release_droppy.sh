@@ -175,6 +175,11 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     git push origin main
     git push origin "v$VERSION"
 
+    echo "\n-> Creating GitHub Release v$VERSION..."
+    gh release create "v$VERSION" "$DMG_NAME" \
+        --title "v$VERSION" \
+        --notes-file "$NOTES_FILE"
+
     echo "\n🎉 DONE! Release is live."
     echo "Users can run 'brew upgrade droppy' to get the new version."
 else

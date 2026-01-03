@@ -37,12 +37,16 @@ final class DragMonitor: ObservableObject {
     private var jiggleNotified = false
     private var dragEndNotified = false
     
+    // Pre-initialize and hold onto the drag pasteboard to avoid constant reallocation
+    // This addresses the objc_release crash in high-frequency polling
+    private let dragPasteboard = NSPasteboard(name: .drag)
+    
     private init() {}
     
-    /// Starts monitoring for drag events
+    /// Starts monitoring for drag events (Reduced frequency to 0.05s for stability)
     func startMonitoring() {
         guard dragCheckTimer == nil else { return }
-        dragCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
+        dragCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             self?.checkForActiveDrag()
         }
     }
@@ -62,7 +66,7 @@ final class DragMonitor: ObservableObject {
     }
     
     private func checkForActiveDrag() {
-        let dragPasteboard = NSPasteboard(name: .drag)
+        // Use the pre-initialized pasteboard
         let currentChangeCount = dragPasteboard.changeCount
         let mouseIsDown = NSEvent.pressedMouseButtons & 1 != 0
         
