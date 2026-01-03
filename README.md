@@ -5,7 +5,7 @@
 <h1 align="center">Droppy</h1>
 
 <p align="center">
-  <strong>A drag-and-drop file shelf that lives in your notch</strong>
+  <strong>The ultimate drag-and-drop file shelf for macOS</strong>
 </p>
 
 <p align="center">
@@ -19,9 +19,9 @@
 
 ## What is Droppy?
 
-Droppy is a **free, open-source** macOS app that gives you a temporary file shelf right in your notch. Drop files there while you navigate to their destination — no more juggling Finder windows or cluttering your desktop.
+Droppy is a **free, open-source** utility that makes file management on macOS effortless. It provides you with a temporary shelf to store files while you navigate between apps and folders. No more juggling finder windows or cluttering your desktop with temporary screenshots.
 
-Built with the new **Liquid Glass** design language from macOS Tahoe, Droppy feels native and beautiful.
+**Now updated to Version 2.0**, Droppy is more powerful than ever.
 
 ## Installation
 
@@ -37,59 +37,66 @@ brew install iordv/tap/droppy
 2. Drag `Droppy.app` to your Applications folder
 3. Right-click → Open (required for unsigned apps)
 
+## New in v2.0 🚀
+
+### 🧺 The Floating Basket
+Welcome to the family! Sometimes the notch is too far away. The **Floating Basket** brings the shelf to you.
+- **Jiggle to Reveal (Beta)**: Just give your mouse a little jiggle while dragging files, and the basket pops up right where you are. (Enable this in *Settings > Beta Features*)
+- **Drag & Drop**: Drop files in to hold them, drag them out when you're ready.
+- **Push to Shelf**: Want to keep files for later? One click sends items from your temporary basket to the main notch shelf.
+
+### ⚡ Power Tools
+Droppy is no longer just a shelf. It's a Swiss Army knife for your files:
+- **Auto-Rename ZIPs**: Created a ZIP? Typo? No problem. New archives automatically enter rename mode.
+- **Instant ZIP Creation**: Select multiple files and zip them up instantly.
+- **Text Extraction (OCR)**: Right-click an image or PDF to extract text. Copy it directly to your clipboard.
+- **Conversion**: Right-click to convert images to different formats (PNG, JPEG, HEIC, TIFF, etc.) on the fly.
+
+### 🎨 Refined Experience
+- **Smoother Animations**: Every interaction has been polished.
+- **macOS Sonoma Ready**: Now fully compatible with macOS 14 (Sonoma) and later.
+
 ## Features
 
 ### 🗂️ Notch File Shelf
-Drop files onto the notch area and they'll stay there until you need them. The shelf expands smoothly to show your files with beautiful animations.
+The classic experience. Drop files onto the notch area, and they'll stay there safely. Hover to expand, drag out to use.
 
 ### ✨ Liquid Glass Design
-Built for macOS 26 Tahoe with the new Liquid Glass aesthetic — translucent materials, smooth animations, and that signature refractive look.
+Built with a stunning, translucent interface that feels at home on modern macOS.
 
 ### 🔄 File Conversion
 Right-click any file to convert between formats:
 - **Images**: PNG ↔ JPEG, HEIC → JPEG/PNG, TIFF, BMP, GIF
-- **Documents**: Word, Excel, PowerPoint → PDF (works out of the box via Cloudmersive API)
-
-### 💾 Quick Save
-Right-click any file in the shelf and choose "Save" to quickly save it to a location of your choice.
-
-### ⚙️ Customizable
-- Launch at login
-- Menu bar icon toggle
-- Transparent background option for a cleaner look
+- **Documents**: Word, Excel, PowerPoint → PDF
 
 ### 🔒 Privacy-First
-- No analytics or tracking
-- Document conversion uses the secure Cloudmersive API (files are processed in memory and not stored)
-- All other files stay local on your Mac
+- No analytics or tracking.
+- Your files stay on your Mac.
+- Optional Cloudmersive API usage for documents is processed in-memory and never stored.
 
 ## Usage
 
-1. **Add files**: Drag files onto the notch area — it glows to show it's ready
-2. **View shelf**: Hover over the notch or click to expand
-3. **Use files**: Drag files out to their destination
-4. **Convert files**: Right-click → Convert to...
+1. **Add files**: Drag files to the notch (or jiggle for the basket!)
+2. **View shelf**: Hover over the notch area
+3. **Organize**: Convert, rename, or zip files directly in the shelf
+4. **Use files**: Drag them out to their final destination
 5. **Clear shelf**: Click the trash icon or drag files out
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/placeholder-jiggle" alt="Jiggle Feature" width="600">
+  <br>
+  <em>Enable "Jiggle to Reveal" in Settings for the ultimate drag-and-drop experience.</em>
+</p>
 
 ## Requirements
 
-- **macOS 26.0 (Tahoe)** or later
-- Mac with a notch (MacBook Pro 14"/16", MacBook Air M2/M3)
+- **macOS 14.0 (Sonoma)** or later
+- Works on all Macs (Notch recommended but not required)
 
 > **Note**: Since Droppy isn't code-signed, you'll need to right-click → Open on first launch, or run:
 > ```bash
 > xattr -d com.apple.quarantine /Applications/Droppy.app
 > ```
-
-## Document Conversion Setup (Local Fallback)
-
-Droppy uses the Cloudmersive API for PDF conversions out of the box. If you prefer to keep everything local or hit the API limits, you can run a local Gotenberg instance as a fallback:
-
-```bash
-docker run -d -p 3001:3000 gotenberg/gotenberg:8
-```
-
-Image conversions work natively without any additional setup.
 
 ## Contributing
 
