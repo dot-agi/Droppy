@@ -144,10 +144,12 @@ git tag "v$VERSION"
 
 # Tap Repo
 cd "$TAP_REPO" || exit
-echo "   - Tap Repo: Pulling latest changes..."
-git pull origin main --rebase
+echo "   - Tap Repo: Syncing changes..."
+# Commit first to stash changes
 git add .
-git commit -m "Update Droppy to v$VERSION"
+# Allow commit to fail if nothing to commit (e.g. if previous run already committed)
+git commit -m "Update Droppy to v$VERSION" || true
+git pull origin main --rebase
 
 # 8. Confirmation
 if [ "$3" == "-y" ] || [ "$3" == "--yes" ]; then
