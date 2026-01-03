@@ -48,6 +48,10 @@ Fixed: Window memory management stability improvements
 ### 🗂️ Notch File Shelf
 The classic experience. Drop files onto the notch area, and they'll stay there safely. Hover to expand, drag out to use.
 
+<p align="center">
+  <img src="https://i.postimg.cc/63TpswW4/image.png" alt="Notch Shelf Preview" width="600">
+</p>
+
 ### ✨ Liquid Glass Design
 Built with a stunning, translucent interface that feels at home on modern macOS.
 
@@ -70,7 +74,7 @@ Right-click any file to convert between formats:
 5. **Clear shelf**: Click the trash icon or drag files out
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/placeholder-jiggle" alt="Jiggle Feature" width="600">
+  <img src="https://i.postimg.cc/50488cNj/image.png" alt="Floating Basket Preview" width="600">
   <br>
   <em>Enable "Jiggle to Reveal" in Settings for the ultimate drag-and-drop experience.</em>
 </p>
