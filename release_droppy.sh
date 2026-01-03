@@ -116,6 +116,18 @@ CASK_CONTENT="cask \"droppy\" do
 
   app \"Droppy.app\"
 
+  caveats <<~EOS
+    ____                             
+   / __ \\_________  ____  ____  __  __
+  / / / / ___/ __ \\/ __ \\/ __ \\/ / / /
+ / /_/ / /  / /_/ / /_/ / /_/ / /_/ / 
+/_____/_/   \\____/ .___/ .___/\\__, /  
+                /_/   /_/    /____/   
+
+    Thank you for installing Droppy! 
+    The ultimate drag-and-drop file shelf for macOS.
+  EOS
+
   zap trash: [
     \"~/Library/Application Support/Droppy\",
     \"~/Library/Preferences/iordv.Droppy.plist\",
