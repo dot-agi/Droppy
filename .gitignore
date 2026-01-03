@@ -1,0 +1,30 @@
+# Xcode
+.DS_Store
+*.swp
+*.lock
+profile
+base_profile
+DerivedData/
+build/
+build_check/
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.ipa
+*.pkg
+*.dmg
+*.log
+build_output*.txt
+
+# Pods
+Pods/
+
+# Swift Package Manager
+.build/
+
+# Other
+.agent/
+.gemini/
