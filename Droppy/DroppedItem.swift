@@ -93,6 +93,28 @@ struct DroppedItem: Identifiable, Hashable, Transferable {
         NSWorkspace.shared.open(url)
     }
     
+    /// Opens the file with a specific application
+    func openWith(applicationURL: URL) {
+        NSWorkspace.shared.open([url], withApplicationAt: applicationURL, configuration: NSWorkspace.OpenConfiguration())
+    }
+    
+    /// Gets the list of applications that can open this file
+    /// Returns an array of (name, icon, URL) tuples sorted by name
+    func getAvailableApplications() -> [(name: String, icon: NSImage, url: URL)] {
+        let appURLs = NSWorkspace.shared.urlsForApplications(toOpen: url)
+        
+        var apps: [(name: String, icon: NSImage, url: URL)] = []
+        
+        for appURL in appURLs {
+            let name = appURL.deletingPathExtension().lastPathComponent
+            let icon = NSWorkspace.shared.icon(forFile: appURL.path)
+            apps.append((name: name, icon: icon, url: appURL))
+        }
+        
+        // Sort by name alphabetically
+        return apps.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+    
     /// Reveals the file in Finder
     func revealInFinder() {
         NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)

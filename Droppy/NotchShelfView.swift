@@ -631,7 +631,21 @@ struct NotchItemView: View {
                 Label("Open", systemImage: "arrow.up.forward.square")
             }
             
-
+            // Open With submenu
+            let availableApps = item.getAvailableApplications()
+            if !availableApps.isEmpty {
+                Menu {
+                    ForEach(availableApps, id: \.url) { app in
+                        Button {
+                            item.openWith(applicationURL: app.url)
+                        } label: {
+                            Label(app.name, image: NSImage.Name(app.name))
+                        }
+                    }
+                } label: {
+                    Label("Open With...", systemImage: "square.and.arrow.up.on.square")
+                }
+            }
             
             Button {
                 item.saveToDownloads()
