@@ -39,7 +39,7 @@ if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
     export SWIFT_CONTENT=$(echo "$NOTES_CONTENT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
     
     cd "$MAIN_REPO" || exit
-    perl -0777 -i -pe 's/static let current = \"\"\"(.*?)\"\"\"/static let current = \"\"\"\n$ENV{SWIFT_CONTENT}\n\"\"\"/s' Droppy/SettingsView.swift
+    perl -0777 -i -pe 's/(\s*)static let current = \"\"\"(.*?)\"\"\"/$1static let current = \"\"\"\n$ENV{SWIFT_CONTENT}\n$1\"\"\"/s' Droppy/SettingsView.swift
 
     # 2. Update README.md
     echo "   - Updating README.md..."

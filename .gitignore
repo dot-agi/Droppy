@@ -15,7 +15,7 @@ build_check/
 *.hmap
 *.ipa
 *.pkg
-*.dmg
+
 *.log
 build_output*.txt
 
