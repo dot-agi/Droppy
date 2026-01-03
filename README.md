@@ -117,8 +117,9 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Bug Fixes
-- **Move To...**: Fixed an issue where the "Choose Folder..." dialog wouldn't appear for some users.
+# New
+- **Non-blocking Moves**: Moving large files to network drives/NAS is now buttery smooth. Droppy handles the heavy lifting in the background so you can keep working instantly.
+- **Bug Fixes**: Reliably opens the "Choose Folder" dialog every time.
 <!-- CHANGELOG_END -->
 
 ---
