@@ -1,9 +1,9 @@
-Release v3.1
+Release v3.1.1
 
-Features:
-- **Download Stats**: Secure, privacy-first download counting is now live in Settings > About. We track installs, not people.
-- **Improved Clipboard**: Smarter deduplication logic now correctly handles multiple screenshots, ensuring no data loss while keeping your history clean.
+Hotfix:
+- **Crash Fix**: Resolved a critical crash related to notch interaction monitoring. We replaced the old polling system with a modern, reactive observer to improve stability and performance.
 
-Polish:
-- **UI Refinements**: Cleaner layout for the About section in Settings.
-- **Clarity**: Updated descriptions for transparency settings to better reflect what's being affected (Shelf, Notch, Clipboard, Notifications).
+Features (from v3.1):
+- **Download Stats**: Secure, privacy-first download counting is now live in Settings > About.
+- **Improved Clipboard**: Smarter deduplication logic now correctly handles multiple screenshots.
+- **UI Refinements**: Cleaner layout and descriptions.

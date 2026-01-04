@@ -9,14 +9,15 @@ import AppKit
 import SwiftUI
 import Combine
 import UniformTypeIdentifiers
+import Observation
 
 /// Manages the transparent overlay window positioned at the MacBook notch
 final class NotchWindowController: NSObject, ObservableObject {
     /// The notch overlay window
     private var notchWindow: NotchWindow?
     
-    /// Timer for fast interaction updates (clicks through)
-    private var interactionTimer: Timer?
+    /// Storage for Combine cancellables
+    private var cancellables = Set<AnyCancellable>()
     
     /// Timer for slow environmental checks (fullscreen)
     private var fullscreenTimer: Timer?
@@ -108,25 +109,17 @@ final class NotchWindowController: NSObject, ObservableObject {
     private func startMonitors() {
         stopMonitors() // Idempotency
         
-        // Timer for periodic hit test updates (every 50ms)
-        // Timer for periodic hit test updates (every 50ms) - Fast, lightweight
-        interactionTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-            guard let self = self else {
-                timer.invalidate()
-                return
+        // 1. React to DragMonitor changes (using Combine)
+        DragMonitor.shared.$isDragging
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.notchWindow?.updateMouseEventHandling()
             }
-            guard let window = self.notchWindow, window.isValid else {
-                timer.invalidate()
-                return
-            }
-            // Additional safety: verify window has a contentView before calling
-            guard window.contentView != nil else {
-                timer.invalidate()
-                return
-            }
-            // Call on main thread without autoreleasepool to avoid objc_release crashes
-            window.updateMouseEventHandling()
-        }
+            .store(in: &cancellables)
+            
+        // 2. React to DroppyState changes (using Observation)
+        // Replaces the polling interactionTimer
+        setupStateObservation()
         
         // Timer for fullscreen/visibility checks (every 1s) - Slower, heavier
         fullscreenTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
@@ -153,10 +146,27 @@ final class NotchWindowController: NSObject, ObservableObject {
         }
     }
     
+    /// Sets up observation for DroppyState properties
+    private func setupStateObservation() {
+        // Track the specific properties that affect mouse event handling
+        withObservationTracking {
+            _ = DroppyState.shared.isExpanded
+            _ = DroppyState.shared.isMouseHovering
+            _ = DroppyState.shared.isDropTargeted
+        } onChange: {
+            // onChange fires BEFORE the property changes.
+            // dispatch async to run update AFTER the change is applied.
+            DispatchQueue.main.async { [weak self] in
+                self?.notchWindow?.updateMouseEventHandling()
+                // Must re-register observation after it fires (one-shot)
+                self?.setupStateObservation()
+            }
+        }
+    }
+    
     /// Stops and releases all monitors and timers
     private func stopMonitors() {
-        interactionTimer?.invalidate()
-        interactionTimer = nil
+        cancellables.removeAll()
         
         fullscreenTimer?.invalidate()
         fullscreenTimer = nil
