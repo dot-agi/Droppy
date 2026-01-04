@@ -43,9 +43,7 @@ final class DragMonitor: ObservableObject {
     func startMonitoring() {
         guard dragCheckTimer == nil else { return }
         dragCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            autoreleasepool {
-                self?.checkForActiveDrag()
-            }
+            self?.checkForActiveDrag()
         }
     }
     
@@ -62,16 +60,16 @@ final class DragMonitor: ObservableObject {
         directionChanges.removeAll()
         lastDragDirection = .zero
     }
-    
-    private let dragPasteboard = NSPasteboard(name: .drag)
 
     private func checkForActiveDrag() {
+        // Retrieve pasteboard handle locally to ensure validity
+        let dragPasteboard = NSPasteboard(name: .drag)
         let currentChangeCount = dragPasteboard.changeCount
         let mouseIsDown = NSEvent.pressedMouseButtons & 1 != 0
         
         // Detect drag START
         if currentChangeCount != dragStartChangeCount && mouseIsDown {
-            let hasContent = dragPasteboard.types?.isEmpty == false
+            let hasContent = (dragPasteboard.types?.count ?? 0) > 0
             if hasContent && !dragActive {
                 dragActive = true
                 dragStartChangeCount = currentChangeCount

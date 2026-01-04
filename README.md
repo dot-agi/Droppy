@@ -139,25 +139,19 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Droppy v2.7.3: Update Screen Verification 🧪
-*Testing the new Liquid Update Experience.*
+# Droppy v2.7.4: The Liquid Update 🌊
 
-### 🧪 Test Release
-This release is primarily to **verify** the new update screen implementation.
+This release introduces a completely redesigned, custom-built Update Screen that matches the premium "Liquid Glass" aesthetic of Droppy.
 
-### ✨ What to look for:
-1.  **Bold text** should be bold.
-2.  *Italics* should be italic.
-3.  This list should render correctly with bullets/numbers.
-4.  The window should look like **Liquid Glass**.
+### ✨ New Features & Improvements:
+- **Custom Update Window**: A borderless, interactive glass window with dynamic Hexagon background effects, replacing the standard macOS update prompts.
+- **Refined Clipboard Empty States**: New "Scissors" and "Document" iconography for the Clipboard Manager when no items are present or selected.
+- **Enhanced Markdown Support**: Release notes now render beautifully with support for bold, italics, lists, and quotes, ensuring you're always informed about what's new.
+- **Silky Smooth Animations**: Unified hover and interaction physics across all windows for a more cohesive experience.
 
-> "The details are not the details. They make the design." - Charles Eames
+> "Design is not just what it looks like and feels like. Design is how it works." - Steve Jobs
 
-### 🛠️ Improvements
-- **Update Logic**: Now uses the new `UpdateWindowController`.
-- **Markdown Parsing**: Enhanced safety checks.
-
-*Enjoy the testing!* 🚀
+Enjoy the most fluid Droppy experience yet! 🚀
 <!-- CHANGELOG_END -->
 
 ---
