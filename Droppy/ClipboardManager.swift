@@ -99,12 +99,10 @@ class ClipboardManager: ObservableObject {
     // MARK: - Settings (UserDefaults)
     // Using direct UserDefaults access instead of @AppStorage to avoid crashes in Timer callbacks
     
-    var isEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "enableClipboardBeta") }
-        set {
-            objectWillChange.send()
-            UserDefaults.standard.set(newValue, forKey: "enableClipboardBeta")
-            if newValue {
+    @Published var isEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(isEnabled, forKey: "enableClipboardBeta")
+            if isEnabled {
                 startMonitoring()
             } else {
                 stopMonitoring()
@@ -112,28 +110,22 @@ class ClipboardManager: ObservableObject {
         }
     }
     
-    var historyLimit: Int {
-        get {
-            let val = UserDefaults.standard.integer(forKey: "clipboardHistoryLimit")
-            return val == 0 ? 50 : val // Default to 50
-        }
-        set {
-            objectWillChange.send()
-            UserDefaults.standard.set(newValue, forKey: "clipboardHistoryLimit")
+    @Published var historyLimit: Int = 50 {
+        didSet {
+            UserDefaults.standard.set(historyLimit, forKey: "clipboardHistoryLimit")
             enforceHistoryLimit()
         }
     }
     
-    private var excludedAppsData: Data {
-        get { UserDefaults.standard.data(forKey: "excludedClipboardApps") ?? Data() }
-        set { UserDefaults.standard.set(newValue, forKey: "excludedClipboardApps") }
+    private var excludedAppsData: Data = Data() {
+        didSet {
+            UserDefaults.standard.set(excludedAppsData, forKey: "excludedClipboardApps")
+        }
     }
     
-    var skipConcealedContent: Bool {
-        get { UserDefaults.standard.bool(forKey: "skipConcealedClipboard") }
-        set {
-            objectWillChange.send()
-            UserDefaults.standard.set(newValue, forKey: "skipConcealedClipboard")
+    @Published var skipConcealedContent: Bool = false {
+        didSet {
+            UserDefaults.standard.set(skipConcealedContent, forKey: "skipConcealedClipboard")
         }
     }
     
@@ -157,17 +149,26 @@ class ClipboardManager: ObservableObject {
     private var lastChangeCount: Int
     private var isMonitoring = false
     
-    private var persistenceURL: URL {
+    private lazy var persistenceURL: URL = {
         let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
         let appSupport = paths[0].appendingPathComponent("Droppy", isDirectory: true)
         try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         return appSupport.appendingPathComponent("clipboard_history.json")
-    }
+    }()
     
     init() {
         self.lastChangeCount = NSPasteboard.general.changeCount
         self.hasAccessibilityPermission = AXIsProcessTrusted()
+        
+        // Initial load of settings from UserDefaults
+        self.isEnabled = UserDefaults.standard.bool(forKey: "enableClipboardBeta")
+        let limit = UserDefaults.standard.integer(forKey: "clipboardHistoryLimit")
+        self.historyLimit = limit == 0 ? 50 : limit
+        self.excludedAppsData = UserDefaults.standard.data(forKey: "excludedClipboardApps") ?? Data()
+        self.skipConcealedContent = UserDefaults.standard.bool(forKey: "skipConcealedClipboard")
+        
         loadFromDisk()
+        
         if isEnabled {
             startMonitoring()
         }

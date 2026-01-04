@@ -151,21 +151,25 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# What's New in v3.2.7
+# Release Notes v3.2.7
 
-### 🔗 Next-Gen URL Previews
-- **Fully Interactive**: Click any link preview to open it in your browser.
-- **Auto-Close Workflow**: The clipboard window closes instantly upon clicking a link, keeping you focused on your browsing.
-- **Rich Metadata**: Website snapshots with titles, descriptions, favicons, and direct image renders for `.avif`, `.apng`, and more.
-- **Smarter Detection**: Improved plain-text link recognition from text snippets using robust `NSDataDetector` heuristics.
+### 🚀 Major Improvements to URL Handling
+- **Rich Interactive URL Previews**: Link previews are now fully interactive. Click any preview card to open the link in your default browser.
+- **Auto-Close Clipboard**: For a smoother workflow, the clipboard window now automatically closes after you click a link, letting you focus on your browsing.
+- **Enhanced Preview Metadata**: URL previews now include website snapshots with titles, descriptions, and favicons, providing more context at a glance.
+- **Improved Link Detection**: Smarter plain-text link detection using `NSDataDetector`, allowing Droppy to recognize URLs even when they lack `http://` or `www.`.
+- **Expanded Media Support**: Direct image previews now support `.avif` and `.apng` formats, with improved detection for common image hosting sites.
 
-### 🍱 Premium Workspace
-- **Expanded Width**: The clipboard window is now **20% wider (1040px)**, making rich previews look stunning and providing more room for your history.
-- **Refined Badges**: "Website" and "Image Link" badges now match the exact styling of the "Extract Text" button with ultra-thin material backgrounds and shadows.
-- **Borderless Aesthetic**: A cleaner, borderless design for metadata strips that blends perfectly with Droppy's glass UI.
+### 🍱 Refined Workspace & UI
+- **20% Wider Clipboard Window**: Increased the maximum width of the clipboard window from 864px to **1040px**. This provides a more spacious layout for rich content and ensures the preview pane feels premium and uncrowded.
+- **Matched Action Badges**: The "Website" and "Image Link" badges have been restyled to exactly match the "Extract Text" button's aesthetic, including its ultra-thin material background, refined overlay, and subtle shadow.
+- **Title Case Badges**: Updated badge labels to a cleaner Title Case for a more modern, integrated appearance.
+- **Borderless Aesthetic**: Removed borders and internal backgrounds from URL previews for a cleaner, glass-like look that blends perfectly with Droppy's design language.
 
 ### 🧹 Code Health & DX
-- Resolved various compiler warnings and optimized MainActor synchronization for smoother UI updates.
+- Fixed various compiler warnings related to unused values and results.
+- Optimized MainActor synchronization for smoother UI transitions.
+- Improved coordinate conversion logic in multi-monitor setups.
 <!-- CHANGELOG_END -->
 
 ---
