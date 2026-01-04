@@ -32,7 +32,7 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         // Borderless, transparent window, but RESIZABLE for manual resizing
         // Removed .nonactivatingPanel to allow taking focus (Fixes "Enter" to paste)
         window = ClipboardPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 864, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: 1040, height: 640),
             styleMask: [.borderless, .fullSizeContentView, .resizable], 
             backing: .buffered,
             defer: false
@@ -67,9 +67,9 @@ class ClipboardWindowController: NSObject, NSWindowDelegate {
         if let screen = NSScreen.main {
             let screenRect = screen.visibleFrame
             let newRect = NSRect(
-                x: screenRect.midX - 432, 
+                x: screenRect.midX - 520, 
                 y: screenRect.midY - 320, 
-                width: 864, 
+                width: 1040, 
                 height: 640
             )
             DispatchQueue.main.async {

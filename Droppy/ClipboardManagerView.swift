@@ -64,7 +64,7 @@ struct ClipboardManagerView: View {
             Divider().overlay(Color.white.opacity(0.1))
             previewPane
         }
-        .frame(minWidth: 864, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
+        .frame(minWidth: 1040, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
         .background(useTransparentBackground ? Color.clear : Color.black)
         .background {
             if useTransparentBackground {
@@ -478,7 +478,7 @@ struct ClipboardManagerView: View {
             } // Close else
 
         }
-        .frame(width: 360)
+        .frame(width: 400)
         .frame(maxHeight: .infinity) // Sidebar takes full height, but width fixed
         .background(Color.black.opacity(0.3)) // Slight separation for sidebar
     }
@@ -918,7 +918,9 @@ struct ClipboardPreviewView: View {
     
     // Link Preview State
     @State private var linkPreviewTitle: String?
+    @State private var linkPreviewDescription: String?
     @State private var linkPreviewImage: NSImage?
+    @State private var linkPreviewIcon: NSImage?
     @State private var isLoadingLinkPreview = false
     @State private var isDirectImageLink = false
     
@@ -1062,93 +1064,15 @@ struct ClipboardPreviewView: View {
                             .foregroundStyle(.white)
                             .padding(12)
                     } else {
-                        VStack(spacing: 16) {
-                            // Loading state
-                            if isLoadingLinkPreview {
-                                VStack(spacing: 12) {
-                                    ProgressView()
-                                        .controlSize(.regular)
-                                    Text("Loading preview...")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(height: 100)
-                            }
-                            // Direct image link - show the image
-                            else if isDirectImageLink {
-                                if let previewImage = linkPreviewImage {
-                                    Image(nsImage: previewImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(maxHeight: 200)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                } else {
-                                    // Failed to load image
-                                    VStack(spacing: 8) {
-                                        Image(systemName: "photo")
-                                            .font(.system(size: 32))
-                                            .foregroundStyle(.secondary)
-                                        Text("Image could not be loaded")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .frame(height: 80)
-                                }
-                            }
-                            // Website preview with metadata
-                            else {
-                                VStack(spacing: 12) {
-                                    // Preview image (if available)
-                                    if let previewImage = linkPreviewImage {
-                                        Image(nsImage: previewImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(maxHeight: 140)
-                                            .clipped()
-                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                    }
-                                    
-                                    // Title and domain
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        if let title = linkPreviewTitle {
-                                            Text(title)
-                                                .font(.headline)
-                                                .foregroundStyle(.white)
-                                                .lineLimit(2)
-                                        }
-                                        
-                                        if let urlString = item.content,
-                                           let domain = LinkPreviewService.shared.extractDomain(from: urlString) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "link")
-                                                    .font(.caption2)
-                                                Text(domain)
-                                                    .font(.caption)
-                                            }
-                                            .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.white.opacity(0.08))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                )
-                            }
-                            
-                            // Always show the full URL
-                            Text(liveItem.content ?? "")
-                                .font(.system(.callout, design: .monospaced))
-                                .foregroundStyle(.blue)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal)
-                        }
+                        URLPreviewCard(
+                            item: item,
+                            isLoading: isLoadingLinkPreview,
+                            isDirectImage: isDirectImageLink,
+                            title: linkPreviewTitle,
+                            description: linkPreviewDescription,
+                            image: linkPreviewImage,
+                            icon: linkPreviewIcon
+                        )
                         .padding(.vertical)
                     }
                     
@@ -1561,6 +1485,13 @@ struct ClipboardPreviewView: View {
                 if let urlString = item.content {
                     isLoadingLinkPreview = true
                     
+                    // Clear previous states
+                    linkPreviewTitle = nil
+                    linkPreviewDescription = nil
+                    linkPreviewImage = nil
+                    linkPreviewIcon = nil
+                    isDirectImageLink = false
+                    
                     // Check if it's a direct image link
                     if LinkPreviewService.shared.isDirectImageURL(urlString) {
                         isDirectImageLink = true
@@ -1569,14 +1500,19 @@ struct ClipboardPreviewView: View {
                         // Fetch website metadata
                         if let metadata = await LinkPreviewService.shared.fetchMetadata(for: urlString) {
                             linkPreviewTitle = metadata.title
+                            linkPreviewDescription = metadata.description
                             
-                            // Try to get image from metadata
-                            if let imageProvider = metadata.imageProvider {
-                                linkPreviewImage = await withCheckedContinuation { continuation in
-                                    imageProvider.loadObject(ofClass: NSImage.self) { image, error in
-                                        continuation.resume(returning: image as? NSImage)
-                                    }
-                                }
+                            if let imageData = metadata.image {
+                                linkPreviewImage = NSImage(data: imageData)
+                            }
+                            
+                            if let iconData = metadata.icon {
+                                linkPreviewIcon = NSImage(data: iconData)
+                            }
+                            
+                            // If still no image but it's an image link we missed
+                            if linkPreviewImage == nil && LinkPreviewService.shared.isDirectImageURL(urlString) {
+                                linkPreviewImage = await LinkPreviewService.shared.fetchImagePreview(for: urlString)
                             }
                         }
                     }
@@ -1857,4 +1793,174 @@ class WindowDragNSView: NSView {
     }
 }
 
+// MARK: - URL Preview Components
 
+struct URLPreviewCard: View {
+    let item: ClipboardItem
+    let isLoading: Bool
+    let isDirectImage: Bool
+    let title: String?
+    let description: String?
+    let image: NSImage?
+    let icon: NSImage?
+    @State private var isHovering = false
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView().controlSize(.regular)
+                    Text("Fetching preview...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+            } else {
+                VStack(spacing: 0) {
+                    // Main Image Area
+                    ZStack {
+                        if let previewImage = image {
+                            Image(nsImage: previewImage)
+                                .resizable()
+                                .aspectRatio(contentMode: isDirectImage ? .fit : .fill)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: isDirectImage ? 260 : 180)
+                                .clipped()
+                        } else {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.05))
+                                .frame(height: isDirectImage ? 200 : 120)
+                                .overlay {
+                                    Image(systemName: isDirectImage ? "photo" : "link")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(.secondary.opacity(0.3))
+                                }
+                        }
+                    }
+                    .background(Color.black.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    
+                    MetadataInfoStrip(
+                        item: item,
+                        isDirectImage: isDirectImage,
+                        title: title,
+                        description: description,
+                        icon: icon
+                    )
+                }
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    isHovering = hovering
+                }
+                .onTapGesture {
+                    if let urlString = item.content, let url = URL(string: urlString) {
+                        NSWorkspace.shared.open(url)
+                        ClipboardWindowController.shared.close()
+                    }
+                }
+                .opacity(isHovering ? 0.8 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: isHovering)
+                .help("Click to open link")
+                
+                // Raw URL at the bottom
+                Text(item.content ?? "")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.blue.opacity(0.8))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
+        }
+    }
+}
+
+struct MetadataInfoStrip: View {
+    let item: ClipboardItem
+    let isDirectImage: Bool
+    let title: String?
+    let description: String?
+    let icon: NSImage?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                // Favicon/Icon
+                Group {
+                    if let icon = icon {
+                        Image(nsImage: icon)
+                            .resizable()
+                    } else {
+                        Image(systemName: "globe")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.secondary)
+                            .background(Color.white.opacity(0.05))
+                    }
+                }
+                .frame(width: 32, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    if let title = title {
+                        Text(title)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                    } else if isDirectImage, let url = URL(string: item.content ?? "") {
+                        Text(url.lastPathComponent)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                    }
+                    
+                    Text(description ?? "No description")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+            }
+            .padding(.bottom, 4)
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            // Domain Area
+            HStack {
+                if let urlString = item.content,
+                   let domain = LinkPreviewService.shared.extractDomain(from: urlString) {
+                    Label(domain, systemImage: "link")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                // Type Badge
+                URLTypeBadge(isDirectImage: isDirectImage)
+            }
+            .padding(.top, 4)
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+struct URLTypeBadge: View {
+    let isDirectImage: Bool
+    
+    var body: some View {
+        Text(isDirectImage ? "Image Link" : "Website")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .background(Color.black.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+    }
+}

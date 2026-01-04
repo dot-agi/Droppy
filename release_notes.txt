@@ -1,32 +1,19 @@
-# What's New in v3.2.7
+# Release Notes v3.2.7
 
-### ⚡️ Simplified Save & Feedback
-- **Direct Save to Downloads**: Clicking the Save button now instantly saves the file to your Downloads folder, skipping the dialog for a faster workflow.
-- **Success Morph Animations**: The Copy and Save buttons now morph into a green checkmark briefly to provide clear, beautiful confirmation of success.
+### 🚀 Major Improvements to URL Handling
+- **Rich Interactive URL Previews**: Link previews are now fully interactive. Click any preview card to open the link in your default browser.
+- **Auto-Close Clipboard**: For a smoother workflow, the clipboard window now automatically closes after you click a link, letting you focus on your browsing.
+- **Enhanced Preview Metadata**: URL previews now include website snapshots with titles, descriptions, and favicons, providing more context at a glance.
+- **Improved Link Detection**: Smarter plain-text link detection using `NSDataDetector`, allowing Droppy to recognize URLs even when they lack `http://` or `www.`.
+- **Expanded Media Support**: Direct image previews now support `.avif` and `.apng` formats, with improved detection for common image hosting sites.
 
-### 🔗 Link Preview Enhancements
-- **Smarter URL Detection**: Droppy now recognizes links even when they are copied as plain text (e.g., from code editors or terminals).
-- **AVIF Support**: Added support for `.avif` and `.apng` image links.
-- **Better Image Host Support**: Improved detection for direct image links from sites like Postimg and Imgur.
-- Added a loading indicator for URL previews.
+### 🍱 Refined Workspace & UI
+- **20% Wider Clipboard Window**: Increased the maximum width of the clipboard window from 864px to **1040px**. This provides a more spacious layout for rich content and ensures the preview pane feels premium and uncrowded.
+- **Matched Action Badges**: The "Website" and "Image Link" badges have been restyled to exactly match the "Extract Text" button's aesthetic, including its ultra-thin material background, refined overlay, and subtle shadow.
+- **Title Case Badges**: Updated badge labels to a cleaner Title Case for a more modern, integrated appearance.
+- **Borderless Aesthetic**: Removed borders and internal backgrounds from URL previews for a cleaner, glass-like look that blends perfectly with Droppy's design language.
 
-### 🎨 UI Polish
-- **OCR Consistency**: Fixed the button shapes in the "Extracted Text" view to use the app's signature squarcle design instead of pill shapes.
-
-### 🩹 Stability & Performance
-- Fixed a lag when favoriting items by making disk operations asynchronous.
-- Resolved a critical graphics crash in the Hexagon animated background.
-- Fixed a race condition that could cause clipboard history to disappear during app launch.
-- Optimized memory usage for Link Previews with better caching.
-
----
-
-# What's New in v3.2.6
-
-### 💾 Save to File
-- New download button in the clipboard preview pane.
-- Save any clipboard item directly to your disk.
-
-### 🔗 Link Previews
-- URLs now show rich previews with website metadata.
-- Direct image URLs display the image directly.
+### 🧹 Code Health & DX
+- Fixed various compiler warnings related to unused values and results.
+- Optimized MainActor synchronization for smoother UI transitions.
+- Improved coordinate conversion logic in multi-monitor setups.

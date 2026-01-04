@@ -71,6 +71,9 @@ struct ClipboardItem: Identifiable, Codable, Hashable {
         case .file:
             return URL(fileURLWithPath: content ?? "").lastPathComponent
         case .url:
+            if let content = content, LinkPreviewService.shared.isDirectImageURL(content), let url = URL(string: content) {
+                return url.lastPathComponent
+            }
             return content ?? "Link"
         case .color:
             return "Color"
@@ -365,10 +368,14 @@ class ClipboardManager: ObservableObject {
                     // HEURISTIC: Check if this string looks like a URL
                     // This is for apps that put a URL as plain text but don't mark it as .URL type
                     let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let urlPattern = "^(https?://|www\\.)[a-zA-Z0-9\\-\\.]+\\.[a-zA-Z]{2,}(/\\S*)?$"
-                    if let _ = trimmed.range(of: urlPattern, options: [.regularExpression, .caseInsensitive]) {
-                        results.append(ClipboardItem(type: .url, content: trimmed, sourceApp: app, isConcealed: isConcealed))
-                        continue
+                    
+                    if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
+                        let matches = detector.matches(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count))
+                        // If the entire string is a URL, treat it as a URL type
+                        if let firstMatch = matches.first, firstMatch.range.length == trimmed.utf16.count {
+                            results.append(ClipboardItem(type: .url, content: trimmed, sourceApp: app, isConcealed: isConcealed))
+                            continue
+                        }
                     }
                     
                     // Try to capture RTF data if available

@@ -2,20 +2,28 @@ import Foundation
 import AppKit
 import LinkPresentation
 
+struct RichLinkMetadata: Codable {
+    var title: String?
+    var description: String?
+    var image: Data?
+    var icon: Data?
+    var domain: String?
+}
+
 /// Service for fetching and caching link previews for URLs
 class LinkPreviewService {
     static let shared = LinkPreviewService()
     
-    private var metadataCache: [String: LPLinkMetadata] = [:]
+    private var metadataCache: [String: RichLinkMetadata] = [:]
     private var imageCache: [String: NSImage] = [:]
-    private var pendingRequests: [String: Task<LPLinkMetadata?, Never>] = [:]
+    private var pendingRequests: [String: Task<RichLinkMetadata?, Never>] = [:]
     
     private init() {}
     
     // MARK: - Public API
     
-    /// Fetch metadata for a URL using LinkPresentation
-    func fetchMetadata(for urlString: String) async -> LPLinkMetadata? {
+    /// Fetch metadata for a URL using LinkPresentation and URLSession
+    func fetchMetadata(for urlString: String) async -> RichLinkMetadata? {
         // Check cache first
         if let cached = metadataCache[urlString] {
             return cached
@@ -29,23 +37,49 @@ class LinkPreviewService {
         guard let url = URL(string: urlString) else { return nil }
         
         // Create a task for this request
-        let task = Task<LPLinkMetadata?, Never> {
+        let task = Task<RichLinkMetadata?, Never> {
             let provider = LPMetadataProvider()
             provider.timeout = 10
             
             do {
                 let metadata = try await provider.startFetchingMetadata(for: url)
-                await MainActor.run {
-                    self.metadataCache[urlString] = metadata
+                
+                var rich = RichLinkMetadata()
+                rich.title = metadata.title
+                rich.description = metadata.value(forKey: "summary") as? String ?? ""
+                rich.domain = url.host
+                
+                // Try to get image from metadata
+                if let imageProvider = metadata.imageProvider {
+                    rich.image = await withCheckedContinuation { continuation in
+                        imageProvider.loadDataRepresentation(forTypeIdentifier: "public.image") { data, error in
+                            continuation.resume(returning: data)
+                        }
+                    }
+                }
+                
+                // Try to get icon
+                if let iconProvider = metadata.iconProvider {
+                    rich.icon = await withCheckedContinuation { continuation in
+                        iconProvider.loadDataRepresentation(forTypeIdentifier: "public.image") { data, error in
+                            continuation.resume(returning: data)
+                        }
+                    }
+                }
+                
+                _ = await MainActor.run {
+                    self.metadataCache[urlString] = rich
                     self.pendingRequests.removeValue(forKey: urlString)
                 }
-                return metadata
+                return rich
             } catch {
                 _ = await MainActor.run {
                     self.pendingRequests.removeValue(forKey: urlString)
                 }
                 print("LinkPreview Error: \(error.localizedDescription)")
-                return nil
+                
+                // Fallback: Just return basic info
+                return RichLinkMetadata(title: nil, description: nil, image: nil, icon: nil, domain: url.host)
             }
         }
         
@@ -82,12 +116,17 @@ class LinkPreviewService {
         
         guard let url = URL(string: urlString) else { return nil }
         
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 10
+        
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: request)
             
-            // Try to create image from data - some servers don't return proper content-type
+            // Try to create image from data
+            // For AVIF/WEBP, we might need to rely on native support if available
             if let image = NSImage(data: data) {
-                await MainActor.run {
+                _ = await MainActor.run {
                     self.imageCache[urlString] = image
                 }
                 return image

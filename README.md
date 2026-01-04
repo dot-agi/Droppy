@@ -8,7 +8,7 @@
   <strong>The ultimate productivity tool for macOS.</strong><br>
   <em>Notch Shelf • Floating Basket • Clipboard Manager</em><br>
   <br>
-  Designed with ❤️ and pixel-perfect polish. Now featuring a <strong>stunning new App Icon</strong> and a <strong>custom Menu Bar stencil</strong>.
+  Designed with ❤️ and pixel-perfect polish. Now featuring **Rich Interactive URL Previews** and a wider **1040px clipboard workspace**.
 </p>
 
 <p align="center">
@@ -78,9 +78,12 @@ Drag files out of the shelf and drop into any app — email, Discord, Photoshop,
 | **Paste** | `Enter` to paste instantly |
 | **Search** | `Cmd + F` or click the search icon |
 | **Favorite** | Click ⭐ — favorites float to the top |
-| **Extract Text** | Click "Extract Text" on any image to OCR |
-| **Edit** | Click ✏️ to edit text entries inline |
-| **Drag & Drop** | Drag entries directly into any app |
+
+### 📥 Smarter Links
+- **Rich Interactive Previews**: Every URL now shows a detailed snippet with page titles, descriptions, and favicons.
+- **Click to Open**: Click any link preview to jump straight to your browser. The clipboard closes automatically for a seamless workflow.
+- **Direct Image Previews**: Links directly to images (`.png`, `.jpg`, `.avif`, etc.) display the actual image directly in your history.
+- **Smart Detection**: Accurate plain-text link detection (even without `http://`) via `NSDataDetector`.
 
 > **Works everywhere** — even in password fields and Terminal, thanks to low-level hotkey support.
 
@@ -148,28 +151,21 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# What's New in v3.2.6
+# What's New in v3.2.7
 
-### 💾 Save to File
-- New download button in the clipboard preview pane
-- Save any clipboard item directly to your disk:
-  - Images save as PNG/JPG
-  - Text saves as .txt files
-  - Files are copied to your chosen location
-- Full NSSavePanel integration with format selection
+### 🔗 Next-Gen URL Previews
+- **Fully Interactive**: Click any link preview to open it in your browser.
+- **Auto-Close Workflow**: The clipboard window closes instantly upon clicking a link, keeping you focused on your browsing.
+- **Rich Metadata**: Website snapshots with titles, descriptions, favicons, and direct image renders for `.avif`, `.apng`, and more.
+- **Smarter Detection**: Improved plain-text link recognition from text snippets using robust `NSDataDetector` heuristics.
 
-### 🔗 Link Previews
-- URLs now show rich previews with website metadata:
-  - Page title
-  - Domain name
-  - Preview image when available
-- Direct image URLs (`.png`, `.jpg`, `.gif`, etc.) display the image directly
-- Async loading with cached results for fast re-display
+### 🍱 Premium Workspace
+- **Expanded Width**: The clipboard window is now **20% wider (1040px)**, making rich previews look stunning and providing more room for your history.
+- **Refined Badges**: "Website" and "Image Link" badges now match the exact styling of the "Extract Text" button with ultra-thin material backgrounds and shadows.
+- **Borderless Aesthetic**: A cleaner, borderless design for metadata strips that blends perfectly with Droppy's glass UI.
 
-### 🎨 Visual Improvements
-- Save button matches the existing squircle icon button styling
-- Smooth loading states with progress indicators
-- Link preview cards with subtle glass background
+### 🧹 Code Health & DX
+- Resolved various compiler warnings and optimized MainActor synchronization for smoother UI updates.
 <!-- CHANGELOG_END -->
 
 ---
