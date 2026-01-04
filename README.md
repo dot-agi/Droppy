@@ -140,13 +140,12 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Release v3.0.1
+Release v3.0.2
 
 Bug Fixes:
 - Fixed critical objc_release crash in NotchWindowController timer callbacks
 - Fixed objc_release crash in DragMonitor checkForActiveDrag method
-- Improved memory safety by removing problematic autoreleasepool wrappers
-- Fixed visual padding consistency between entries list and action buttons
+- Aligned bottom padding (20pt) between entries list and action buttons for visual consistency
 <!-- CHANGELOG_END -->
 
 ---
