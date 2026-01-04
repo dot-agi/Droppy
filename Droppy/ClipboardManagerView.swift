@@ -457,7 +457,7 @@ struct ClipboardManagerView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 20)
                         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sortedHistory)
                     }
                     .onAppear {
