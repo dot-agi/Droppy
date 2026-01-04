@@ -140,13 +140,13 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Release v3.1.8
+Release v3.1.9
 
-Refinement:
-- **Menu Bar Icon**: Replaced the generic tray with a pixel-perfect stencil of the official Droppy app icon.
+Update:
+- **Menu Bar Icon**: Updated to the latest custom stencil provided by design team (Basket + Checklist).
 
 Previous v3.1.x updates:
-- **Crash Fix**: Optimized drag monitoring stability.
+- **Crash Fixes**: Performance and stability optimizations.
 - **Settings Icon**: Added to empty shelf.
 <!-- CHANGELOG_END -->
 
