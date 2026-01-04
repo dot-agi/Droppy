@@ -148,14 +148,19 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Release v3.1.9
+# What's New in v3.1.9
 
-Update:
-- **Menu Bar Icon**: Updated to the latest custom stencil provided by design team (Basket + Checklist).
+### ❤️ Support Development
+Added a new "Support Development" section in Settings. If you enjoy Droppy, you can now easily buy me a coffee to support the project!
 
-Previous v3.1.x updates:
-- **Crash Fixes**: Performance and stability optimizations.
-- **Settings Icon**: Added to empty shelf.
+### 🎨 UI Refinements
+- **Refined Settings UI**: Improved layout and alignment in the Settings sidebar.
+- **New Update Button**: The "Check for Updates" button has been redesigned to match the modern "Paste" button style inside the clipboard manager.
+- **Cleaner Interface**: Removed redundant icons for a cleaner look.
+
+### 🛠️ Improvements
+- **Repository Cleanup**: Optimized project structure for contributors.
+- **Performance**: Minor under-the-hood optimizations.
 <!-- CHANGELOG_END -->
 
 ---
