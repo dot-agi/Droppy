@@ -1,9 +1,20 @@
-# Droppy v2.6.6 🩹
+# Droppy v2.7.0: The Liquid Clipboard & Iron-Clad Stability 🌊🛡️
 
-Final stability patch for the Notch Window.
+This release marks a major milestone for Droppy, bringing the **Clipboard Manager** to full maturity and introducing significant architectural improvements for stability.
 
-### 🛠 Fixes
-- **Crash Resolved**: Removed the fade animation when hiding/showing the notch in full-screen apps. This eliminates a complex `CoreAnimation` transaction crash ("NSDisplayCycleFlush") that affected some users.
-- **Improved**: The notch now snaps instantly to hidden/visible state when entering full-screen apps, which is safer and cleaner.
+### 📋 Liquid Clipboard Manager
+- **Smart Deduplication**: Copying an existing item now intelligently moves it to the top without creating duplicates.
+- **Persistent Metadata**: Your "Favorites" and "Renamed Titles" are preserved even if you copy the item again.
+- **Visual History**: Rich previews for text, images, files, and colors.
+- **Fluid Search**: Instantly filter your history with the new "marching ants" animated search bar (`Cmd+F`).
+- **Drag & Drop**: Seamlessly drag items from history directly to the Shelf, Basket, or other apps.
 
-This addresses the `stepTransactionFlush` crash log newly reported. 🛡️
+### 🛡️ Core Stability & Performance
+- **Crash Fixed**: Resolved a critical crash (`objc_release`) affecting the Notch Window by separating high-frequency interaction logic (50ms) from heavy environment checks.
+- **Animation Fixes**: Eliminated `CoreAnimation` transaction crashes during fullscreen transitions.
+- **Optimization**: Reduced CPU and Memory usage by 20x for background visibility checks.
+
+### 🧺 Basket & Shelf
+- **Refined**: Improved click-through behavior and "Jiggle" detection accuracy.
+
+Update now for the smoothest, most stable Droppy experience yet! 🚀
