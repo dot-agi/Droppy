@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://i.postimg.cc/PxdpGc3S/appstore.png" alt="Droppy Icon" width="128">
+  <img src="https://i.postimg.cc/9FxZhRf3/1024-mac.webp" alt="Droppy Icon" width="128">
 </p>
 
 <h1 align="center">Droppy</h1>
