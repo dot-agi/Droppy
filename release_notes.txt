@@ -1,10 +1,12 @@
-Release v3.0.3
+Release v3.0.5
 
-New Features:
-- Smooth scroll-to-top animation when favoriting items - the view now follows the item as it moves to the favorites section
+Improvements:
+- Enhanced favorite scroll animation for smoother, more reliable scrolling when favoriting items
+- Animation now uses easeInOut timing for better coordination with list reordering
 
 Bug Fixes:
-- Fixed critical objc_release crash in NotchWindowController timer callbacks
-- Fixed objc_release crash in DragMonitor checkForActiveDrag method
-- Aligned bottom padding between entries list and action buttons for visual consistency
+- Fixed persistent objc_release crash in NotchWindowController with additional safety checks
+- Added contentView validation before timer callbacks
+- Improved isValid flag management to prevent crashes during window deallocation
+- Fixed objc_release crash in DragMonitor
 

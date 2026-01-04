@@ -433,8 +433,8 @@ struct ClipboardManagerView: View {
                                             manager.toggleFavorite(item)
                                             // Scroll to the item after it moves to favorites section
                                             if willBeFavorite {
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                                    withAnimation(.easeInOut(duration: 0.4)) {
                                                         scrollProxy?.scrollTo(item.id, anchor: .top)
                                                     }
                                                 }
@@ -1144,8 +1144,8 @@ struct ClipboardPreviewView: View {
                     manager.toggleFavorite(item)
                     // Scroll to the item after it moves to favorites section
                     if willBeFavorite {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            withAnimation(.easeInOut(duration: 0.4)) {
                                 scrollProxy?.scrollTo(item.id, anchor: .top)
                             }
                         }

@@ -119,6 +119,11 @@ final class NotchWindowController: NSObject, ObservableObject {
                 timer.invalidate()
                 return
             }
+            // Additional safety: verify window has a contentView before calling
+            guard window.contentView != nil else {
+                timer.invalidate()
+                return
+            }
             // Call on main thread without autoreleasepool to avoid objc_release crashes
             window.updateMouseEventHandling()
         }
@@ -259,32 +264,38 @@ class NotchWindow: NSWindow {
     }
     
     func updateMouseEventHandling() {
-        // Early exit if window is being deallocated or not on main thread
+        // Critical: Early exit if window is being deallocated
         guard isValid else { return }
+        
+        // Must be on main thread
         guard Thread.isMainThread else { return }
         
-        // Additional safety: check if window itself is still accessible
-        guard self.contentView != nil else { return }
+        // Verify window is still valid before any property access
+        guard self.contentView != nil else {
+            isValid = false
+            return
+        }
         
-        // Capture state values directly and safely
-        let isExpanded = DroppyState.shared.isExpanded
-        let isHovering = DroppyState.shared.isMouseHovering
-        let isDragging = DragMonitor.shared.isDragging
-        let isDropTargeted = DroppyState.shared.isDropTargeted
+        // Safely capture state - avoid accessing shared singletons if they might be nil
+        // Use local variables to minimize property access time
+        let state = DroppyState.shared
+        let dragMonitor = DragMonitor.shared
+        
+        let isExpanded = state.isExpanded
+        let isHovering = state.isMouseHovering
+        let isDragging = dragMonitor.isDragging
+        let isDropTargeted = state.isDropTargeted
         
         // Window should accept mouse events when:
         // - Shelf is expanded (need to interact with items)
         // - User is hovering over notch (need click to open)
         // - Files are being dragged (need to accept drops)
-        // Note: Basket being visible doesn't block notch - they work independently
         let shouldAcceptEvents = isExpanded || isHovering || isDragging || isDropTargeted
         
+        // Only update if the value actually needs to change
         if self.ignoresMouseEvents == shouldAcceptEvents {
             self.ignoresMouseEvents = !shouldAcceptEvents
         }
-        
-        // Check for fullscreen apps (games/videos) - Now handled by separate timer
-        // checkForFullscreen() 
     }
     
     func checkForFullscreen() {
