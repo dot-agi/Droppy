@@ -139,18 +139,14 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Clipboard Manager - Production Ready!
+Hotfix Release
+
+Fixes:
+- Fixed clipboard history not loading after update (backwards compatibility)
+- Fixed crash in NotchWindow related to objc_release
 
 Features:
-- Clipboard Manager moved out of Beta into dedicated settings tab
-- App Exclusions: Exclude specific apps from clipboard history (Settings → Clipboard → Excluded Apps)
-- Skip Passwords: Optional toggle to skip recording passwords from password managers
-- New Clipboard tab in Settings with proper production UI
-
-Improvements:
-- Removed Beta section from Settings
-- Cleaner app picker with proper icon filtering
-- All settings persist across restarts and reboots
+- Password entries now show a key icon in clipboard history
 <!-- CHANGELOG_END -->
 
 ---
