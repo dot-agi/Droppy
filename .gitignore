@@ -16,8 +16,10 @@ build_check/
 *.ipa
 *.pkg
 
+
 *.log
 build_output*.txt
+build_log*.txt
 
 # Pods
 Pods/
