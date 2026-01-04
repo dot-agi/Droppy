@@ -140,17 +140,15 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-Release v3.0.5
+Release v3.1
 
-Improvements:
-- Enhanced favorite scroll animation for smoother, more reliable scrolling when favoriting items
-- Animation now uses easeInOut timing for better coordination with list reordering
+Features:
+- **Download Stats**: Secure, privacy-first download counting is now live in Settings > About. We track installs, not people.
+- **Improved Clipboard**: Smarter deduplication logic now correctly handles multiple screenshots, ensuring no data loss while keeping your history clean.
 
-Bug Fixes:
-- Fixed persistent objc_release crash in NotchWindowController with additional safety checks
-- Added contentView validation before timer callbacks
-- Improved isValid flag management to prevent crashes during window deallocation
-- Fixed objc_release crash in DragMonitor
+Polish:
+- **UI Refinements**: Cleaner layout for the About section in Settings.
+- **Clarity**: Updated descriptions for transparency settings to better reflect what's being affected (Shelf, Notch, Clipboard, Notifications).
 <!-- CHANGELOG_END -->
 
 ---
