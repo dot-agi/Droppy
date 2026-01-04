@@ -6,7 +6,9 @@
 
 <p align="center">
   <strong>The ultimate drag-and-drop file shelf for macOS.</strong><br>
-  <em>"It feels like it should have been there all along."</em>
+  <em>"It feels like it should have been there all along."</em><br>
+  <br>
+  Designed with ❤️ and pixel-perfect polish. Now featuring a <strong>stunning new App Icon</strong> and a <strong>custom Menu Bar stencil</strong>.
 </p>
 
 <p align="center">
