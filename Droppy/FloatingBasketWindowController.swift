@@ -85,9 +85,14 @@ final class FloatingBasketWindowController: NSObject {
         let deltaY = abs(currentFrame.origin.y - newFrame.origin.y)
         if deltaX < 1.0 && deltaY < 1.0 { return }
         
-        // DIRECT UPDATE: Avoid NSAnimationContext.runAnimationGroup as it can cause 
-        // CA::Transaction::flush related crashes during rapid window movements.
-        panel.setFrame(newFrame, display: true)
+        // SMOOTH ANIMATION: Re-introducing animation context with stability focus.
+        // The crash was primarily due to window destruction during animation.
+        // Movement is safe; hideBasket still uses direct updates + delayed nil-ing.
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4 // Slower for "woosh" / "fly" feel
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(newFrame, display: true)
+        }, completionHandler: nil)
         
         panel.orderFrontRegardless()
     }
@@ -174,9 +179,15 @@ final class FloatingBasketWindowController: NSObject {
         DroppyState.shared.isDropTargeted = false
         DroppyState.shared.isBasketVisible = true
         
-        // DIRECT UPDATE: Avoid NSAnimationContext for initial visibility to prevent
-        // display cycle race conditions.
-        panel.alphaValue = 1.0
+        // SMOOTH FADE-IN: Restoring visual polish
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1.0
+        }, completionHandler: nil)
         
         basketWindow = panel
         isShowingOrHiding = false
