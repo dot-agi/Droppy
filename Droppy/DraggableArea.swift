@@ -49,6 +49,11 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
     private var hostingView: NSHostingView<Content>
     private var mouseDownEvent: NSEvent?
     
+    /// CRITICAL: Retain drag preview images for the duration of the drag session.
+    /// Without this, Core Animation may try to release images that ARC has already deallocated,
+    /// causing crashes in RB::SurfacePool::collect / release_image.
+    private var dragSessionImages: [NSImage] = []
+    
     init(rootView: Content, items: @escaping () -> [NSPasteboardWriting], onTap: @escaping (NSEvent.ModifierFlags) -> Void, onRightClick: @escaping () -> Void) {
         self.items = items
         self.onTap = onTap
@@ -117,7 +122,11 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
         let pasteboardItems = items()
         guard !pasteboardItems.isEmpty else { return }
         
-        let draggingItems = pasteboardItems.enumerated().compactMap { (index, writer) -> NSDraggingItem? in
+        // Clear any images from previous drag session
+        dragSessionImages.removeAll()
+        
+        let draggingItems = pasteboardItems.enumerated().compactMap { [weak self] (index, writer) -> NSDraggingItem? in
+            guard let self = self else { return nil }
             let dragItem = NSDraggingItem(pasteboardWriter: writer)
             
             // Try to generate a preview icon if it looks like a file
@@ -184,6 +193,9 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
             
             guard let validImage = usedImage else { return nil }
             
+            // CRITICAL: Retain the image for the drag session duration
+            self.dragSessionImages.append(validImage)
+            
             // Calculate frame centered on the view, with offset for multiple items
             let center = CGPoint(x: self.hostingView.bounds.midX, y: self.hostingView.bounds.midY)
             // Offset for stack effect (up and to the left/right)
@@ -211,5 +223,10 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
     
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         return .every
+    }
+    
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        // Release retained images now that drag session is complete
+        dragSessionImages.removeAll()
     }
 }
