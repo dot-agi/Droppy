@@ -151,9 +151,13 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-## 🛠 Hotfix
+## 🛠 Features
 
-- **Critical Fix**: Resolved a crash (`IOHIDQueueCopyNextValue`) causing the app to quit unexpectedly for some users. This was due to improper cleanup of event monitoring resources.
+- **Dynamic Notch Positioning**: The visual notch now automatically recenters itself when you change screen resolutions or dock/undock your MacBook.
+
+## 🛠 Fixes
+
+- Resolved an issue where the notch could get stuck in the middle of the screen after resolution changes.
 <!-- CHANGELOG_END -->
 
 ---
