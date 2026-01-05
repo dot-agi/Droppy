@@ -135,6 +135,37 @@ final class NotchWindowController: NSObject, ObservableObject {
             self?.handleMouseEvent(event)
             return event
         }
+        
+        // 3. Monitor screen parameter changes (resolution, docking)
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                print("📺 Screen parameters changed - Updating Notch Window Frame")
+                self?.updateWindowFrame()
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Updates the window frame to center it on the current screen
+    private func updateWindowFrame() {
+        guard let window = notchWindow, let screen = NSScreen.main else { return }
+        
+        // Use same dimensions as setup
+        let windowWidth: CGFloat = 500
+        let windowHeight: CGFloat = 200
+        
+        // Recalculate position based on new screen dimensions
+        let xPosition = (screen.frame.width - windowWidth) / 2
+        let yPosition = screen.frame.height - windowHeight
+        
+        let newFrame = NSRect(
+            x: xPosition,
+            y: yPosition,
+            width: windowWidth,
+            height: windowHeight
+        )
+        
+        window.setFrame(newFrame, display: true)
     }
     
     private func fullscreenMonitorLoop() {
