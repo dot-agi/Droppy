@@ -163,10 +163,11 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-v4.4.6 - Stability Hotfix
+v4.4.7 - Visual Polish
 
-Fixes:
-- Fixed crash in brightness monitoring on certain display configurations
+Improvements:
+- Updated shelf control buttons (collapse/trash/settings) to use Liquid Glass style matching macOS 26 Tahoe aesthetic
+- Updated clipboard manager preview GIF
 <!-- CHANGELOG_END -->
 
 ---
