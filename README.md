@@ -163,15 +163,10 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-v4.4.3 - Code Quality Update
-
-Improvements:
-- Resolved all compiler deprecation warnings for macOS 15 compatibility
-- Updated video compression to use modern AVURLAsset API
-- Cleaned up unused variables and optimized code
+v4.4.4 - Stability Hotfix
 
 Fixes:
-- Share menu now works correctly in context menus (shelf, basket)
+- Fixed crash in clipboard monitoring (objc_release) that could occur during rapid pasteboard changes
 <!-- CHANGELOG_END -->
 
 ---
