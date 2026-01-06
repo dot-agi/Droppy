@@ -163,15 +163,11 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Droppy v4.5.4 - Update Stability
+## v4.6 - Appearance Consistency Update
 
-## 🐛 Fixes
-
-- **Fixed "App is damaged" error after updating** — The update process now removes the macOS quarantine attribute, preventing Gatekeeper from blocking the newly installed app.
-
----
-
-*If you previously had issues updating, this fix will apply once you install this version.*
+### Fixed
+- Transparent background setting now only applies to windows (Settings, Clipboard, Update) and not the shelf/notch, which always stays solid black for a cleaner look
+- Updated setting description to clarify behavior: "Use glass effect for windows (not shelf)"
 <!-- CHANGELOG_END -->
 
 ---
