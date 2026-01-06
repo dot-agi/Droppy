@@ -163,12 +163,10 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-v4.4.5 - External Display & Keyboard Fixes
+v4.4.6 - Stability Hotfix
 
 Fixes:
-- Volume/Brightness HUD now appears on external displays even when "hide notch" is enabled
-- Brightness controls now correctly target laptop's built-in display when docked
-- Improved external keyboard media key handling for volume/brightness controls
+- Fixed crash in brightness monitoring on certain display configurations
 <!-- CHANGELOG_END -->
 
 ---
