@@ -169,48 +169,44 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-## Version 4.7.7 - Battery HUD & Auto-Update Improvements
+# Version 4.7.7 - Battery HUD & Auto-Update Improvements
 
-### ✨ New Features
+## ✨ New Features
 
-- **🔋 Battery Charging HUD**: Beautiful animated indicator appears when you plug in/unplug your charger or when battery is low. Green pulsing icon during charging, orange for low battery. Toggle in Settings > System HUD.
+### 🔋 Battery Charging HUD
+Beautiful animated indicator that appears when you plug in or unplug your charger, or when battery reaches low levels.
+- **Green pulsing icon** during charging
+- **Orange indicator** for low battery warnings
+- Perfectly aligned with volume/brightness HUD styling
+- Toggle on/off in Settings > System HUD
 
-### 🐛 Bug Fixes
+## 🐛 Bug Fixes
 
-- **Fixed brightness HUD false triggers**: The brightness HUD no longer randomly appears during environment changes, power state changes, or auto-brightness adjustments. Now only triggers when you manually press brightness keys.
-- **Fixed auto-update failures**: Complete rewrite of the update script with:
-  - Proper process termination by PID (no more "can't delete old app" errors)
-  - Automatic admin privilege request if needed
-  - Friendly error messages with manual fallback instructions
-  - Reliable cleanup of temporary files
+### Brightness HUD False Triggers Fixed
+The brightness HUD no longer randomly appears during:
+- Environment lighting changes (auto-brightness)
+- Power state changes (plugging in/unplugging charger)
+- Other automatic brightness adjustments
 
-### 🔧 Improvements
+Now **only triggers when you manually press the brightness keys (F1/F2)**.
 
-- **Battery HUD sizing**: Perfectly aligned icon and percentage with consistent spacing matching volume/brightness HUD
-- **Swift 6 compatibility**: Fixed async/await warnings for Swift 6 language mode
+### Auto-Update Failures Fixed
+Complete rewrite of the update system to be bulletproof:
+- **Proper process termination**: Kills the old app by PID instead of hoping it closes
+- **Admin privilege fallback**: Automatically requests admin password if regular delete fails
+- **Friendly error messages**: Clear instructions if something goes wrong
+- **Manual fallback**: Opens Applications folder and DMG with instructions if auto-update fails
+- **Reliable cleanup**: Always cleans up temporary files, even on failure
+
+## 🔧 Improvements
+
+- **Battery HUD sizing**: Icon (18pt) and percentage (15pt) match volume/brightness HUD exactly
+- **Consistent spacing**: Horizontal padding matches vertical padding for perfect visual balance
+- **Swift 6 compatibility**: Fixed async/await warnings for future Swift 6 language mode
 
 ---
 
-## Version 4.7.6 - Zero Obstruction Fix
-
-### 🐛 Bug Fixes
-
-- **Fixed invisible area blocking interactions below the notch**: When dragging files anywhere on screen, Droppy was previously blocking a large invisible region below the physical notch. This caused issues with:
-  - Chrome bookmarks bar (couldn't drop bookmarks in the center)
-  - Safari URL bar interactions
-  - Other apps with UI elements positioned below the menu bar
-
-### 🔧 Technical Details
-
-The fix changes how Droppy handles mouse event interception during drag operations:
-
-- **Before**: When ANY drag started anywhere on screen, the entire 500×200 pixel notch window would capture mouse events, blocking underlying apps
-- **After**: The window now only captures events when:
-  1. The shelf is expanded (interacting with items)
-  2. User is hovering directly over the notch
-  3. The drag is **actively targeting** the notch area (`isDropTargeted`)
-
-This leverages macOS's native drag-and-drop broadcasting system - registered drag destinations receive events regardless of `ignoresMouseEvents`, so dropping files onto the notch still works perfectly while no longer blocking other apps.
+This update focuses on reliability and polish. The new Battery HUD brings awareness to your charging status without being intrusive, while the auto-update fix ensures smooth updates for all users regardless of their permission setup.
 <!-- CHANGELOG_END -->
 
 ---
