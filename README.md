@@ -163,44 +163,26 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Droppy 4.7.5 - Memory & Performance Optimization
+## Version 4.7.6 - Zero Obstruction Fix
 
-## 🚀 Major Performance Improvements
+### 🐛 Bug Fixes
 
-### Memory Usage (Up to 95% Reduction)
-- **Disk-based image storage**: Clipboard images are now stored on disk instead of in RAM
-  - Before: All images loaded in memory (~2-3GB with 50+ images)
-  - After: Only thumbnails loaded on-demand (~100-250MB typical)
-- **Automatic migration**: Existing clipboard entries are automatically migrated on first launch
-- **No data loss**: All existing clipboard history is preserved
+- **Fixed invisible area blocking interactions below the notch**: When dragging files anywhere on screen, Droppy was previously blocking a large invisible region below the physical notch. This caused issues with:
+  - Chrome bookmarks bar (couldn't drop bookmarks in the center)
+  - Safari URL bar interactions
+  - Other apps with UI elements positioned below the menu bar
 
-### CPU Optimization (Smoother Scrolling)
-- **Async thumbnail loading**: Thumbnails now load in background threads, eliminating scroll lag
-- **Cached sorted history**: Filter/sort operations now run only when data changes, not on every frame
-- **Reduced main thread blocking**: Image decoding moved off the main thread
+### 🔧 Technical Details
 
-## 🔧 Technical Improvements
+The fix changes how Droppy handles mouse event interception during drag operations:
 
-### Clipboard System
-- New `ThumbnailCache` system using NSCache for efficient memory management
-- Image files stored in `~/Library/Application Support/Droppy/images/`
-- Automatic cleanup when items are deleted or history limit is reached
-- Image compression for new entries (JPEG 80% quality, max 1MB)
+- **Before**: When ANY drag started anywhere on screen, the entire 500×200 pixel notch window would capture mouse events, blocking underlying apps
+- **After**: The window now only captures events when:
+  1. The shelf is expanded (interacting with items)
+  2. User is hovering directly over the notch
+  3. The drag is **actively targeting** the notch area (`isDropTargeted`)
 
-### Link Preview Service
-- Converted Dictionary caches to NSCache with automatic eviction
-- Limits: 50 metadata entries, 30 images (auto-evicts under memory pressure)
-
-### Brightness Manager
-- Increased polling interval from 250ms to 500ms
-- Added mutex to prevent XPC race conditions and crashes
-
-## 📋 What's Changed
-- Added: `ThumbnailCache.swift` - New thumbnail caching system
-- Modified: `ClipboardManager.swift` - Disk-based image storage & migration
-- Modified: `ClipboardManagerView.swift` - Async thumbnails & cached sorted history
-- Modified: `LinkPreviewService.swift` - NSCache for memory efficiency
-- Modified: `BrightnessManager.swift` - Improved polling stability
+This leverages macOS's native drag-and-drop broadcasting system - registered drag destinations receive events regardless of `ignoresMouseEvents`, so dropping files onto the notch still works perfectly while no longer blocking other apps.
 <!-- CHANGELOG_END -->
 
 ---
