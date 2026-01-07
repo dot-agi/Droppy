@@ -340,7 +340,7 @@ struct SettingsView: View {
                 }
                 
                 if showMediaPlayer {
-                    FeaturePreviewGIF(url: "https://i.postimg.cc/wM52HXm6/Schermopname2026-01-05om21-48-08-ezgif-com-video-to-gif-converter.gif")
+                    FeaturePreviewGIF(url: "https://i.postimg.cc/SKjDMGrP/Schermopname2026-01-07om15-17-29-ezgif-com-video-to-gif-converter.gif")
                     
                     Toggle(isOn: $autoFadeMediaHUD) {
                         VStack(alignment: .leading) {
@@ -389,7 +389,7 @@ struct SettingsView: View {
                 }
                 
                 if enableHUDReplacement {
-                    FeaturePreviewGIF(url: "https://i.postimg.cc/hG22QtJ8/Schermopname2026-01-05om19-08-22-ezgif-com-video-to-gif-converter.gif")
+                    FeaturePreviewGIF(url: "https://i.postimg.cc/qqQ3wPMV/Schermopname2026-01-07om15-20-48-ezgif-com-video-to-gif-converter.gif")
                 }
             } header: {
                 Text("System HUD")
@@ -1112,9 +1112,9 @@ class GIFPreloader {
         // Floating Basket
         "https://i.postimg.cc/dtHH09fB/Schermopname2026-01-05om22-01-22-ezgif-com-video-to-gif-converter.gif",
         // Media Player
-        "https://i.postimg.cc/wM52HXm6/Schermopname2026-01-05om21-48-08-ezgif-com-video-to-gif-converter.gif",
+        "https://i.postimg.cc/SKjDMGrP/Schermopname2026-01-07om15-17-29-ezgif-com-video-to-gif-converter.gif",
         // HUDs
-        "https://i.postimg.cc/hG22QtJ8/Schermopname2026-01-05om19-08-22-ezgif-com-video-to-gif-converter.gif",
+        "https://i.postimg.cc/qqQ3wPMV/Schermopname2026-01-07om15-20-48-ezgif-com-video-to-gif-converter.gif",
         // Clipboard Manager (CRITICAL: was missing!)
         "https://i.postimg.cc/Kvc9c2Kr/Schermopname2026-01-06om18-05-02-ezgif-com-video-to-gif-converter.gif"
     ]
