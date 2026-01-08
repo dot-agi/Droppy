@@ -191,13 +191,34 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Version 4.8.7 - USB Audio Polish
+# Version 4.9 - Alfred Integration
 
-## 🔧 Improvements
+## 🆕 New Features
 
-### 🔊 USB Audio Fix Polish
-- **Main thread protection** - osascript fallback no longer blocks UI
-- **Simplified debounce logic** - Cleaner cancellation handling
+### 🔮 Alfred Integration
+- **Push files to Droppy from Alfred** - Select files in Finder, invoke Alfred, and send them directly to Droppy
+- **Two file actions** - Choose between "Add to Droppy Shelf" (notch) or "Add to Droppy Basket" (floating)
+- **One-click install** - Open Settings → About → click "Install in Alfred" — workflow imports instantly
+- **URL scheme support** - External apps can use `droppy://add?target=shelf&path=/path/to/file` to push files programmatically
+- **Fully bundled** - Alfred workflow included in the app, no external downloads needed
+
+### 🛠️ Under the Hood
+- **New `droppy://` URL scheme** - Enables third-party integrations and automation
+- **URLSchemeHandler** - Robust URL parsing with full path decoding support
+- **Alfred icon in Settings** - Beautiful native integration UI with instant icon loading
+
+## 📖 How to Use
+
+1. Open **Droppy Settings** → **About**
+2. Click **"Install in Alfred"**
+3. Select files in Finder → Alfred → "Actions"
+4. Choose **Add to Droppy Shelf** or **Add to Droppy Basket**
+
+Files appear in Droppy instantly!
+
+---
+
+*Requires Alfred 4+ with Powerpack*
 <!-- CHANGELOG_END -->
 
 ---
