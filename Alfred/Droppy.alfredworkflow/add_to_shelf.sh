@@ -7,8 +7,8 @@
 url="droppy://add?target=shelf"
 
 for file in "$@"; do
-    # URL-encode the path (basic encoding for spaces and special chars)
-    encoded_path=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$file', safe=''))")
+    # URL-encode the path safely using stdin (handles quotes and special chars)
+    encoded_path=$(echo -n "$file" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=''))")
     url="${url}&path=${encoded_path}"
 done
 

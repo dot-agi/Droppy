@@ -2,7 +2,7 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
-    @State private var selectedTab: String? = "General"
+    @State private var selectedTab: String? = "Features"
     @AppStorage("showInMenuBar") private var showInMenuBar = true
     @AppStorage("startAtLogin") private var startAtLogin = false
     @AppStorage("useTransparentBackground") private var useTransparentBackground = false
@@ -29,23 +29,24 @@ struct SettingsView: View {
     @State private var isUpdateHovering = false
     
     // Hover states for sidebar items
-    @State private var hoverGeneral = false
+    @State private var hoverFeatures = false
     @State private var hoverClipboard = false
-    @State private var hoverDisplay = false
-    @State private var hoverAccessibility = false
+    @State private var hoverAppearance = false
+    @State private var hoverIndicators = false
     @State private var hoverAbout = false
     @State private var isCoffeeHovering = false
+    @State private var isAlfredHovering = false
     @State private var scrollOffset: CGFloat = 0
     
     var body: some View {
         ZStack {
             NavigationSplitView {
                 VStack(spacing: 6) {
-                    sidebarButton(title: "General", icon: "gear", tag: "General", isHovering: $hoverGeneral)
+                    sidebarButton(title: "Features", icon: "star.fill", tag: "Features", isHovering: $hoverFeatures)
                     sidebarButton(title: "Clipboard", icon: "doc.on.clipboard", tag: "Clipboard", isHovering: $hoverClipboard)
-                    sidebarButton(title: "Display", icon: "display", tag: "Display", isHovering: $hoverDisplay)
-                    sidebarButton(title: "Accessibility", icon: "accessibility", tag: "Accessibility", isHovering: $hoverAccessibility)
-                    sidebarButton(title: "About Droppy", icon: "info.circle", tag: "About Droppy", isHovering: $hoverAbout)
+                    sidebarButton(title: "Appearance", icon: "paintbrush.fill", tag: "Appearance", isHovering: $hoverAppearance)
+                    sidebarButton(title: "Indicators", icon: "hand.point.up.left.fill", tag: "Indicators", isHovering: $hoverIndicators)
+                    sidebarButton(title: "About", icon: "info.circle.fill", tag: "About", isHovering: $hoverAbout)
                     
                     Spacer()
                     
@@ -82,15 +83,15 @@ struct SettingsView: View {
             } detail: {
                 ZStack(alignment: .top) {
                     Form {
-                        if selectedTab == "General" {
-                            generalSettings
+                        if selectedTab == "Features" {
+                            featuresSettings
                         } else if selectedTab == "Clipboard" {
                             clipboardSettings
-                        } else if selectedTab == "Display" {
-                            displaySettings
-                        } else if selectedTab == "Accessibility" {
-                            accessibilitySettings
-                        } else if selectedTab == "About Droppy" {
+                        } else if selectedTab == "Appearance" {
+                            appearanceSettings
+                        } else if selectedTab == "Indicators" {
+                            indicatorsSettings
+                        } else if selectedTab == "About" {
                             aboutSettings
                         }
                     }
@@ -181,9 +182,9 @@ struct SettingsView: View {
     
     // MARK: - Sections
     
-    private var generalSettings: some View {
+    private var featuresSettings: some View {
         Group {
-            // MARK: System Section
+            // MARK: Startup Section
             Section {
                 Toggle(isOn: $showInMenuBar) {
                     VStack(alignment: .leading) {
@@ -209,7 +210,7 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("System")
+                Text("Startup")
             }
             
             // MARK: Drop Zones Section
@@ -259,63 +260,6 @@ struct SettingsView: View {
                 Text("Drop Zones")
             } footer: {
                 Text("Enable one or both drop zones to hold files temporarily.")
-            }
-        }
-    }
-    
-    private var displaySettings: some View {
-        Group {
-            // MARK: Appearance
-            Section {
-                Toggle(isOn: $useTransparentBackground) {
-                    VStack(alignment: .leading) {
-                        Text("Transparent Background")
-                        Text("Use glass effect for windows (not shelf)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                Toggle(isOn: $hideNotchOnExternalDisplays) {
-                    VStack(alignment: .leading) {
-                        Text("Hide on External Displays")
-                        Text("Disable notch shelf on external monitors")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Appearance")
-            }
-            
-            // MARK: Shelf Behavior
-            Section {
-                Toggle(isOn: $autoShrinkShelf) {
-                    VStack(alignment: .leading) {
-                        Text("Auto-Collapse")
-                        Text("Shrink shelf when mouse leaves")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                if autoShrinkShelf {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Collapse Delay")
-                            Spacer()
-                            Text("\(autoShrinkDelay)s")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        Slider(value: Binding(
-                            get: { Double(autoShrinkDelay) },
-                            set: { autoShrinkDelay = Int($0) }
-                        ), in: 1...10, step: 1)
-                    }
-                }
-            } header: {
-                Text("Shelf Behavior")
             }
             
             // MARK: Media Player
@@ -387,7 +331,7 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
             } header: {
-                Text("Media Player")
+                Text("Media")
             }
             
             // MARK: System HUD
@@ -442,62 +386,11 @@ struct SettingsView: View {
                     FeaturePreviewGIF(url: "https://i.postimg.cc/Fznd6bvv/Schermopname2026-01-07om22-36-08-ezgif-com-video-to-gif-converter.gif")
                 }
             } header: {
-                Text("System HUD")
+                Text("System HUDs")
             } footer: {
                 Text("Requires Accessibility permissions to intercept media keys.")
             }
-        }
-    }
-    
-    private var accessibilitySettings: some View {
-        Group {
-            Section {
-                Toggle(isOn: $showClipboardButton) {
-                    VStack(alignment: .leading) {
-                        Text("Clipboard Button")
-                        Text("Show button to open clipboard in shelf and basket")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                Toggle(isOn: $showOpenShelfIndicator) {
-                    VStack(alignment: .leading) {
-                        Text("Open Shelf Indicator")
-                        Text("Show \"Open Shelf\" tooltip when hovering over notch")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                if showOpenShelfIndicator {
-                    FeaturePreviewImage(url: "https://i.postimg.cc/8CcLwcLd/image.png")
-                }
-                
-                Toggle(isOn: $showDropIndicator) {
-                    VStack(alignment: .leading) {
-                        Text("Drop Indicator")
-                        Text("Show \"Drop!\" tooltip when dragging files over notch")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                if showDropIndicator {
-                    FeaturePreviewImage(url: "https://i.postimg.cc/RhL3vxcz/image.png")
-                }
-            } header: {
-                Text("Interface Helpers")
-            } footer: {
-                Text("Show or hide visual hints and quick-access buttons.")
-            }
-        }
-    }
-    
-    @State private var isAlfredHovering = false
-    
-    private var aboutSettings: some View {
-        Group {
+            
             // MARK: Alfred Integration
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -556,7 +449,113 @@ struct SettingsView: View {
             } footer: {
                 Text("Requires Alfred 4+ with Powerpack.")
             }
+        }
+    }
+    
+    private var appearanceSettings: some View {
+        Group {
+            // MARK: Visual Style
+            Section {
+                Toggle(isOn: $useTransparentBackground) {
+                    VStack(alignment: .leading) {
+                        Text("Transparent Background")
+                        Text("Use glass effect for windows (not shelf)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Toggle(isOn: $hideNotchOnExternalDisplays) {
+                    VStack(alignment: .leading) {
+                        Text("Hide on External Displays")
+                        Text("Disable notch shelf on external monitors")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Visual Style")
+            }
             
+            // MARK: Shelf Behavior
+            Section {
+                Toggle(isOn: $autoShrinkShelf) {
+                    VStack(alignment: .leading) {
+                        Text("Auto-Collapse")
+                        Text("Shrink shelf when mouse leaves")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if autoShrinkShelf {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Collapse Delay")
+                            Spacer()
+                            Text("\(autoShrinkDelay)s")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { Double(autoShrinkDelay) },
+                            set: { autoShrinkDelay = Int($0) }
+                        ), in: 1...10, step: 1)
+                    }
+                }
+            } header: {
+                Text("Shelf Behavior")
+            }
+        }
+    }
+    
+    private var indicatorsSettings: some View {
+        Group {
+            Section {
+                Toggle(isOn: $showClipboardButton) {
+                    VStack(alignment: .leading) {
+                        Text("Clipboard Button")
+                        Text("Show button to open clipboard in shelf and basket")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Toggle(isOn: $showOpenShelfIndicator) {
+                    VStack(alignment: .leading) {
+                        Text("Open Shelf Indicator")
+                        Text("Show \"Open Shelf\" tooltip when hovering over notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if showOpenShelfIndicator {
+                    FeaturePreviewImage(url: "https://i.postimg.cc/8CcLwcLd/image.png")
+                }
+                
+                Toggle(isOn: $showDropIndicator) {
+                    VStack(alignment: .leading) {
+                        Text("Drop Indicator")
+                        Text("Show \"Drop!\" tooltip when dragging files over notch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if showDropIndicator {
+                    FeaturePreviewImage(url: "https://i.postimg.cc/RhL3vxcz/image.png")
+                }
+            } header: {
+                Text("Visual Hints")
+            } footer: {
+                Text("Show or hide visual hints and quick-access buttons.")
+            }
+        }
+    }
+    
+    private var aboutSettings: some View {
+        Group {
             // MARK: About
             Section {
             VStack(alignment: .leading) {
