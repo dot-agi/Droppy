@@ -169,16 +169,13 @@ brew install --cask iordv/tap/droppy
 
 ## 🆕 What's New
 <!-- CHANGELOG_START -->
-# Version 4.8.6 - USB Audio Speed Fix
+# Version 4.8.7 - USB Audio Polish
 
 ## 🔧 Improvements
 
-### 🔊 Faster Volume Control for USB Audio Devices
-- **Debounced volume changes** - Rapid key presses now coalesce to single operation
-- **Eliminated delay buildup** - Previous 1-3 second delays from queue buildup are gone
-- **50ms smart debounce** - Waits for rapid presses to stop before applying final volume
-
-This specifically improves volume control speed when using virtual audio routing (like BlackHole) with USB speakers.
+### 🔊 USB Audio Fix Polish
+- **Main thread protection** - osascript fallback no longer blocks UI
+- **Simplified debounce logic** - Cleaner cancellation handling
 <!-- CHANGELOG_END -->
 
 ---
