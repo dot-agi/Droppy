@@ -47,11 +47,11 @@
 
 The essentials — what you see in the demo above:
 
-| | Feature | Description |
-|:--|:--------|:------------|
-| 🗂️ | **Notch Shelf** | Drag files to your notch — they vanish into a sleek shelf, ready when you need them |
-| 🧺 | **Floating Basket** | Jiggle your mouse while dragging to summon a basket anywhere on screen |
-| ⚡ | **Quick Actions** | Right-click any file for instant access to compress, convert, OCR, move, share, and more |
+| Feature | Description |
+|:--------|:------------|
+| **Notch Shelf** | Drag files to your notch — they vanish into a sleek shelf, ready when you need them |
+| **Floating Basket** | Jiggle your mouse while dragging to summon a basket anywhere on screen |
+| **Quick Actions** | Right-click any file for instant access to compress, convert, OCR, move, share, and more |
 
 ---
 
@@ -59,18 +59,18 @@ The essentials — what you see in the demo above:
 
 Everything Droppy can do:
 
-| | Feature | Description |
-|:--|:--------|:------------|
-| � | **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
-| 🎵 | **Media Player** | Now Playing controls in your notch with album art and seek slider |
-| 🔊 | **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
-| 📁 | **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
-| � | **Smart Compression** | Compress images, PDFs, and videos with auto or target size options — keeps originals if larger |
-| ✏️ | **Fast Actions** | Convert images, extract text (OCR), create ZIPs, rename — all from the shelf with one click |
-| 🙈 | **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover for quick access |
-| 🖥️ | **Multi-Monitor** | Works on external displays with smart fullscreen detection and automatic positioning |
-| 🏝️ | **Dynamic Island** | Non-notch Macs get a beautiful floating pill interface that matches the notch experience |
-| 🔗 | **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
+| Feature | Description |
+|:--------|:------------|
+| **Clipboard Manager** | Full history with search, favorites, OCR text extraction, and drag-out support |
+| **Media Player** | Now Playing controls in your notch with album art and seek slider |
+| **Custom HUDs** | Beautiful volume, brightness, battery, and Caps Lock overlays |
+| **Move To...** | Send files directly to saved folder locations like your NAS, cloud drives, or project folders |
+| **Smart Compression** | Compress images, PDFs, and videos with auto or target size options — keeps originals if larger |
+| **Fast Actions** | Convert images, extract text (OCR), create ZIPs, rename — all from the shelf with one click |
+| **Auto-Hide Basket** | Basket slides to screen edge when idle, peeks out on hover for quick access |
+| **Multi-Monitor** | Works on external displays with smart fullscreen detection and automatic positioning |
+| **Dynamic Island** | Non-notch Macs get a beautiful floating pill interface that matches the notch experience |
+| **Alfred Integration** | Push files to Droppy from Alfred with a quick action |
 
 ---
 
@@ -129,20 +129,20 @@ Drag files out of the shelf and drop into any app. The file moves and vanishes f
 
 ---
 
-## 🛠️ Pro Tips
+## Pro Tips
 
-### � Alfred Integration
+### Alfred Integration
 Push files from Finder to Droppy: **Settings** → **About** → **Install in Alfred**, then use Alfred's Universal Actions on any file.
 
-### � Smart Compression
+### Smart Compression
 - **Auto**: Balanced settings for most files
 - **Target Size**: Need under 2MB? Right-click → Compress → **Target Size...**
-- **Size Guard** 🛡️: If compression would make the file larger, Droppy keeps the original
+- **Size Guard**: If compression would make the file larger, Droppy keeps the original
 
-### ✍️ Drag-and-Drop OCR
+### Drag-and-Drop OCR
 Drag an image into Droppy, hold **Shift** while dragging out, and drop into a text editor — **it's text!**
 
-### 🙈 Auto-Hide Basket
+### Auto-Hide Basket
 Enable in Settings → Basket → **Auto-Hide**. The basket slides to the screen edge when not in use and peeks out on hover.
 
 ---
