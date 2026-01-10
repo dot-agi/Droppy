@@ -186,6 +186,8 @@ Enable in Settings → Basket → **Auto-Hide**. The basket slides to the screen
 <!-- CHANGELOG_START -->
 # Droppy v6.0 - Native Spotify Integration
 
+This is a major release introducing native Spotify integration with rock-solid playback controls.
+
 ## New Features
 
 - **Native Spotify Integration**: Full native control of Spotify playback directly from the media player
@@ -199,12 +201,18 @@ Enable in Settings → Basket → **Auto-Hide**. The basket slides to the screen
 - **AppleScript Position Sync**: True playback position is fetched directly from Spotify every second
 - **Fixed AppleScript Double Parsing**: Properly handles floating-point return values from AppleScript
 - **Improved Timing Architecture**: MediaRemote timing is ignored for Spotify; AppleScript is the single source of truth
+- **Simplified Timing Logic**: Clean separation between Spotify (AppleScript) and other media sources (MediaRemote)
 
 ## Bug Fixes
 
 - Fixed timestamp jumping when clicking Spotify controls
 - Fixed timestamp showing 0:00 on pause/resume
-- Fixed AppleScript not parsing player position correctly
+- Fixed AppleScript not parsing player position correctly (was returning 0)
+- Removed noisy debug logging
+
+## Documentation
+
+- Added Native Spotify feature to README with official Spotify icon
 <!-- CHANGELOG_END -->
 
 </details>
