@@ -183,13 +183,35 @@ Enable in Settings → Basket → **Auto-Hide**. The basket slides to the screen
 <summary><strong>v5.4.2 — Rename Fix</strong></summary>
 
 <!-- CHANGELOG_START -->
-### 🔧 Bug Fixes
-- **Fixed spacebar during rename** — Pressing spacebar while renaming files now correctly inserts a space character instead of triggering Quick Look preview
+# Droppy v5.4.3 - Visual Harmony Update
 
-### 📖 Documentation
-- Added hero demo GIF to README
-- Redesigned feature tables for better readability
-- Added clickable badges and download button
+## UI Improvements
+
+- **Universal Corner Radius Harmony**: Complete audit and unification of all corner radii across the entire app
+  - 16pt for buttons, cards, and medium elements
+  - 14pt for thumbnails and internal cards
+  - 8pt for small elements and selection indicators
+  - 4pt for sliders and progress bars
+  
+- **Basket & Shelf Consistency**: Perfect visual parity between Floating Basket and Notch Shelf items
+  - Unified thumbnail corner radius (14pt)
+  - Matched hover effect backgrounds and opacities
+  - Consistent text colors and font sizes
+  
+- **Settings Preview Polish**: Fixed PeekPreview component to match real basket proportions
+
+## Bug Fixes
+
+- Fixed shelf item hover effects overlapping outer edge (added proper clipping)
+- Fixed basket item label color inconsistency (.primary → .white)
+- Fixed NotchControlButton border opacity mismatch (0.1 → 0.15)
+- Fixed HUD album art placeholder corner radius (5pt → 4pt)
+
+## Documentation
+
+- Cleaned up README with emoji-free tables and headers
+- Added high-quality 30fps GIF previews for all features
+- Added official Alfred icon to integration section
 <!-- CHANGELOG_END -->
 
 </details>
