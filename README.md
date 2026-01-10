@@ -186,27 +186,14 @@ Enable in Settings → Basket → **Auto-Hide**. The basket slides to the screen
 <summary><strong>v6.0 — Native Spotify Integration</strong></summary>
 
 <!-- CHANGELOG_START -->
-# Droppy v6.1 Release Notes
+# Droppy v6.1.1 Release Notes
 
-## ✨ New Features
+## 🐛 Bug Fixes
 
-### Auto-Clear
-- Files are automatically cleared from shelf/basket after successful drop
-- Toggle in Settings to enable/disable this feature
-- Smoother workflow without manual cleanup
-
-## 🎨 Improvements
-
-- **Drag Feedback**: Enhanced visual feedback during drag operations
-- **Item Wrapper UX**: Improved drag item wrapper behavior
-- **Clipboard View**: Minor refinements to clipboard manager
-
-## 🌐 Website
-
-- **Theatre Mode**: Demo now fades surrounding content for focus
-- **Faster Trigger**: Hover-to-demo reduced to 500ms
-- **Mobile Support**: Tap-only demo trigger on mobile devices
-- **Feature Showcase**: Added Alfred icon and grow animation
+### Finder Services Fix
+- **Fixed**: "Add to Droppy Shelf/Basket" from Finder context menu now works correctly
+- Removed redundant internal check that was blocking services from functioning
+- Services now work when enabled in System Settings → Keyboard → Shortcuts → Services
 <!-- CHANGELOG_END -->
 
 </details>
