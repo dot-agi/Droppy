@@ -58,7 +58,7 @@ Drag files to your notch — they vanish into a sleek shelf, ready when you need
 Jiggle your mouse while dragging to summon a basket anywhere on screen.
 
 <p align="center">
-  <img src="assets/previews/basket_preview.gif" alt="Floating Basket" width="600">
+  <img src="assets/previews/clipboard_preview.gif" alt="Floating Basket" width="600">
 </p>
 
 ---
@@ -67,7 +67,7 @@ Jiggle your mouse while dragging to summon a basket anywhere on screen.
 Full history with search, favorites, OCR text extraction, and drag-out support.
 
 <p align="center">
-  <img src="assets/previews/clipboard_preview.gif" alt="Clipboard Manager" width="600">
+  <img src="assets/previews/basket_preview.gif" alt="Clipboard Manager" width="600">
 </p>
 
 ---
