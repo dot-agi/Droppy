@@ -200,20 +200,14 @@ fi
 info "Packaging DMG"
 APP_PATH="$APP_BUILD_PATH/Build/Products/Release/Droppy.app"
 DMG_NAME="Droppy-$VERSION.dmg"
-DMG_BACKGROUND="$MAIN_REPO/assets/dmg/background.png"
 rm -f Droppy*.zip Droppy*.dmg rw.*.dmg
 
-# Create temp folder with app + Applications symlink
-mkdir -p dmg_root
-cp -R "$APP_PATH" dmg_root/
+# Create DMG using Sindre's create-dmg (clean, respects user's appearance)
+npx create-dmg "$APP_PATH" . --overwrite 2>/dev/null || error "DMG creation failed"
 
-# Add Applications symlink for drag-to-install
-ln -s /Applications dmg_root/Applications
-
-# Create DMG with hdiutil (simple and reliable)
-hdiutil create -volname Droppy -srcfolder dmg_root -ov -format UDZO "$DMG_NAME" -quiet || error "DMG creation failed"
+# Rename to our versioned name
+mv "Droppy $VERSION.dmg" "$DMG_NAME" 2>/dev/null || mv Droppy*.dmg "$DMG_NAME" 2>/dev/null
 success "$DMG_NAME created"
-rm -rf dmg_root
 
 # Checksum
 info "Generating Integrity Checksum"
@@ -303,7 +297,29 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     # GitHub Release
     info "Creating GitHub Release"
     cd "$MAIN_REPO"
-    gh release create "v$VERSION" "$DMG_NAME" --title "v$VERSION" --notes-file "$NOTES_FILE"
+    
+    # Append installation instructions to notes
+    TEMP_NOTES=$(mktemp)
+    cat "$NOTES_FILE" > "$TEMP_NOTES"
+    cat >> "$TEMP_NOTES" << 'INSTALL_FOOTER'
+
+---
+
+## 📦 Installation
+
+**Recommended: Install via Homebrew** (easiest, auto-updates)
+```bash
+brew install --cask iordv/tap/droppy
+```
+
+**Manual Install:** Download the DMG above, drag Droppy to Applications, then run:
+```bash
+xattr -rd com.apple.quarantine /Applications/Droppy.app
+```
+INSTALL_FOOTER
+    
+    gh release create "v$VERSION" "$DMG_NAME" --title "v$VERSION" --notes-file "$TEMP_NOTES"
+    rm -f "$TEMP_NOTES"
     
     echo -e "\n${GREEN}✨ RELEASE COMPLETE! ✨${RESET}"
     echo -e "Users can now update with: ${CMD}brew upgrade droppy${RESET}\n"
