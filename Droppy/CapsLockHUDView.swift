@@ -22,6 +22,7 @@ struct CapsLockHUDView: View {
     }
     
     /// Accent color based on Caps Lock state (matches battery green/white scheme)
+    /// In transparent DI mode, always use white for readability
     private var accentColor: Color {
         capsLockManager.isCapsLockOn ? .green : .white
     }
@@ -40,6 +41,16 @@ struct CapsLockHUDView: View {
         return (!hasNotch || forceTest) && useDynamicIsland
     }
     
+    /// Whether transparent Dynamic Island mode is enabled
+    private var isTransparentDI: Bool {
+        isDynamicIslandMode && UserDefaults.standard.bool(forKey: "useDynamicIslandTransparent")
+    }
+    
+    /// Color for Dynamic Island mode - white for transparent, accent color otherwise
+    private var dynamicIslandColor: Color {
+        isTransparentDI ? .white : accentColor
+    }
+    
     var body: some View {
         VStack(alignment: .center, spacing: 0) {
             if isDynamicIslandMode {
@@ -47,20 +58,20 @@ struct CapsLockHUDView: View {
                 // Standardized sizing: 18px icons, 13pt text, 14px horizontal padding
                 // EXACT COPY of BatteryHUDView Dynamic Island layout
                 HStack(spacing: 12) {
-                    // Caps Lock icon
+                    // Caps Lock icon - white in transparent mode for readability
                     Image(systemName: capsLockIcon)
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(accentColor)
+                        .foregroundStyle(dynamicIslandColor)
                         .symbolEffect(.pulse, options: .repeating, value: capsLockManager.isCapsLockOn)
                         .contentTransition(.symbolEffect(.replace))
                         .symbolVariant(.fill)
                         .frame(width: 20, height: 20)
-                        .shadow(color: accentColor.opacity(capsLockManager.isCapsLockOn ? 0.4 : 0), radius: 4)
+                        .shadow(color: dynamicIslandColor.opacity(capsLockManager.isCapsLockOn ? 0.4 : 0), radius: 4)
                     
-                    // ON/OFF text
+                    // ON/OFF text - white in transparent mode for readability
                     Text(capsLockManager.isCapsLockOn ? "ON" : "OFF")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(accentColor)
+                        .foregroundStyle(dynamicIslandColor)
                         .monospacedDigit()
                         .contentTransition(.interpolate)
                 }
