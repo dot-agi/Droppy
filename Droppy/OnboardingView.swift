@@ -859,11 +859,16 @@ struct OnboardingView: View {
     /// Alfred extension highlight using the bundled Alfred icon
     private func alfredExtensionHighlight() -> some View {
         HStack(spacing: 12) {
-            Image("AlfredIcon")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 36, height: 36)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            // Official Alfred icon with squircle background (matching Settings style)
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(white: 0.15))
+                Image("AlfredIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(2)
+            }
+            .frame(width: 36, height: 36)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("Alfred Workflow")
