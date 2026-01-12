@@ -309,8 +309,9 @@ struct ExtensionInfoView: View {
     
     private var actionText: String {
         switch extensionType {
+        case .aiBackgroundRemoval: return "Install"
         case .alfred: return "Install Workflow"
-        case .finder: return "Configure"
+        case .finder, .finderServices: return "Configure"
         case .spotify: return "Connect"
         case .elementCapture: return "Configure Shortcut"
         }
@@ -318,8 +319,9 @@ struct ExtensionInfoView: View {
     
     private var actionIcon: String {
         switch extensionType {
+        case .aiBackgroundRemoval: return "arrow.down.circle.fill"
         case .alfred: return "arrow.down.circle.fill"
-        case .finder: return "gearshape"
+        case .finder, .finderServices: return "gearshape"
         case .spotify: return "link"
         case .elementCapture: return "keyboard"
         }

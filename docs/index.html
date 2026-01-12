@@ -1346,9 +1346,15 @@
                         <a href="extensions.html"
                             class="group block p-8 rounded-[32px] bg-slate-900/50 hover:bg-slate-800/60 transition-all duration-300 text-center">
                             <div class="flex items-center justify-center gap-4">
-                                <svg class="w-10 h-10 text-slate-300 transition-all duration-300 group-hover:scale-110 group-hover:text-slate-100"
-                                    fill="currentColor" viewBox="0 0 20 20">
-                                    <path
+                                <svg class="w-10 h-10 transition-all duration-300 group-hover:scale-110"
+                                    viewBox="0 0 20 20">
+                                    <defs>
+                                        <linearGradient id="puzzleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#a855f7" />
+                                            <stop offset="100%" style="stop-color:#3b82f6" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path fill="url(#puzzleGradient)"
                                         d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
                                 </svg>
                                 <h2 class="text-2xl font-bold text-slate-100">Large library of powerful extensions!</h2>
