@@ -197,8 +197,14 @@ final class ElementCaptureManager: ObservableObject {
         // Check Accessibility
         let accessibilityTrusted = AXIsProcessTrusted()
         
-        // Check Screen Recording (preflight only)
-        let screenRecordingOK = CGPreflightScreenCaptureAccess()
+        // Check Screen Recording
+        // First preflight (no prompt), then request if needed
+        var screenRecordingOK = CGPreflightScreenCaptureAccess()
+        
+        if !screenRecordingOK {
+            // This will show the system prompt for screen recording
+            screenRecordingOK = CGRequestScreenCaptureAccess()
+        }
         
         return accessibilityTrusted && screenRecordingOK
     }
@@ -212,9 +218,20 @@ final class ElementCaptureManager: ObservableObject {
         alert.addButton(withTitle: "Cancel")
         
         if alert.runModal() == .alertFirstButtonReturn {
-            // Open Privacy settings
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") {
-                NSWorkspace.shared.open(url)
+            // Check which permission is missing and open the right pane
+            let accessibilityTrusted = AXIsProcessTrusted()
+            let screenRecordingOK = CGPreflightScreenCaptureAccess()
+            
+            if !screenRecordingOK {
+                // Open Screen Recording settings
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                    NSWorkspace.shared.open(url)
+                }
+            } else if !accessibilityTrusted {
+                // Open Accessibility settings
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
             }
         }
     }
