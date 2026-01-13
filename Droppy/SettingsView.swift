@@ -2459,6 +2459,7 @@ struct ExtensionsShopView: View {
     @State private var selectedCategory: ExtensionCategory = .all
     @Namespace private var categoryAnimation
     @State private var extensionCounts: [String: Int] = [:]
+    @State private var extensionRatings: [String: AnalyticsService.ExtensionRating] = [:]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -2471,8 +2472,14 @@ struct ExtensionsShopView: View {
         }
         .onAppear {
             Task {
-                if let counts = try? await AnalyticsService.shared.fetchExtensionCounts() {
+                async let countsTask = AnalyticsService.shared.fetchExtensionCounts()
+                async let ratingsTask = AnalyticsService.shared.fetchExtensionRatings()
+                
+                if let counts = try? await countsTask {
                     extensionCounts = counts
+                }
+                if let ratings = try? await ratingsTask {
+                    extensionRatings = ratings
                 }
             }
         }
@@ -2509,27 +2516,42 @@ struct ExtensionsShopView: View {
         ], spacing: 16) {
             // AI Background Removal
             if selectedCategory == .all || selectedCategory == .ai {
-                AIBackgroundRemovalCard(installCount: extensionCounts["aiBackgroundRemoval"])
+                AIBackgroundRemovalCard(
+                    installCount: extensionCounts["aiBackgroundRemoval"],
+                    rating: extensionRatings["aiBackgroundRemoval"]
+                )
             }
             
             // Alfred Integration
             if selectedCategory == .all || selectedCategory == .productivity {
-                AlfredExtensionCard(installCount: extensionCounts["alfred"])
+                AlfredExtensionCard(
+                    installCount: extensionCounts["alfred"],
+                    rating: extensionRatings["alfred"]
+                )
             }
             
             // Finder Integration
             if selectedCategory == .all || selectedCategory == .productivity {
-                FinderExtensionCard(installCount: extensionCounts["finder"])
+                FinderExtensionCard(
+                    installCount: extensionCounts["finder"],
+                    rating: extensionRatings["finder"]
+                )
             }
             
             // Spotify Integration
             if selectedCategory == .all || selectedCategory == .media {
-                SpotifyExtensionCard(installCount: extensionCounts["spotify"])
+                SpotifyExtensionCard(
+                    installCount: extensionCounts["spotify"],
+                    rating: extensionRatings["spotify"]
+                )
             }
             
             // Element Capture
             if selectedCategory == .all || selectedCategory == .productivity {
-                ElementCaptureCard(installCount: extensionCounts["elementCapture"])
+                ElementCaptureCard(
+                    installCount: extensionCounts["elementCapture"],
+                    rating: extensionRatings["elementCapture"]
+                )
             }
         }
     }
@@ -2718,6 +2740,7 @@ struct AIBackgroundRemovalCard: View {
     @ObservedObject private var manager = AIInstallManager.shared
     @State private var showInstallSheet = false
     var installCount: Int?
+    var rating: AnalyticsService.ExtensionRating?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -2755,7 +2778,7 @@ struct AIBackgroundRemovalCard: View {
             
             Spacer(minLength: 8)
             
-            // Status row with install count
+            // Status row with rating and install count
             HStack {
                 if manager.isInstalled {
                     HStack(spacing: 4) {
@@ -2766,6 +2789,19 @@ struct AIBackgroundRemovalCard: View {
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.green)
                     }
+                } else if let r = rating, r.ratingCount > 0 {
+                    // Show star rating
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", r.averageRating))
+                            .font(.caption2.weight(.medium))
+                        Text("(\(r.ratingCount))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
                 } else {
                     Text("One-click install")
                         .font(.caption2)
@@ -2802,6 +2838,7 @@ struct AIBackgroundRemovalCard: View {
 struct AlfredExtensionCard: View {
     @State private var showInfoSheet = false
     var installCount: Int?
+    var rating: AnalyticsService.ExtensionRating?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -2847,11 +2884,25 @@ struct AlfredExtensionCard: View {
             
             Spacer(minLength: 8)
             
-            // Status row with install count
+            // Status row with rating and install count
             HStack {
-                Text("Requires Powerpack")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                if let r = rating, r.ratingCount > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", r.averageRating))
+                            .font(.caption2.weight(.medium))
+                        Text("(\(r.ratingCount))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text("Requires Powerpack")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
                 
                 Spacer()
                 
@@ -2888,6 +2939,7 @@ struct FinderExtensionCard: View {
     @State private var showSetupSheet = false
     @State private var showInfoSheet = false
     var installCount: Int?
+    var rating: AnalyticsService.ExtensionRating?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -2933,11 +2985,25 @@ struct FinderExtensionCard: View {
             
             Spacer(minLength: 8)
             
-            // Status row with install count
+            // Status row with rating and install count
             HStack {
-                Text("One-time setup")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                if let r = rating, r.ratingCount > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", r.averageRating))
+                            .font(.caption2.weight(.medium))
+                        Text("(\(r.ratingCount))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text("One-time setup")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
                 
                 Spacer()
                 
@@ -2975,6 +3041,7 @@ struct FinderExtensionCard: View {
 struct SpotifyExtensionCard: View {
     @State private var showInfoSheet = false
     var installCount: Int?
+    var rating: AnalyticsService.ExtensionRating?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -3020,16 +3087,30 @@ struct SpotifyExtensionCard: View {
             
             Spacer(minLength: 8)
             
-            // Status with install count
+            // Status with rating and install count
             HStack {
-                // Live status indicator
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(SpotifyController.shared.isSpotifyRunning ? Color.green : Color.gray.opacity(0.5))
-                        .frame(width: 6, height: 6)
-                    Text(SpotifyController.shared.isSpotifyRunning ? "Running" : "Not running")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(SpotifyController.shared.isSpotifyRunning ? .primary : .secondary)
+                // Live status or rating
+                if let r = rating, r.ratingCount > 0, !SpotifyController.shared.isSpotifyRunning {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", r.averageRating))
+                            .font(.caption2.weight(.medium))
+                        Text("(\(r.ratingCount))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(SpotifyController.shared.isSpotifyRunning ? Color.green : Color.gray.opacity(0.5))
+                            .frame(width: 6, height: 6)
+                        Text(SpotifyController.shared.isSpotifyRunning ? "Running" : "Not running")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(SpotifyController.shared.isSpotifyRunning ? .primary : .secondary)
+                    }
                 }
                 
                 Spacer()
@@ -3064,6 +3145,7 @@ struct ElementCaptureCard: View {
     @State private var currentShortcut: SavedShortcut?
     @State private var showInfoSheet = false
     var installCount: Int?
+    var rating: AnalyticsService.ExtensionRating?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -3108,16 +3190,29 @@ struct ElementCaptureCard: View {
             
             Spacer(minLength: 8)
             
-            // Shortcut status with install count
+            // Shortcut status with rating and install count
             HStack {
-                Text("Shortcut")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                
-                if let shortcut = currentShortcut {
-                    Text(shortcut.description)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
+                if let r = rating, r.ratingCount > 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", r.averageRating))
+                            .font(.caption2.weight(.medium))
+                        Text("(\(r.ratingCount))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
+                } else if let shortcut = currentShortcut {
+                    HStack {
+                        Text("Shortcut")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(shortcut.description)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Text("Not configured")
                         .font(.caption2)

@@ -179,4 +179,77 @@ final class AnalyticsService: Sendable {
         
         return [:]
     }
+    
+    // MARK: - Extension Ratings
+    
+    /// Rating data structure
+    struct ExtensionRating {
+        let averageRating: Double
+        let ratingCount: Int
+    }
+    
+    /// Submit a rating for an extension
+    func submitExtensionRating(extensionId: String, rating: Int, feedback: String?) async throws {
+        let ratingsURL = URL(string: "https://anannmonpspjsnfgdglb.supabase.co/rest/v1/extension_ratings")!
+        let analyticsID = getOrGenerateAnalyticsID()
+        
+        var payload: [String: Any] = [
+            "extension_id": extensionId,
+            "anonymous_id": analyticsID,
+            "rating": rating
+        ]
+        
+        if let feedback = feedback, !feedback.isEmpty {
+            payload["feedback"] = feedback
+        }
+        
+        var request = URLRequest(url: ratingsURL)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(supabaseKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Upsert: update if exists, insert if not
+        request.addValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+    
+    /// Fetch average ratings for all extensions
+    func fetchExtensionRatings() async throws -> [String: ExtensionRating] {
+        let rpcURL = URL(string: "https://anannmonpspjsnfgdglb.supabase.co/rest/v1/rpc/get_extension_ratings")!
+        
+        var request = URLRequest(url: rpcURL)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(supabaseKey, forHTTPHeaderField: "apikey")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [:])
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Response is array of {extension_id, average_rating, rating_count}
+        if let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            var ratings: [String: ExtensionRating] = [:]
+            for result in results {
+                if let extId = result["extension_id"] as? String,
+                   let avg = (result["average_rating"] as? NSNumber)?.doubleValue,
+                   let count = result["rating_count"] as? Int {
+                    ratings[extId] = ExtensionRating(averageRating: avg, ratingCount: count)
+                }
+            }
+            return ratings
+        }
+        
+        return [:]
+    }
 }
