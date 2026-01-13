@@ -167,15 +167,18 @@ enum ExtensionType: String, CaseIterable, Identifiable {
             .frame(width: 64, height: 64)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .finder, .finderServices:
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(white: 0.15))
-                Image(nsImage: NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app"))
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding(4)
+            AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/finder.jpg")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .failure:
+                    Image(systemName: "folder").font(.system(size: 32)).foregroundStyle(.blue)
+                default:
+                    RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(white: 0.2))
+                }
             }
             .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .spotify:
             AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/spotify.jpg")) { phase in
                 switch phase {

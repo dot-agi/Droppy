@@ -19,16 +19,24 @@ struct FinderExtensionCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with icon, stats, and badge
             HStack(alignment: .top) {
-                // Official Finder icon with squircle background
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(white: 0.15))
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app"))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .padding(2)
+                // Finder icon from remote URL (keeps app binary small)
+                AsyncImage(url: URL(string: "https://iordv.github.io/Droppy/assets/icons/finder.jpg")) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        Image(systemName: "folder")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.blue)
+                    default:
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(white: 0.2))
+                    }
                 }
                 .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 
                 Spacer()
                 
