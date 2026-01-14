@@ -40,7 +40,7 @@ struct WindowSnapInfoView: View {
             // Buttons
             buttonSection
         }
-        .frame(width: 560)
+        .frame(width: 640)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.black)
         .clipped()
