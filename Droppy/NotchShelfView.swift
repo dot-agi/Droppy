@@ -725,7 +725,8 @@ struct NotchShelfView: View {
     private func triggerVolumeHUD() {
         hudWorkItem?.cancel()
         hudType = .volume
-        hudValue = CGFloat(volumeManager.rawVolume)
+        // Show 0% when muted to display muted icon, otherwise show actual volume
+        hudValue = volumeManager.isMuted ? 0 : CGFloat(volumeManager.rawVolume)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             hudIsVisible = true
         }

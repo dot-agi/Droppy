@@ -4,440 +4,646 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Droppy — Download for Mac</title>
-    <meta name="description" content="Download Droppy for Mac">
-    <link rel="icon" href="assets/app-icon.png">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        droppy: {
-                            25: '#f0f9ff', 50: '#e0f2fe', 75: '#e0f2fe', 100: '#bae6fd',
-                            200: '#7dd3fc', 300: '#38bdf8', 400: '#38bdf8', 500: '#0ea5e9',
-                            600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e', 950: '#082f49',
-                        }
-                    },
-                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-                }
-            }
-        }
-    </script>
+    <title>Download — Droppy</title>
+    <meta name="description" content="Download Droppy for macOS. Free, open-source, and built entirely in Swift.">
+    <link rel="icon" type="image/png" href="assets/app-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap"
         rel="stylesheet">
-
-    <!-- Droppy Version Config - Single source of truth -->
-    <script src="assets/js/version.js"></script>
-
-    <!-- Block copy/zoom keyboard shortcuts -->
-    <script>
-        document.addEventListener('keydown', function (e) {
-            if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'a')) e.preventDefault();
-            if ((e.metaKey || e.ctrlKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) e.preventDefault();
-        });
-        document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    </script>
-
     <style>
-        /* Block text selection */
-        body {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
         }
-    </style>
 
-    <style>
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
+        html {
+            scroll-behavior: smooth;
+        }
 
-            to {
-                opacity: 1;
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #000;
+            color: #ddd;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .serif {
+            font-family: 'Playfair Display', Georgia, serif;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #fff;
+        }
+
+        .header-brand img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+
+        .header-brand span {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 18px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 24px;
+        }
+
+        .header-nav a {
+            font-size: 14px;
+            color: #888;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .header-nav a:hover {
+            color: #fff;
+        }
+
+        /* Download Hero */
+        .download-hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 140px 24px 80px;
+        }
+
+        .download-icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 28px;
+            margin-bottom: 40px;
+            animation: float 6s ease-in-out infinite;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
                 transform: translateY(0);
             }
-        }
 
-        @keyframes scaleIn {
-            from {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
+            50% {
+                transform: translateY(-10px);
             }
         }
 
-        @keyframes scaleOut {
-            from {
-                opacity: 1;
-                transform: scale(1);
+        .download-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(42px, 7vw, 72px);
+            font-weight: 400;
+            color: #fff;
+            margin-bottom: 24px;
+        }
+
+        .download-title em {
+            font-style: italic;
+        }
+
+        .download-subtitle {
+            font-size: 16px;
+            color: #888;
+            max-width: 400px;
+            margin: 0 auto 48px;
+        }
+
+        /* Download Options */
+        .download-options {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+
+        .download-card {
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            border-radius: 24px;
+            padding: 32px;
+            width: 100%;
+            max-width: 380px;
+            text-align: left;
+            transition: all 0.3s ease;
+        }
+
+        .download-card:hover {
+            border-color: #333;
+            transform: translateY(-4px);
+        }
+
+        .download-card.preferred {
+            border-color: #3b82f6;
+            position: relative;
+        }
+
+        .preferred-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: #3b82f6;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 999px;
+        }
+
+        .download-card h3 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 22px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .download-card p {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        /* Homebrew Command */
+        .homebrew-cmd {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 999px;
+            padding: 16px 24px;
+            font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            color: #22c55e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .homebrew-cmd code {
+            flex: 1;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .copy-btn {
+            background: #222;
+            border: none;
+            border-radius: 999px;
+            padding: 8px 16px;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .copy-btn:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        .copy-btn.copied {
+            background: #22c55e;
+            color: #000;
+        }
+
+        .copy-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Download Button */
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px 24px;
+            background: #fff;
+            border: none;
+            border-radius: 999px;
+            color: #000;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+        }
+
+        .download-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .download-btn.secondary {
+            background: #1a1a1a;
+            color: #fff;
+            border: 1px solid #333;
+        }
+
+        .download-btn.secondary:hover {
+            background: #222;
+            box-shadow: none;
+        }
+
+        .download-meta {
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+
+        .download-meta a {
+            color: #888;
+            text-decoration: underline;
+        }
+
+        .download-meta a:hover {
+            color: #fff;
+        }
+
+        /* Requirements Section */
+        .requirements {
+            padding: 80px 24px;
+            background: #0a0a0a;
+        }
+
+        .requirements-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .requirements h2 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 32px;
+            font-weight: 400;
+            color: #fff;
+            margin-bottom: 32px;
+        }
+
+        .requirements-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 48px;
+        }
+
+        @media (max-width: 640px) {
+            .requirements-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .requirement-item {
+            background: #111;
+            border: 1px solid #1a1a1a;
+            border-radius: 20px;
+            padding: 32px 24px;
+        }
+
+        .requirement-item h4 {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .requirement-item p {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 20px;
+            color: #fff;
+        }
+
+        /* Footer */
+        footer {
+            padding: 80px 24px;
+            border-top: 1px solid #1a1a1a;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 48px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .footer-brand img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+
+        .footer-brand span {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 48px;
+        }
+
+        .footer-column h5 {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+        }
+
+        .footer-column a {
+            display: block;
+            font-size: 14px;
+            color: #888;
+            text-decoration: none;
+            margin-bottom: 12px;
+            transition: color 0.2s;
+        }
+
+        .footer-column a:hover {
+            color: #fff;
+        }
+
+        .footer-bottom {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #1a1a1a;
+            text-align: center;
+            font-size: 13px;
+            color: #555;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Hide scrollbars */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        * {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @media (max-width: 640px) {
+            .header-nav {
+                display: none;
             }
 
-            to {
-                opacity: 0;
-                transform: scale(0.95);
+            .download-options {
+                flex-direction: column;
+                align-items: center;
             }
-        }
-
-        .modal-backdrop {
-            backdrop-filter: blur(8px);
-            transition: opacity 0.25s ease-out;
-        }
-
-        #modal {
-            transition: opacity 0.25s ease-out;
-        }
-
-        #modal.modal-closing {
-            opacity: 0;
-        }
-
-        .modal-closing .modal-backdrop {
-            opacity: 0;
-        }
-
-        .modal-closing .modal-cards {
-            animation: scaleOut 0.25s ease-out forwards;
         }
     </style>
 </head>
 
-<body class="font-sans antialiased bg-slate-950 text-slate-100">
-    <section class="flex min-h-screen flex-col text-slate-100">
-        <!-- Header (IDENTICAL to main page) -->
-        <header
-            class="fixed top-0 z-40 flex w-full justify-center bg-slate-950 px-8 py-5 outline outline-1 outline-droppy-400/0 duration-300 sm:py-7"
-            id="header">
-            <div class="flex w-full max-w-screen-2xl items-center justify-center">
-                <!-- Center: Logo -->
-                <div class="flex items-center opacity-100" style="animation: fadeIn 0.5s ease-out 0.1s both;">
-                    <a href="/Droppy/" class="group flex items-center outline-none" aria-label="Go home">
-                        <div
-                            class="relative mr-3 h-10 w-10 overflow-hidden rounded-xl border-[2.5px] border-slate-500 bg-slate-800">
-                            <!-- Overlay/Icon slides left -->
-                            <div
-                                class="absolute inset-0.5 origin-center rounded-lg bg-slate-700 transition delay-50 duration-300 ease-out group-hover:-translate-x-full group-hover:scale-x-50 group-hover:scale-y-75 group-hover:opacity-25 group-hover:delay-0">
-                                <img src="assets/app-icon.png" alt="Droppy"
-                                    class="w-full h-full object-cover rounded-lg">
-                            </div>
-                            <!-- Arrow moves in from right -->
-                            <svg class="absolute -left-1 -top-1 h-11 w-11 fill-current text-slate-100"
-                                viewBox="0 0 36 36">
-                                <path
-                                    class="ease absolute origin-right translate-x-0.5 scale-50 opacity-0 blur-xs transition duration-300 group-hover:translate-x-0 group-hover:scale-100 group-hover:opacity-100 group-hover:blur-none group-hover:delay-50"
-                                    d="M18.032 11.218a1 1 0 0 0-1.414 0l-6.075 6.075a1 1 0 0 0 0 1.414l6.075 6.075a1 1 0 0 0 1.414-1.414L13.664 19H24.75a1 1 0 1 0 0-2H13.664l4.368-4.368a1 1 0 0 0 0-1.414Z" />
-                            </svg>
-                        </div>
-                        <div class="text-2xl font-bold">Droppy</div>
-                    </a>
-                    <a href="https://github.com/iordv/Droppy/releases"
-                        class="group ml-2 mt-2.5 flex items-center justify-center self-start whitespace-nowrap rounded-lg border-[1.5px] border-slate-600 bg-slate-800 px-1.5 py-0.5 text-center text-xs font-bold text-slate-400"
-                        target="_blank">
-                        <span class="droppy-version">v6.3</span>
-                    </a>
-                </div>
-            </div>
-        </header>
+<body oncontextmenu="return false;">
 
-        <!-- Main Content -->
-        <main class="flex flex-1 justify-center px-8 pb-16 pt-32 sm:pb-28 sm:pt-48 xl:px-36">
-            <div class="w-full max-w-screen-md text-center">
-                <!-- Headline with Mac icon IN FRONT of Mac -->
-                <h1 class="mb-6 text-5xl font-bold tracking-tight sm:text-8xl whitespace-nowrap"
-                    style="animation: fadeIn 0.6s ease-out 0.3s both;">
-                    Droppy for
-                    <span class="relative inline-block">
-                        <svg class="inline-block -mt-2 mr-1 size-10 fill-current sm:-mt-4 sm:mr-2 sm:size-20"
-                            viewBox="0 0 24 24">
+    <!-- Header -->
+    <header>
+        <a href="index.html" class="header-brand">
+            <img src="assets/droppy-logo.png" alt="Droppy">
+            <span>Droppy</span>
+        </a>
+        <nav class="header-nav">
+            <a href="index.html">Home</a>
+            <a href="extensions.html">Extensions</a>
+            <a href="download.html">Download</a>
+            <a href="https://github.com/iordv/Droppy" target="_blank">GitHub</a>
+        </nav>
+    </header>
+
+    <!-- Download Hero -->
+    <section class="download-hero">
+        <img src="assets/droppy-logo.png" alt="Droppy" class="download-icon">
+
+        <h1 class="download-title">Get <em>Droppy</em></h1>
+
+        <p class="download-subtitle">
+            Droppy is free and open-source. Built entirely in <span
+                style="text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #555; text-underline-offset: 3px;">Swift</span>.
+            Requires <span
+                style="text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #555; text-underline-offset: 3px;">macOS
+                14</span> Sonoma or later.
+        </p>
+
+        <div class="download-options">
+            <!-- Homebrew (Preferred) -->
+            <div class="download-card preferred">
+                <span class="preferred-badge">Recommended</span>
+                <h3 style="display: flex; align-items: center; gap: 10px;">
+                    <img src="https://brew.sh/assets/img/homebrew.svg" alt="Homebrew"
+                        style="width: 28px; height: 28px;">
+                    Homebrew
+                </h3>
+                <p>Install via Homebrew for automatic updates and easy management.</p>
+
+                <!-- Step 1: Install Droppy -->
+                <p
+                    style="font-size: 11px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Install Droppy</p>
+                <div class="homebrew-cmd">
+                    <code>brew install --cask droppy</code>
+                    <button class="copy-btn" onclick="copyCommand(this)">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path
-                                d="M19.37 7.648c-.114.088-2.11 1.213-2.11 3.715 0 2.894 2.54 3.918 2.616 3.944-.011.062-.403 1.402-1.34 2.767-.834 1.201-1.706 2.4-3.032 2.4s-1.667-.77-3.198-.77c-1.492 0-2.022.796-3.235.796-1.214 0-2.06-1.112-3.033-2.477C4.911 16.42 4 13.93 4 11.566c0-3.791 2.465-5.802 4.891-5.802 1.29 0 2.364.847 3.173.847.77 0 1.972-.897 3.438-.897.556 0 2.553.05 3.867 1.934Zm-4.564-3.54c.607-.719 1.036-1.718 1.036-2.716 0-.138-.012-.279-.037-.392-.987.037-2.161.657-2.87 1.478-.555.632-1.074 1.63-1.074 2.643 0 .152.026.304.037.353.063.011.164.025.266.025.885 0 1.998-.593 2.642-1.39Z">
-                            </path>
-                        </svg>Mac
-                        <span
-                            class="absolute -bottom-1 left-0 right-0 h-2 rounded-full bg-droppy-400/30 sm:-bottom-1.5 sm:h-2.5"></span>
-                    </span>
-                </h1>
+                                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Copy
+                    </button>
+                </div>
 
-                <!-- Instructions -->
-                <div class="mx-auto flex max-w-[30rem] flex-col items-center justify-center"
-                    style="animation: fadeIn 0.6s ease-out 0.5s both;">
-                    <p class="mt-4 text-xl leading-normal sm:mt-6 text-slate-400">
-                        Install via <span class="font-semibold text-slate-100">Homebrew</span> for automatic updates.
-                    </p>
-                    </p>
-
-                    <!-- Homebrew Card -->
-                    <div
-                        class="my-8 flex w-full max-w-md flex-col items-center justify-center rounded-[32px] bg-slate-800/50 pb-8 pt-6 sm:my-10">
-                        <div class="mb-4 size-32">
-                            <img src="https://brew.sh/assets/img/homebrew-256x256.png" alt="Homebrew"
-                                class="size-full select-none" draggable="false">
-                        </div>
-                        <p class="text-2xl font-bold text-slate-100">Homebrew</p>
-                        <p class="text-base font-semibold text-slate-400">Recommended Install</p>
-                        <p class="inline-flex items-center text-sm font-semibold text-slate-500">
-                            Auto-updates <span
-                                class="mx-1.5 mt-px inline-block size-[3px] rounded-full bg-slate-500"></span> <span
-                                class="droppy-version">v6.3</span>
-                        </p>
-
-                        <!-- Command Box - Fully Clickable -->
-                        <button onclick="openModal()"
-                            class="group mt-6 flex w-[calc(100%-2rem)] items-center justify-center gap-3 rounded-[28px] bg-slate-800 px-5 py-3.5 text-droppy-75 transition-all duration-200 hover:bg-slate-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
-                            <code class="text-sm sm:text-base font-mono">brew install --cask iordv/tap/droppy</code>
-                            <svg class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- Divider -->
-                    <div class="flex items-center gap-4 w-full max-w-xs mb-8">
-                        <div class="flex-1 h-px bg-slate-700"></div>
-                        <span class="text-sm font-semibold text-slate-500">or</span>
-                        <div class="flex-1 h-px bg-slate-700"></div>
-                    </div>
-
-                    <!-- Manual Download Card -->
-                    <div
-                        class="flex w-full max-w-md flex-col items-center justify-center rounded-[32px] bg-slate-800/50 pb-8 pt-6">
-                        <!-- macOS Disk Icon (official macOS 26 style) -->
-                        <div class="mb-4 size-32 relative">
-                            <img src="assets/macos-disk-icon.png" alt="macOS Disk"
-                                class="size-full object-contain select-none" draggable="false">
-                        </div>
-                        <p class="text-2xl font-bold text-slate-100">Direct Download</p>
-                        <p class="text-base font-semibold text-slate-400">Manual Install</p>
-                        <p class="inline-flex items-center text-sm font-semibold text-slate-500">
-                            DMG Installer <span
-                                class="mx-1.5 mt-px inline-block size-[3px] rounded-full bg-slate-500"></span> <span
-                                class="droppy-version">v6.3</span>
-                        </p>
-
-                        <!-- Download Button - matching main page style -->
-                        <a id="dmg-download-link" href="#"
-                            class="group relative mt-6 flex w-[calc(100%-2rem)] max-h-[3.75rem] items-center justify-center rounded-[28px] px-5 py-4 text-lg font-bold outline-none transition duration-300 bg-slate-100 text-slate-900 shadow-xl shadow-black/30 hover:bg-white pl-[3.25rem]">
-                            <div
-                                class="ease absolute left-5 translate-x-0 opacity-100 transition duration-300 group-hover:-translate-x-full group-hover:scale-x-50 group-hover:opacity-0 group-hover:blur-sm">
-                                <!-- macOS Disk Icon -->
-                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-                                    <path
-                                        d="M20 6H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H4V8h16v8zM6 10h2v4H6v-4z" />
-                                </svg>
-                            </div>
-                            <div class="ease translate-x-0 transition duration-300 group-hover:-translate-x-8">Download
-                                <span>Droppy.dmg</span>
-                            </div>
-                            <div
-                                class="ease absolute right-5 translate-x-full scale-x-50 opacity-0 blur-sm transition duration-300 group-hover:translate-x-0 group-hover:scale-x-100 group-hover:opacity-100 group-hover:blur-none">
-                                <svg class="h-6 w-6 fill-transparent stroke-current stroke-2" viewBox="0 0 24 24"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
-                                </svg>
-                            </div>
-                        </a>
-
-                        <!-- Quarantine Command -->
-                        <p class="mt-6 text-xs text-slate-400 text-center px-4">Before opening, run this in Terminal:
-                        </p>
-                        <button onclick="copyQuarantineCommand(this)"
-                            class="group mt-2 flex w-[calc(100%-2rem)] items-center justify-between rounded-[20px] bg-slate-800 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-all duration-200 active:scale-[0.98]">
-                            <code
-                                class="text-xs font-mono truncate mr-2">xattr -rd com.apple.quarantine ~/Downloads/Droppy-*.dmg</code>
-                            <svg id="copyIconQuarantine" class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            <svg id="checkIconQuarantine" class="h-5 w-5 shrink-0 text-green-400 hidden" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M5 13l4 4L19 7" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <p class="mt-8 text-sm text-slate-500">Minimum macOS 14 Sonoma</p>
-
-                    <p class="mt-10 max-w-sm text-lg leading-normal text-slate-400">
-                        If you have any issues, please
-                        <a class="relative whitespace-nowrap font-medium text-slate-100 outline-none transition duration-200 after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-[0.125rem] after:bg-droppy-400 after:transition after:duration-200 after:content-[''] hover:text-droppy-400 after:hover:translate-y-px"
-                            href="https://github.com/iordv/Droppy/issues" target="_blank">open an issue</a>.
-                    </p>
+                <!-- Step 2: Install Homebrew (if needed) -->
+                <p
+                    style="font-size: 11px; color: #666; margin-bottom: 8px; margin-top: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Don't have Homebrew? Install it first</p>
+                <div class="homebrew-cmd" style="background: #0d0d0d;">
+                    <code style="font-size: 11px;">/bin/bash -c "$(curl -fsSL https://brew.sh/install.sh)"</code>
+                    <button class="copy-btn" onclick="copyCommand(this)">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path
+                                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Copy
+                    </button>
                 </div>
             </div>
-        </main>
 
-        <!-- Footer -->
-        <footer class="relative flex flex-col items-center justify-center px-8 pb-20 sm:pb-0"
-            style="animation: fadeIn 0.6s ease-out 0.7s both;">
-            <div class="flex items-center justify-center space-x-3">
-                <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-slate-800 rounded-xl bg-slate-800/50 p-2 text-slate-400 hover:text-slate-100 size-10"
-                    href="https://github.com/iordv/Droppy" target="_blank">
-                    <svg class="size-6 fill-current transition duration-300 ease-out group-hover:scale-105"
-                        viewBox="0 0 24 24">
-                        <path fill-rule="evenodd"
-                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                            clip-rule="evenodd" />
+            <!-- Direct Download -->
+            <div class="download-card">
+                <h3>Direct Download</h3>
+                <p>Download the DMG installer directly from GitHub releases.</p>
+                <a href="https://github.com/iordv/Droppy/releases/latest/download/Droppy.dmg" class="download-btn"
+                    id="dmg-download">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
                     </svg>
+                    Download Droppy.dmg
                 </a>
-                <a class="group inline-flex items-center justify-center outline-none transition duration-300 hover:bg-slate-800 rounded-xl bg-slate-800/50 p-2 text-slate-400 hover:text-slate-100 size-10"
-                    href="https://buymeacoffee.com/droppy" target="_blank">
-                    <svg class="size-6 fill-current transition duration-300 ease-out group-hover:scale-105"
-                        viewBox="0 0 24 24">
-                        <path
-                            d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
-                    </svg>
-                </a>
-            </div>
-            <div
-                class="pointer-events-none -mt-6 hidden select-none overflow-hidden bg-gradient-to-b from-slate-100/10 from-25% to-slate-100/0 bg-clip-text text-[14rem] font-black leading-none text-transparent sm:block sm:h-36 md:h-48 md:text-[18rem] lg:h-56 lg:text-[20rem]">
-                Droppy</div>
-        </footer>
-    </section>
 
-    <!-- Installation Modal -->
-    <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto">
-        <div class="absolute inset-0 bg-black/70 modal-backdrop" onclick="closeModal()"></div>
-
-        <!-- Two Floating Cards Container -->
-        <div class="relative flex flex-col items-center gap-4 max-w-lg w-full py-8 modal-cards"
-            style="animation: scaleIn 0.3s ease-out;">
-
-            <!-- Step 1 Title (floating above card) -->
-            <h3 class="text-3xl font-bold text-slate-100 w-full text-left flex items-center gap-3">
-                <img src="https://brew.sh/assets/img/homebrew-256x256.png" class="size-8" alt="Homebrew">
-                Step 1
-            </h3>
-
-            <!-- Card 1: Install Homebrew -->
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-lg font-semibold text-slate-100">Install Homebrew</span>
-                    <span class="text-xs text-slate-500">Skip if already installed</span>
+                <!-- Quarantine removal command -->
+                <p
+                    style="font-size: 11px; color: #666; margin-bottom: 8px; margin-top: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    After downloading, run in Terminal</p>
+                <div class="homebrew-cmd" style="background: #0d0d0d;">
+                    <code style="font-size: 11px;">xattr -d com.apple.quarantine ~/Downloads/Droppy.dmg</code>
+                    <button class="copy-btn" onclick="copyCommand(this)">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path
+                                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Copy
+                    </button>
                 </div>
-                <p class="text-sm text-slate-400 mb-4">Homebrew is the free, open-source package manager for macOS. It
-                    handles installation and automatic updates.</p>
-                <button onclick="copyHomebrewCommand(this)"
-                    class="group flex items-center justify-between w-full bg-slate-800 rounded-[20px] px-4 py-3 text-slate-100 hover:bg-slate-700 transition-all duration-200 active:scale-[0.98]">
-                    <code
-                        class="text-xs font-mono text-slate-300 truncate mr-2">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code>
-                    <svg id="copyIconBrew" class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100" fill="none"
-                        stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <svg id="checkIconBrew" class="h-5 w-5 shrink-0 text-green-400 hidden" fill="none"
-                        stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                </button>
-            </div>
+                <p style="font-size: 11px; color: #555; margin-top: 8px; margin-bottom: 0; font-style: italic;">Adjust
+                    path if you saved elsewhere</p>
 
-            <!-- Step 2 Title (floating above card) -->
-            <h3 class="text-3xl font-bold text-slate-100 w-full text-left mt-4 flex items-center gap-3">
-                <img src="assets/app-icon.png" class="size-8 rounded-lg" alt="Droppy">
-                Step 2
-            </h3>
-
-            <!-- Card 2: Install Droppy -->
-            <div class="bg-slate-900 rounded-[32px] shadow-2xl w-full p-8">
-                <span class="text-lg font-semibold text-slate-100 block mb-3">Install Droppy</span>
-                <p class="text-sm text-slate-400 mb-4">Run this command in Terminal. Updates are automatic!</p>
-                <button onclick="copyCommand(this)"
-                    class="group flex items-center justify-between w-full bg-slate-800 rounded-[20px] px-4 py-3 text-slate-100 hover:bg-slate-700 transition-all duration-200 active:scale-[0.98]">
-                    <code class="text-sm font-mono">brew install --cask iordv/tap/droppy</code>
-                    <svg id="copyIcon" class="h-5 w-5 shrink-0 opacity-60 group-hover:opacity-100" fill="none"
-                        stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <svg id="checkIcon" class="h-5 w-5 shrink-0 text-green-400 hidden" fill="none" stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                </button>
-
-                <p class="mt-6 text-sm text-slate-500 text-center">
-                    Need help? <a href="https://brew.sh" target="_blank"
-                        class="font-medium text-droppy-400 hover:text-droppy-300 transition-colors">Visit brew.sh →</a>
+                <p style="font-size: 12px; color: #666; margin-top: 16px; margin-bottom: 0;">
+                    <span class="droppy-version">v7.7.1</span> · Universal (Apple Silicon + Intel)
                 </p>
             </div>
-
         </div>
-    </div>
 
+        <p class="download-meta">
+            <a href="https://github.com/iordv/Droppy/releases" target="_blank">View all releases</a> ·
+            <a href="https://github.com/iordv/Droppy" target="_blank">Source code on GitHub</a>
+        </p>
+    </section>
+
+    <!-- Requirements -->
+    <section class="requirements">
+        <div class="requirements-content">
+            <h2>System Requirements</h2>
+            <div class="requirements-grid">
+                <div class="requirement-item">
+                    <h4>Operating System</h4>
+                    <p>macOS 14+</p>
+                </div>
+                <div class="requirement-item">
+                    <h4>Architecture</h4>
+                    <p>Universal Binary</p>
+                </div>
+                <div class="requirement-item">
+                    <h4>Price</h4>
+                    <p>Free, Forever</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <img src="assets/droppy-logo.png" alt="Droppy">
+                <span>Droppy</span>
+            </div>
+            <div class="footer-links">
+                <div class="footer-column">
+                    <h5>Product</h5>
+                    <a href="download.html">Download</a>
+                    <a href="extensions.html">Extensions</a>
+                </div>
+                <div class="footer-column">
+                    <h5>Resources</h5>
+                    <a href="https://github.com/iordv/Droppy" target="_blank">GitHub</a>
+                    <a href="https://github.com/iordv/Droppy/issues" target="_blank">Support</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            © 2025 Droppy. Free and open-source.
+        </div>
+    </footer>
+
+    <!-- Version Script -->
+    <script src="assets/js/version.js"></script>
     <script>
-        function openModal() {
-            const modal = document.getElementById('modal');
-            modal.classList.remove('hidden', 'modal-closing');
-            modal.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-        }
-        function closeModal() {
-            const modal = document.getElementById('modal');
-            modal.classList.add('modal-closing');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex', 'modal-closing');
-                document.body.style.overflow = '';
-            }, 250);
-        }
-        function copyCommand() {
-            navigator.clipboard.writeText('brew install --cask iordv/tap/droppy');
-            document.getElementById('copyIcon').classList.add('hidden');
-            document.getElementById('checkIcon').classList.remove('hidden');
-            setTimeout(() => { document.getElementById('copyIcon').classList.remove('hidden'); document.getElementById('checkIcon').classList.add('hidden'); }, 2000);
-        }
-        function copyHomebrewCommand() {
-            navigator.clipboard.writeText('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"');
-            document.getElementById('copyIconBrew').classList.add('hidden');
-            document.getElementById('checkIconBrew').classList.remove('hidden');
-            setTimeout(() => { document.getElementById('copyIconBrew').classList.remove('hidden'); document.getElementById('checkIconBrew').classList.add('hidden'); }, 2000);
-        }
-        function copyQuarantineCommand() {
-            navigator.clipboard.writeText('xattr -rd com.apple.quarantine ~/Downloads/Droppy-*.dmg');
-            document.getElementById('copyIconQuarantine').classList.add('hidden');
-            document.getElementById('checkIconQuarantine').classList.remove('hidden');
-            setTimeout(() => { document.getElementById('copyIconQuarantine').classList.remove('hidden'); document.getElementById('checkIconQuarantine').classList.add('hidden'); }, 2000);
-        }
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-
-        // Header shadow on scroll (same as main page)
-        window.addEventListener('scroll', () => {
-            const header = document.getElementById('header');
-            if (window.scrollY > 20) {
-                header.classList.add('shadow-lg', 'shadow-droppy-950/5');
-            } else {
-                header.classList.remove('shadow-lg', 'shadow-droppy-950/5');
-            }
-        });
-
-        // Initialize version numbers from central config
-        document.addEventListener('DOMContentLoaded', () => {
-            // Update all version display spans
-            document.querySelectorAll('.droppy-version').forEach(el => {
-                el.textContent = 'v' + DROPPY_CONFIG.version;
+        // Copy Homebrew command
+        function copyCommand(btn) {
+            const cmd = btn.previousElementSibling.textContent;
+            navigator.clipboard.writeText(cmd).then(() => {
+                btn.innerHTML = `
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Copied!
+                `;
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = `
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                        </svg>
+                        Copy
+                    `;
+                    btn.classList.remove('copied');
+                }, 2000);
             });
-            // Set DMG download link
-            const dmgLink = document.getElementById('dmg-download-link');
-            if (dmgLink) {
-                dmgLink.href = DROPPY_CONFIG.dmgUrl;
-            }
-        });
+        }
     </script>
+
 </body>
 
 </html>

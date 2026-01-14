@@ -34,6 +34,9 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Monitor for keyboard events (spacebar for Quick Look)
     private var keyboardMonitor: Any?
     
+    /// Timer for edge detection fallback (when mouse events stop at screen edge)
+    private var edgeDetectionTimer: Timer?
+    
     /// Shared instance
     static let shared = NotchWindowController()
     
@@ -241,7 +244,13 @@ final class NotchWindowController: NSObject, ObservableObject {
                 let expandedWidth: CGFloat = 450
                 let centerX = screen.frame.origin.x + screen.frame.width / 2
                 let rowCount = ceil(Double(DroppyState.shared.items.count) / 5.0)
-                let expandedHeight = max(1, rowCount) * 110 + 54
+                var expandedHeight = max(1, rowCount) * 110 + 54
+                
+                // Add extra height for media player when shelf is empty but music is playing
+                let shouldShowPlayer = MusicManager.shared.isPlaying || MusicManager.shared.wasRecentlyPlaying
+                if DroppyState.shared.items.isEmpty && shouldShowPlayer && !MusicManager.shared.isPlayerIdle {
+                    expandedHeight += 100
+                }
 
                 expandedShelfZone = NSRect(
                     x: centerX - expandedWidth / 2,
@@ -315,7 +324,13 @@ final class NotchWindowController: NSObject, ObservableObject {
                     let expandedWidth: CGFloat = 450
                     let centerX = screen.frame.origin.x + screen.frame.width / 2
                     let rowCount = ceil(Double(DroppyState.shared.items.count) / 5.0)
-                    let expandedHeight = max(1, rowCount) * 110 + 54
+                    var expandedHeight = max(1, rowCount) * 110 + 54
+                    
+                    // Add extra height for media player when shelf is empty but music is playing
+                    let shouldShowPlayer = MusicManager.shared.isPlaying || MusicManager.shared.wasRecentlyPlaying
+                    if DroppyState.shared.items.isEmpty && shouldShowPlayer && !MusicManager.shared.isPlayerIdle {
+                        expandedHeight += 100
+                    }
 
                     expandedShelfZone = NSRect(
                         x: centerX - expandedWidth / 2,
@@ -373,6 +388,46 @@ final class NotchWindowController: NSObject, ObservableObject {
             
             return event
         }
+        
+        // EDGE DETECTION TIMER (v7.7.2) - Fallback for when cursor is at screen edge
+        // macOS STOPS generating mouseMoved events when cursor hits the absolute screen edge.
+        // NSEvent.mouseLocation also may not update, so we use CGEvent to get the raw cursor pos.
+        edgeDetectionTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self = self,
+                  let notchWindow = self.notchWindow,
+                  UserDefaults.standard.bool(forKey: "enableNotchShelf"),
+                  !DroppyState.shared.isExpanded,  // Don't need edge detection when expanded
+                  !DragMonitor.shared.isDragging   // Drag monitor handles its own detection
+            else { return }
+            
+            // Use CGEvent to get raw cursor position - works even at screen edge
+            guard let cgEvent = CGEvent(source: nil) else { return }
+            let cgPoint = cgEvent.location
+            
+            // Convert CG coordinates to NS coordinates (CG origin is top-left, NS is bottom-left)
+            guard let targetScreen = NSScreen.builtInWithNotch ?? NSScreen.main else { return }
+            
+            // CG Y is inverted: 0 is at top, increases downward
+            // NS Y: 0 is at bottom, increases upward
+            // CGPoint.y == 0 means cursor is at the VERY TOP of the screen
+            let isAtAbsoluteTop = cgPoint.y <= 5  // Within 5 CG pixels of top (CG 0 = screen top)
+            
+            let notchRect = notchWindow.getNotchRect()
+            let isWithinNotchX = cgPoint.x >= notchRect.minX - 40 && cgPoint.x <= notchRect.maxX + 40
+            
+            if isAtAbsoluteTop && isWithinNotchX && !DroppyState.shared.isMouseHovering {
+                // Cursor is at absolute top edge within notch range - trigger hover!
+                DispatchQueue.main.async {
+                    DroppyState.shared.validateItems()
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        DroppyState.shared.isMouseHovering = true
+                    }
+                }
+            }
+        }
+        RunLoop.current.add(timer, forMode: .common)
+        edgeDetectionTimer = timer
     }
     
     private func fullscreenMonitorLoop() {
@@ -430,6 +485,9 @@ final class NotchWindowController: NSObject, ObservableObject {
             NSEvent.removeMonitor(monitor)
             keyboardMonitor = nil
         }
+        
+        edgeDetectionTimer?.invalidate()
+        edgeDetectionTimer = nil
     }
     
     private func checkFullscreenState() {
@@ -646,9 +704,9 @@ class NotchWindow: NSPanel {
             isOverExpandedZone = expandedNotchRect.contains(mouseLocation)
 
             // Special case: If cursor is at the absolute screen top edge within island X range,
-            // always treat it as hovering (Fitt's Law)
-            let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 5
-            let isWithinIslandX = mouseLocation.x >= notchRect.minX - 20 && mouseLocation.x <= notchRect.maxX + 20
+            // always treat it as hovering (Fitt's Law - user slamming cursor to top)
+            let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 20  // Within 20px
+            let isWithinIslandX = mouseLocation.x >= notchRect.minX - 30 && mouseLocation.x <= notchRect.maxX + 30
             if isAtScreenTop && isWithinIslandX {
                 isOverExpandedZone = true
             }
@@ -673,9 +731,10 @@ class NotchWindow: NSPanel {
             // always treat it as hovering. The tolerance needs to be generous because:
             // 1. When cursor hits screen edge, no more mouseMoved events are generated
             // 2. The last event before hitting the edge might have a Y slightly below maxY
-            // 3. Menu bar is ~24px, notch is within that space, so 10px tolerance is safe
-            let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 10  // Within 10px of absolute top
-            let isWithinNotchX = mouseLocation.x >= notchRect.minX - 20 && mouseLocation.x <= notchRect.maxX + 20
+            // 3. macOS may also report Y at or ABOVE maxY when cursor is at physical edge
+            // 4. Menu bar is ~24px, notch is within that space, so 20px tolerance is safe
+            let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 20  // Within 20px of absolute top
+            let isWithinNotchX = mouseLocation.x >= notchRect.minX - 30 && mouseLocation.x <= notchRect.maxX + 30
             if isAtScreenTop && isWithinNotchX {
                 isOverExpandedZone = true
             }
@@ -687,8 +746,8 @@ class NotchWindow: NSPanel {
 
         // For maintaining hover: exact notch OR at screen top within horizontal bounds
         var isOverExactOrEdge = isOverExactNotch
-        let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 5
-        let isWithinNotchX = mouseLocation.x >= notchRect.minX && mouseLocation.x <= notchRect.maxX
+        let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 15  // Within 15px
+        let isWithinNotchX = mouseLocation.x >= notchRect.minX - 30 && mouseLocation.x <= notchRect.maxX + 30
         if isAtScreenTop && isWithinNotchX {
             isOverExactOrEdge = true
         }
