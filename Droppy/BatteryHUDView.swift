@@ -99,7 +99,10 @@ struct BatteryHUDView: View {
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space
-                // Icon and percentage positioned near outer edges with 8px padding
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 26
+                let symmetricPadding = max((notchHeight - iconSize) / 2, 4)  // Min 4px for very small notches
+                
                 HStack(spacing: 0) {
                     // Left wing: Battery icon near left edge
                     HStack {
@@ -108,10 +111,10 @@ struct BatteryHUDView: View {
                             .foregroundStyle(accentColor)
                             .symbolEffect(.bounce, value: batteryManager.isCharging)
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .frame(width: 26, height: 26)  // Standardized with CapsLock/DND
+                            .frame(width: iconSize, height: iconSize, alignment: .leading)
                         Spacer(minLength: 0)
                     }
-                    .padding(.leading, 8)  // Balanced with vertical padding
+                    .padding(.leading, symmetricPadding)
                     .frame(width: wingWidth)
                     
                     // Camera notch area (spacer)
@@ -128,7 +131,7 @@ struct BatteryHUDView: View {
                             .contentTransition(.numericText(value: Double(batteryManager.batteryLevel)))
                             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: batteryManager.batteryLevel)
                     }
-                    .padding(.trailing, 8)  // Balanced with vertical padding
+                    .padding(.trailing, symmetricPadding)
                     .frame(width: wingWidth)
                 }
                 .frame(height: notchHeight)

@@ -89,7 +89,10 @@ struct DNDHUDView: View {
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space
-                // EXACT COPY of CapsLockHUDView Notch Mode layout
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 26
+                let symmetricPadding = max((notchHeight - iconSize) / 2, 4)  // Min 4px for very small notches
+                
                 HStack(spacing: 0) {
                     // Left wing: Focus icon near left edge
                     HStack {
@@ -98,10 +101,10 @@ struct DNDHUDView: View {
                             .foregroundStyle(accentColor)
                             .symbolEffect(.bounce.up, value: dndManager.isDNDActive)
                             .contentTransition(.symbolEffect(.replace.byLayer.downUp))
-                            .frame(width: 26, height: 26)
+                            .frame(width: iconSize, height: iconSize, alignment: .leading)
                         Spacer(minLength: 0)
                     }
-                    .padding(.leading, 8)  // Balanced with vertical padding
+                    .padding(.leading, symmetricPadding)
                     .frame(width: wingWidth)
                     
                     // Camera notch area (spacer)
@@ -117,7 +120,7 @@ struct DNDHUDView: View {
                             .contentTransition(.interpolate)
                             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: dndManager.isDNDActive)
                     }
-                    .padding(.trailing, 8)  // Balanced with vertical padding
+                    .padding(.trailing, symmetricPadding)
                     .frame(width: wingWidth)
                 }
                 .frame(height: notchHeight)

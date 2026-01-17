@@ -143,13 +143,18 @@ struct AirPodsHUDView: View {
     // MARK: - Notch Mode Layout
     
     private var notchModeContent: some View {
-        HStack(spacing: 0) {
+        // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+        let iconSize: CGFloat = 26
+        let symmetricPadding = max((notchHeight - iconSize) / 2, 4)  // Min 4px for very small notches
+        
+        return HStack(spacing: 0) {
             // Left wing: AirPods icon near left edge
             HStack {
-                airPodsIconView(size: 20)  // Standardized: 20pt for notch
+                airPodsIconView(size: 20)
+                    .frame(width: iconSize, height: iconSize, alignment: .leading)
                 Spacer(minLength: 0)
             }
-            .padding(.leading, 8)  // Standardized notch padding
+            .padding(.leading, symmetricPadding)
             .frame(width: wingWidth)
             
             // Camera notch area (spacer)
@@ -159,9 +164,9 @@ struct AirPodsHUDView: View {
             // Right wing: Battery ring near right edge
             HStack {
                 Spacer(minLength: 0)
-                batteryRingView(size: 26)  // Standardized: 26px for notch
+                batteryRingView(size: iconSize)
             }
-            .padding(.trailing, 8)  // Standardized notch padding
+            .padding(.trailing, symmetricPadding)
             .frame(width: wingWidth)
         }
         .frame(height: notchHeight)

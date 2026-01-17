@@ -94,6 +94,10 @@ struct NotchHUDView: View {
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Wide layout - icon + label on left wing, slider on right wing
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 26
+                let symmetricPadding = max((notchHeight - iconSize) / 2, 4)  // Min 4px for very small notches
+                
                 HStack(spacing: 0) {
                     // Left wing: Icon + Label
                     HStack(spacing: 10) {
@@ -101,7 +105,7 @@ struct NotchHUDView: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(isMuted ? .red : (hudType == .brightness ? .yellow : .white))
                             .contentTransition(.symbolEffect(.replace.byLayer))
-                            .frame(width: 26, height: 26, alignment: .center)
+                            .frame(width: iconSize, height: iconSize, alignment: .leading)
                         
                         Text(hudType == .brightness ? "Brightness" : "Volume")
                             .font(.system(size: 15, weight: .semibold))
@@ -111,7 +115,7 @@ struct NotchHUDView: View {
                         
                         Spacer(minLength: 0)
                     }
-                    .padding(.leading, 14)
+                    .padding(.leading, symmetricPadding)
                     .frame(width: wingWidth)
                     
                     // Camera notch area (spacer)
@@ -127,7 +131,7 @@ struct NotchHUDView: View {
                             onChange: onValueChange
                         )
                     }
-                    .padding(.trailing, 14)  // Outer-edge alignment (matches left wing .leading)
+                    .padding(.trailing, symmetricPadding)
                     .frame(width: wingWidth)
                 }
                 .frame(height: notchHeight)

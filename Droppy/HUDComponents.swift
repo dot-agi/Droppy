@@ -173,8 +173,10 @@ struct MediaHUDView: View {
                 .frame(height: notchHeight)
             } else {
                 // NOTCH MODE: Two wings separated by the notch space
-                // Album art and visualizer positioned near outer edges
-                // Horizontal padding matches vertical: (notchHeight - 26) / 2 ≈ 3-5px
+                // Using BoringNotch pattern: padding = (notchHeight - iconHeight) / 2 for symmetry
+                let iconSize: CGFloat = 26
+                let symmetricPadding = max((notchHeight - iconSize) / 2, 4)  // Min 4px for very small notches
+                
                 HStack(spacing: 0) {
                     // Left wing: Album art near left edge
                     HStack {
@@ -193,11 +195,11 @@ struct MediaHUDView: View {
                                     )
                             }
                         }
-                        .frame(width: 26, height: 26)
+                        .frame(width: iconSize, height: iconSize)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         Spacer(minLength: 0)
                     }
-                    .padding(.leading, 8)  // Balanced with vertical padding
+                    .padding(.leading, symmetricPadding)
                     .frame(width: wingWidth)
                     
                     // Camera notch area (spacer)
@@ -209,7 +211,7 @@ struct MediaHUDView: View {
                         Spacer(minLength: 0)
                         MiniAudioVisualizerBars(isPlaying: musicManager.isPlaying, color: visualizerColor)
                     }
-                    .padding(.trailing, 8)  // Balanced with vertical padding
+                    .padding(.trailing, symmetricPadding)
                     .frame(width: wingWidth)
                 }
                 .frame(height: notchHeight)
