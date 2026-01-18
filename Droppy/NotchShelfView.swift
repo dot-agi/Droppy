@@ -969,6 +969,15 @@ struct NotchShelfView: View {
                 musicManager.isMediaHUDHidden = false
             }
         }
+        // MARK: - Auto-Collapse Reliability Fix
+        // Restart timer when mouse LEAVES the shelf area while still expanded
+        // This catches cases where the initial timer fired but hover was true at that moment
+        .onChange(of: state.isMouseHovering) { wasHovering, isHovering in
+            // Only trigger when hover ENDS and shelf is still expanded on this screen
+            if wasHovering && !isHovering && isExpandedOnThisScreen && !isHoveringExpandedContent {
+                startAutoShrinkTimer()
+            }
+        }
         // HUD is now embedded in the notch content (see ZStack above)
         // MARK: - Keyboard Shortcuts
         .background {
