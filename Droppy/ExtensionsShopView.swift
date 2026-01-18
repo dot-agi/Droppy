@@ -59,27 +59,24 @@ struct ExtensionsShopView: View {
     // MARK: - Featured Hero Section
     
     private var featuredSection: some View {
-        VStack(spacing: 16) {
-            // Large Featured Card (AI Background Removal)
-            FeaturedExtensionCard(
-                category: "",
-                title: "Remove Backgrounds",
-                subtitle: "Instantly with local AI. Works offline.",
-                iconURL: "https://iordv.github.io/Droppy/assets/icons/ai-bg.jpg",
-                screenshotURL: "https://iordv.github.io/Droppy/assets/images/ai-bg-screenshot.png",
-                accentColor: .cyan,
-                isInstalled: isAIInstalled,
-                installCount: extensionCounts["aiBackgroundRemoval"]
-            ) {
-                AIInstallView(
-                    installCount: extensionCounts["aiBackgroundRemoval"],
-                    rating: extensionRatings["aiBackgroundRemoval"]
-                )
-            }
-            
-            // Two-column featured row
+        VStack(spacing: 12) {
+            // Row 1: AI Background Removal + Voice Transcribe
             HStack(spacing: 12) {
-                // Voice Transcribe
+                FeaturedExtensionCardCompact(
+                    category: "",
+                    title: "Remove Backgrounds",
+                    subtitle: "Local AI processing",
+                    iconURL: "https://iordv.github.io/Droppy/assets/icons/ai-bg.jpg",
+                    screenshotURL: "https://iordv.github.io/Droppy/assets/images/ai-bg-screenshot.png",
+                    accentColor: .cyan,
+                    isInstalled: isAIInstalled
+                ) {
+                    AIInstallView(
+                        installCount: extensionCounts["aiBackgroundRemoval"],
+                        rating: extensionRatings["aiBackgroundRemoval"]
+                    )
+                }
+                
                 FeaturedExtensionCardCompact(
                     category: "",
                     title: "Voice Transcribe",
@@ -94,8 +91,10 @@ struct ExtensionsShopView: View {
                         rating: extensionRatings["voiceTranscribe"]
                     )
                 }
-                
-                // Video Target Size
+            }
+            
+            // Row 2: Video Target Size + Termi-Notch (NEW)
+            HStack(spacing: 12) {
                 FeaturedExtensionCardCompact(
                     category: "",
                     title: "Video Target Size",
@@ -108,6 +107,21 @@ struct ExtensionsShopView: View {
                     FFmpegInstallView(
                         installCount: extensionCounts["ffmpegVideoCompression"],
                         rating: extensionRatings["ffmpegVideoCompression"]
+                    )
+                }
+                
+                FeaturedExtensionCardCompact(
+                    category: "NEW",
+                    title: "Termi-Notch",
+                    subtitle: "Quick terminal",
+                    iconURL: "https://iordv.github.io/Droppy/assets/icons/termi-notch.jpg",
+                    screenshotURL: "https://iordv.github.io/Droppy/assets/images/terminal-notch-screenshot.png",
+                    accentColor: .green,
+                    isInstalled: isTerminalNotchInstalled
+                ) {
+                    TerminalNotchInfoView(
+                        installCount: extensionCounts["terminalNotch"],
+                        rating: extensionRatings["terminalNotch"]
                     )
                 }
             }
