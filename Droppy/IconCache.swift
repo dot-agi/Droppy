@@ -78,6 +78,12 @@ final class IconCache {
     private init() {
         self.fallbackIcon = NSImage(systemSymbolName: "doc.fill", accessibilityDescription: "File")
             ?? NSImage()
+        
+        // CRITICAL: Trigger IconRendering.framework Metal shader compilation NOW
+        // This call forces the Metal shaders to compile during app startup, not during first drop
+        // We call icon(forFile:) on a known system file to trigger the shader compilation
+        // The result is discarded - we just need to trigger the Metal pipeline
+        _ = NSWorkspace.shared.icon(forFile: "/System/Applications/Utilities/Terminal.app")
     }
     
     /// Returns an SF Symbol-based icon for the UTType (instant, no Metal shaders)

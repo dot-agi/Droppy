@@ -13,6 +13,15 @@ struct DroppyApp: App {
     /// App delegate for handling app lifecycle and notch window setup
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    /// CRITICAL: Warmup runs BEFORE SwiftUI body is even evaluated
+    /// This ensures Metal shaders are compiled before user can interact
+    init() {
+        // Trigger icon warmup immediately - this blocks until complete
+        _ = IconCache.shared
+        // Also trigger QuickLook warmup
+        _ = ThumbnailCache.shared
+    }
+    
     @AppStorage("showInMenuBar") private var showInMenuBar = true
     
     var body: some Scene {
