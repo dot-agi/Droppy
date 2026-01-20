@@ -312,6 +312,42 @@ private struct WelcomeContent: View {
     let hasNotch: Bool
     @Binding var useDynamicIslandStyle: Bool
     
+    // External display style setting (separate from built-in)
+    @AppStorage(AppPreferenceKey.externalDisplayUseDynamicIsland) private var externalDisplayUseDynamicIsland = PreferenceDefault.externalDisplayUseDynamicIsland
+    
+    /// Whether the Mac has a built-in screen with a physical notch (MacBook Pro 14/16)
+    private var hasBuiltInNotch: Bool {
+        NSScreen.builtInWithNotch != nil
+    }
+    
+    /// Whether we're currently running on an external display
+    private var isOnExternalDisplay: Bool {
+        guard let mainScreen = NSScreen.main else { return false }
+        return !mainScreen.isBuiltIn
+    }
+    
+    /// Whether to show any style picker at all
+    /// - MacBook Pro with notch on built-in: NO choice (notch is physical)
+    /// - MacBook Pro with notch on external: show external display style picker only
+    /// - Non-notch Mac (iMac, mini, old MacBook): show standard style picker
+    private var shouldShowStylePicker: Bool {
+        if hasBuiltInNotch {
+            // MacBook Pro with notch - only show picker when on external display
+            return isOnExternalDisplay
+        } else {
+            // Non-notch Mac - show picker (they can choose notch or DI style)
+            return true
+        }
+    }
+    
+    /// Label for the style picker section
+    private var stylePickerLabel: String {
+        if hasBuiltInNotch && isOnExternalDisplay {
+            return "External display style"
+        }
+        return "Choose your display style"
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
             // Big centered NotchFace (winks naturally via its internal timer)
@@ -348,19 +384,32 @@ private struct WelcomeContent: View {
             }
             .frame(width: 380)
             
-            // Style picker (for non-notch Macs)
-            if !hasNotch {
+            // Style picker - only shown when appropriate
+            if shouldShowStylePicker {
                 VStack(spacing: 10) {
-                    Text("Choose your display style")
+                    Text(stylePickerLabel)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                     
-                    HStack(spacing: 16) {
-                        StyleButton(title: "Notch", isSelected: !useDynamicIslandStyle, isNotch: true) {
-                            useDynamicIslandStyle = false
+                    if hasBuiltInNotch && isOnExternalDisplay {
+                        // External display style picker (for MacBook Pro users on external)
+                        HStack(spacing: 16) {
+                            StyleButton(title: "Notch", isSelected: !externalDisplayUseDynamicIsland, isNotch: true) {
+                                externalDisplayUseDynamicIsland = false
+                            }
+                            StyleButton(title: "Dynamic Island", isSelected: externalDisplayUseDynamicIsland, isNotch: false) {
+                                externalDisplayUseDynamicIsland = true
+                            }
                         }
-                        StyleButton(title: "Dynamic Island", isSelected: useDynamicIslandStyle, isNotch: false) {
-                            useDynamicIslandStyle = true
+                    } else {
+                        // Standard style picker (for non-notch Macs)
+                        HStack(spacing: 16) {
+                            StyleButton(title: "Notch", isSelected: !useDynamicIslandStyle, isNotch: true) {
+                                useDynamicIslandStyle = false
+                            }
+                            StyleButton(title: "Dynamic Island", isSelected: useDynamicIslandStyle, isNotch: false) {
+                                useDynamicIslandStyle = true
+                            }
                         }
                     }
                 }

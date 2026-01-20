@@ -290,6 +290,7 @@ struct SmartExportSettingsRow: View {
     @AppStorage(AppPreferenceKey.smartExportEnabled) private var smartExportEnabled = PreferenceDefault.smartExportEnabled
     @State private var showPopover = false
     @State private var showSheet = false
+    @State private var showInfoSheet = false  // NotchFace info sheet when enabling
     @State private var isConfigureHovering = false
     
     var body: some View {
@@ -308,7 +309,16 @@ struct SmartExportSettingsRow: View {
             if smartExportEnabled {
                 // Enabled State: Label + Configure Button (No Toggle)
                 VStack(alignment: .leading) {
-                    Text("Smart Export")
+                    HStack(alignment: .center, spacing: 6) {
+                        Text("Smart Export")
+                        Text("advanced")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.white.opacity(0.08)))
+                            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    }
                     Text("Auto-save processed files to designated folders")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -346,12 +356,21 @@ struct SmartExportSettingsRow: View {
                     set: { newValue in
                         smartExportEnabled = newValue
                         if newValue {
-                            showSheet = true
+                            showInfoSheet = true  // Show info sheet first
                         }
                     }
                 )) {
                     VStack(alignment: .leading) {
-                        Text("Smart Export")
+                        HStack(alignment: .center, spacing: 6) {
+                            Text("Smart Export")
+                            Text("advanced")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.white.opacity(0.08)))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                        }
                         Text("Auto-save processed files to designated folders")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -361,6 +380,9 @@ struct SmartExportSettingsRow: View {
         }
         .sheet(isPresented: $showSheet) {
             SmartExportSettingsView()
+        }
+        .sheet(isPresented: $showInfoSheet) {
+            SmartExportInfoSheet(smartExportEnabled: $smartExportEnabled, showConfigSheet: $showSheet)
         }
     }
     
@@ -441,6 +463,164 @@ struct SmartExportAnimatedIcon: View {
                 isAnimating = true
             }
         }
+    }
+}
+
+// MARK: - Smart Export Info Sheet
+
+/// Info sheet shown when user enables Smart Export (advanced feature)
+struct SmartExportInfoSheet: View {
+    @Binding var smartExportEnabled: Bool
+    @Binding var showConfigSheet: Bool
+    @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
+    @Environment(\.dismiss) private var dismiss
+    @State private var isHoveringDisable = false
+    @State private var isHoveringConfigure = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header with NotchFace
+            VStack(spacing: 16) {
+                NotchFace(size: 60, isExcited: true)
+                
+                Text("Smart Export Enabled")
+                    .font(.title2.bold())
+                    .foregroundStyle(.primary)
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 20)
+            
+            Divider()
+                .padding(.horizontal, 24)
+            
+            // Content
+            VStack(alignment: .center, spacing: 16) {
+                Text("What this does:")
+                    .font(.callout.weight(.medium))
+                
+                // Card with explanation items
+                VStack(spacing: 0) {
+                    // Info item 1
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "folder.badge.plus")
+                            .foregroundStyle(.blue)
+                            .font(.system(size: 14))
+                            .frame(width: 22)
+                        Text("Automatically saves compressed files to a designated folder")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.02))
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Color.white.opacity(0.04)).frame(height: 0.5)
+                    }
+                    
+                    // Info item 2
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(.green)
+                            .font(.system(size: 14))
+                            .frame(width: 22)
+                        Text("Automatically saves converted files to a designated folder")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.02))
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Color.white.opacity(0.04)).frame(height: 0.5)
+                    }
+                    
+                    // Info item 3
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "folder.badge.gearshape")
+                            .foregroundStyle(.orange)
+                            .font(.system(size: 14))
+                            .frame(width: 22)
+                        Text("Configure separate destinations for each file type")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.85))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.02))
+                }
+                .background(Color.white.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                )
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            
+            Divider()
+                .padding(.horizontal, 24)
+            
+            // Buttons (secondary left, Spacer, primary right)
+            HStack(spacing: 8) {
+                // Disable (secondary - left)
+                Button {
+                    smartExportEnabled = false
+                    dismiss()
+                } label: {
+                    Text("Disable")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(isHoveringDisable ? AdaptiveColors.hoverBackgroundAuto : AdaptiveColors.buttonBackgroundAuto)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringDisable = h }
+                }
+                
+                Spacer()
+                
+                // Configure (primary - right)
+                Button {
+                    dismiss()
+                    // Small delay to let sheet dismiss before showing config
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showConfigSheet = true
+                    }
+                } label: {
+                    Text("Configure")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(isHoveringConfigure ? 1.0 : 0.85))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringConfigure = h }
+                }
+            }
+            .padding(16)
+        }
+        .frame(width: 380)
+        .fixedSize(horizontal: true, vertical: true)
+        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
