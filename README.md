@@ -31,6 +31,13 @@
   <a href="https://discord.gg/ghMSjHRa"><strong>💬 Discord</strong></a>
 </p>
 
+<p align="center">
+  <strong>📰 As Seen On</strong><br>
+  <a href="https://medium.com/@PowerUpSkills/droppy-is-the-free-mac-productivity-app-power-users-should-install-first-61e1f42c9b3d">Medium</a> · 
+  <a href="https://appaddict.app/post/droppy-a-notch-app-with-a-lot-to-like">AppAddict</a> · 
+  <a href="https://www.producthunt.com/products/droppy-3">Product Hunt</a>
+</p>
+
 ---
 
 ## What is Droppy?
