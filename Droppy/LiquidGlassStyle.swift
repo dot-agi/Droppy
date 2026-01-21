@@ -118,17 +118,17 @@ struct LiquidButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hover in
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hover
             }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in
-                    withAnimation(.interactiveSpring(response: 0.2)) { isPressed = true }
+                    withAnimation(DroppyAnimation.press) { isPressed = true }
                 }
                 .onEnded { _ in
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isPressed = false }
+                    withAnimation(DroppyAnimation.release) { isPressed = false }
                 }
         )
     }

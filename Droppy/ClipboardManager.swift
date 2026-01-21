@@ -669,7 +669,7 @@ class ClipboardManager: ObservableObject {
     
     func toggleFavorite(_ item: ClipboardItem) {
         if let index = history.firstIndex(where: { $0.id == item.id }) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            withAnimation(DroppyAnimation.listChange) {
                 history[index].isFavorite.toggle()
                 sortHistory()
                 // Force SwiftUI to detect the isFavorite change on rows
@@ -680,7 +680,7 @@ class ClipboardManager: ObservableObject {
     
     func toggleFlag(_ item: ClipboardItem) {
         if let index = history.firstIndex(where: { $0.id == item.id }) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            withAnimation(DroppyAnimation.listChange) {
                 history[index].isFlagged.toggle()
                 sortHistory()
                 // Force SwiftUI to detect the isFlagged change on rows

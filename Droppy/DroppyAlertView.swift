@@ -136,7 +136,7 @@ struct DroppyAlertView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { h in
-                        withAnimation(.easeInOut(duration: 0.15)) { isSecondaryHovering = h }
+                        withAnimation(DroppyAnimation.hover) { isSecondaryHovering = h }
                     }
                 }
                 
@@ -159,7 +159,7 @@ struct DroppyAlertView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isPrimaryHovering = h }
+                    withAnimation(DroppyAnimation.hover) { isPrimaryHovering = h }
                 }
             }
             .padding(16)

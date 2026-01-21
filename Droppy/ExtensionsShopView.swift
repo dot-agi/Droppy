@@ -906,7 +906,7 @@ struct CompactExtensionRow<DetailView: View>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
         }
@@ -954,7 +954,7 @@ struct CategoryPillButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
         }

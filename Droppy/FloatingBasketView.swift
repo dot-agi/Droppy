@@ -393,7 +393,7 @@ struct FloatingBasketView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { isHovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isShelfButtonHovering = isHovering
                     }
                 }
@@ -417,7 +417,7 @@ struct FloatingBasketView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { isHovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isClipboardButtonHovering = isHovering
                     }
                 }
@@ -470,7 +470,7 @@ struct FloatingBasketView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { isHovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isDropHereHovering = isHovering
                     }
                 }
@@ -498,7 +498,7 @@ struct FloatingBasketView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { isHovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isSelectAllHovering = isHovering
                     }
                 }

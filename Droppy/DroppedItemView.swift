@@ -93,22 +93,22 @@ struct DroppedItemView: View {
         .shadow(color: .black.opacity(isHovering ? 0.15 : 0), radius: 8, y: 4)
         .onHover { hovering in
             
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
                 showRemoveButton = hovering
             }
         }
         .onTapGesture {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            withAnimation(DroppyAnimation.state) {
                 onSelect()
             }
         }
         .pressAction {
-            withAnimation(.spring(response: 0.15, dampingFraction: 0.6)) {
+            withAnimation(DroppyAnimation.press) {
                 isPressed = true
             }
         } onRelease: {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+            withAnimation(DroppyAnimation.release) {
                 isPressed = false
             }
         }

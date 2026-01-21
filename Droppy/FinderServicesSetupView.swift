@@ -116,7 +116,7 @@ struct FinderServicesSetupView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringCancel = h
                 }
             }
@@ -148,7 +148,7 @@ struct FinderServicesSetupView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringAction = h
                 }
             }
@@ -271,7 +271,7 @@ struct FinderServicesSetupSheetView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringCancel = h
                 }
             }
@@ -303,7 +303,7 @@ struct FinderServicesSetupSheetView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringAction = h
                 }
             }

@@ -204,7 +204,7 @@ struct ExtensionInfoView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.easeInOut(duration: 0.15)) { isHoveringClose = h }
+                withAnimation(DroppyAnimation.hover) { isHoveringClose = h }
             }
             
             Spacer()
@@ -229,7 +229,7 @@ struct ExtensionInfoView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.easeInOut(duration: 0.15)) { isHoveringAction = h }
+                    withAnimation(DroppyAnimation.hover) { isHoveringAction = h }
                 }
             }
             

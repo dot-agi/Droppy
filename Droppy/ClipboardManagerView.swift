@@ -1106,10 +1106,8 @@ struct FlaggedGridItemView: View {
             )
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
+        .droppyHover { hovering in
+            isHovering = hovering
         }
         .contextMenu {
             Button(action: onPaste) {
@@ -1251,10 +1249,8 @@ struct ClipboardItemRow: View {
         )
 
         .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
+        .droppyHover { hovering in
+            isHovering = hovering
         }
     }
     
