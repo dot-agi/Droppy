@@ -89,7 +89,7 @@ struct KeyShortcutRecorder: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHovering = hovering
                 }
             }

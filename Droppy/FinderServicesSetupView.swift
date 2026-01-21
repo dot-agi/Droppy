@@ -126,7 +126,7 @@ struct FinderServicesSetupView: View {
             // Action button - matching AIInstallView primary style
             Button {
                 openServicesSettings()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     hasOpenedSettings = true
                 }
             } label: {
@@ -281,7 +281,7 @@ struct FinderServicesSetupSheetView: View {
             // Action button - matching AIInstallView primary style
             Button {
                 openServicesSettings()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     hasOpenedSettings = true
                 }
             } label: {

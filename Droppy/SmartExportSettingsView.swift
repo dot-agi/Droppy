@@ -231,7 +231,7 @@ struct SmartExportSettingsView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringClose = h
                 }
             }
@@ -345,7 +345,7 @@ struct SmartExportSettingsRow: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    withAnimation(.easeOut(duration: 0.15)) {
+                    withAnimation(DroppyAnimation.easeOut) {
                         isConfigureHovering = hovering
                     }
                 }

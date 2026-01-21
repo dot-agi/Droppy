@@ -51,7 +51,7 @@ struct AnimatedHUDToggle: View {
                 iconBounce = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     isOn.toggle()
                 }
@@ -123,7 +123,7 @@ struct AnimatedHUDToggleWithSubtitle: View {
                 iconBounce = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     isOn.toggle()
                 }
@@ -199,14 +199,14 @@ struct VolumeAndBrightnessToggle: View {
             
             // Switch back to volume after brief delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     showBrightnessIcon = false
                 }
             }
             
             // Toggle state
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     isEnabled.toggle()
                 }
@@ -297,7 +297,7 @@ struct DisplayModeButton<Icon: View>: View {
                 iconBounce = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     action()
                 }
@@ -378,7 +378,7 @@ struct AnimatedSubSettingToggle: View {
                 iconBounce = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     isOn.toggle()
                 }

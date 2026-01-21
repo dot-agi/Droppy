@@ -178,7 +178,7 @@ struct DroppedItemView: View {
             Divider()
             
             Button(role: .destructive) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     onRemove()
                 }
             } label: {

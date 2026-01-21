@@ -238,7 +238,7 @@ struct VoiceRecordingOverlayView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringButton = h
                 }
             }

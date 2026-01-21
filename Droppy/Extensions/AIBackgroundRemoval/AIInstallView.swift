@@ -340,7 +340,7 @@ struct AIInstallView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isHoveringCancel = h
                     }
                 }
@@ -368,7 +368,7 @@ struct AIInstallView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringReviews = h
                 }
             }
@@ -402,7 +402,7 @@ struct AIInstallView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isHoveringAction = h
                     }
                 }

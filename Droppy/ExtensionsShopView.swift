@@ -170,7 +170,7 @@ struct ExtensionsShopView: View {
                         isSelected: selectedCategory == category,
                         namespace: categoryAnimation
                     ) {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             // Double-click/toggle behavior: clicking selected category deselects it
                             if selectedCategory == category {
                                 selectedCategory = nil  // Back to "all"

@@ -134,7 +134,7 @@ struct ExtensionReviewsSheet: View {
                                     hoveringRating = hovering ? star : 0
                                 }
                                 .onTapGesture {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    withAnimation(DroppyAnimation.state) {
                                         selectedRating = star
                                         showFeedbackField = true
                                     }
@@ -179,7 +179,7 @@ struct ExtensionReviewsSheet: View {
                                 .buttonStyle(.plain)
                                 .disabled(isSubmittingRating)
                                 .onHover { h in
-                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                    withAnimation(DroppyAnimation.hover) {
                                         isHoveringSubmit = h
                                     }
                                 }

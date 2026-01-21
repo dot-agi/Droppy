@@ -234,7 +234,7 @@ struct NotchItemView: View {
                 // Auto-clean: remove only the dragged items, not everything (skip pinned items)
                 let enableAutoClean = UserDefaults.standard.bool(forKey: "enableAutoClean")
                 if enableAutoClean {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         // If this item was selected, remove all selected non-pinned items
                         if state.selectedItems.contains(item.id) {
                             let idsToRemove = state.selectedItems
@@ -300,7 +300,7 @@ struct NotchItemView: View {
             } isTargeted: { targeted in
                 // Only show targeting if Power Folders is enabled and this is a pinned folder
                 guard enablePowerFolders && item.isPinned && item.isDirectory else { return }
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(DroppyAnimation.easeOut) {
                     isDropTargeted = targeted
                 }
                 // Cancel folder preview when drop is happening
@@ -322,7 +322,7 @@ struct NotchItemView: View {
                 // CRITICAL: Ignore interaction if blocked (e.g. context menu open)
                 guard !state.isInteractionBlocked else { return }
                 
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(DroppyAnimation.easeOut) {
                     isHovering = hovering
                 }
                 
@@ -356,7 +356,7 @@ struct NotchItemView: View {
             }
             .onChange(of: state.poofingItemIds) { _, newIds in
                 if newIds.contains(item.id) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                     state.clearPoof(for: item.id)
@@ -365,7 +365,7 @@ struct NotchItemView: View {
             .onAppear {
                 if state.poofingItemIds.contains(item.id) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isPoofing = true
                         }
                         state.clearPoof(for: item.id)
@@ -660,7 +660,7 @@ struct NotchItemView: View {
                     isExtractingText = false
                     state.endFileOperation()
                     // Trigger poof animation for successful extraction
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                     OCRWindowController.shared.show(with: text)
@@ -697,7 +697,7 @@ struct NotchItemView: View {
                     state.endFileOperation()
                     pendingConvertedItem = newItem
                     // Trigger poof animation
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                 }
@@ -814,7 +814,7 @@ struct NotchItemView: View {
                     isCompressing = false
                     state.endFileOperation()
                     pendingConvertedItem = newItem
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                     // Clean up after slight delay to ensure poof is seen
@@ -831,7 +831,7 @@ struct NotchItemView: View {
                     isCompressing = false
                     state.endFileOperation()
                     // Trigger Feedback: Shake + Shield
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    withAnimation(DroppyAnimation.stateEmphasis) {
                         isShakeAnimating = true
                     }
                     
@@ -871,7 +871,7 @@ struct NotchItemView: View {
                     isRemovingBackground = false
                     state.endFileOperation()
                     pendingConvertedItem = newItem
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                 }
@@ -880,7 +880,7 @@ struct NotchItemView: View {
                     isRemovingBackground = false
                     state.endFileOperation()
                     print("Background removal failed: \(error.localizedDescription)")
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    withAnimation(DroppyAnimation.stateEmphasis) {
                         isShakeAnimating = true
                     }
                     Task {
@@ -1026,7 +1026,7 @@ struct NotchItemView: View {
         
         if let renamedItem = item.renamed(to: trimmedName) {
             print("Rename: Success! New item: \(renamedItem.name)")
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 state.replaceItem(item, with: renamedItem)
             }
         } else {
@@ -1061,7 +1061,7 @@ struct NotchControlButton: View {
         }
         .buttonStyle(.plain)
         .onHover { mirroring in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = mirroring
             }
         }
@@ -1226,7 +1226,7 @@ private struct NotchItemContent: View {
         .poofEffect(isPoofing: $isPoofing) {
             // Replace item when poof completes
             if let newItem = pendingConvertedItem {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     state.replaceItem(item, with: newItem)
                 }
                 pendingConvertedItem = nil

@@ -97,7 +97,7 @@ struct NotchFace: View {
         
         // Open eyes with gentle bounce
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+            withAnimation(DroppyAnimation.stateEmphasis) {
                 eyeScale = 1.0
                 smileScale = 1.0
             }

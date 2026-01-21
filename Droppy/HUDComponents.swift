@@ -58,7 +58,7 @@ struct HUDSlider: View {
                         let fraction = max(0, min(1, gesture.location.x / width))
                         value = fraction
                         onChange?(fraction)
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.75)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isDragging = false
                         }
                     }
@@ -235,7 +235,7 @@ struct MediaHUDView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isHovered)
         .allowsHitTesting(true)
         .onTapGesture {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 // Show media player when expanding from mini HUD
                 MusicManager.shared.isMediaHUDForced = true
                 MusicManager.shared.isMediaHUDHidden = false

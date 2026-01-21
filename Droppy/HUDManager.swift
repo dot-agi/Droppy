@@ -135,7 +135,7 @@ final class HUDManager {
         dismissTimer?.invalidate()
         dismissTimer = nil
         
-        withAnimation(.easeOut(duration: 0.15)) {
+        withAnimation(DroppyAnimation.easeOut) {
             activeHUD = nil
         }
         
@@ -163,7 +163,7 @@ final class HUDManager {
             isMuted: request.isMuted
         )
         
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+        withAnimation(DroppyAnimation.hover) {
             activeHUD = hud
         }
         

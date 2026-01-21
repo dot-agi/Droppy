@@ -137,7 +137,7 @@ struct ClipboardManagerView: View {
                         // Search button in sidebar, left of collapse button
                         ToolbarItem(placement: .automatic) {
                             Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                withAnimation(DroppyAnimation.state) {
                                     isSearchVisible.toggle()
                                     if !isSearchVisible {
                                         searchText = ""
@@ -302,7 +302,7 @@ struct ClipboardManagerView: View {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     selectedItems = [first.id]
                 }
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(DroppyAnimation.easeInOut) {
                     scrollProxy?.scrollTo(first.id, anchor: .center)
                 }
             }
@@ -327,7 +327,7 @@ struct ClipboardManagerView: View {
         let itemsToDelete = selectedItemsArray
         let remainingItems = manager.history.filter { !selectedItems.contains($0.id) }
         
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(DroppyAnimation.easeInOut) {
             for item in itemsToDelete {
                 manager.delete(item: item)
             }
@@ -598,7 +598,7 @@ struct ClipboardManagerView: View {
                                             pendingSelectionId = item.id
                                             
                                             // Close search - this triggers list rebuild
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            withAnimation(DroppyAnimation.state) {
                                                 isSearchVisible = false
                                                 searchText = ""
                                                 isSearchFocused = false
@@ -710,7 +710,7 @@ struct ClipboardManagerView: View {
                                             Label("Rename", systemImage: "pencil")
                                         }
                                         Button(role: .destructive) {
-                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                            withAnimation(DroppyAnimation.easeInOut) {
                                                 manager.delete(item: item)
                                                 selectedItems.remove(item.id)
                                                 if selectedItems.isEmpty, let first = manager.history.first {
@@ -1322,7 +1322,7 @@ struct ClipboardPreviewView: View {
             NSPasteboard.general.setData(imgData, forType: .tiff)
         }
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+        withAnimation(DroppyAnimation.stateEmphasis) {
             showCopySuccess = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -1391,7 +1391,7 @@ struct ClipboardPreviewView: View {
             }
             
             // Success Feedback
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            withAnimation(DroppyAnimation.stateEmphasis) {
                 showSaveSuccess = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -1609,7 +1609,7 @@ struct ClipboardPreviewView: View {
                     .matchedGeometryEffect(id: "PrimaryAction", in: animationNamespace)
                     .transition(.move(edge: .leading).combined(with: .opacity))
                     .onHover { hovering in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isPasteHovering = hovering
                         }
                     }
@@ -1643,7 +1643,7 @@ struct ClipboardPreviewView: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
                     .onHover { hovering in
                         if !showCopySuccess {
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                            withAnimation(DroppyAnimation.hover) {
                                 isCopyHovering = hovering
                             }
                         }
@@ -1684,7 +1684,7 @@ struct ClipboardPreviewView: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
                     .onHover { hovering in
                         if !showSaveSuccess {
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                            withAnimation(DroppyAnimation.hover) {
                                 isDownloadHovering = hovering
                             }
                         }
@@ -1693,7 +1693,7 @@ struct ClipboardPreviewView: View {
                 
                 // Favorite Button - Always visible, slides naturally
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                    withAnimation(DroppyAnimation.scalePop) {
                         starAnimationTrigger.toggle()
                     }
                     let willBeFavorite = !item.isFavorite
@@ -1732,14 +1732,14 @@ struct ClipboardPreviewView: View {
                 .buttonStyle(.plain)
                 .help("Toggle Favorite")
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isStarHovering = hovering
                     }
                 }
                 
                 // Flag Button - For important items
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                    withAnimation(DroppyAnimation.scalePop) {
                         flagAnimationTrigger.toggle()
                     }
                     let willBeFlagged = !item.isFlagged
@@ -1778,7 +1778,7 @@ struct ClipboardPreviewView: View {
                 .buttonStyle(.plain)
                 .help("Flag as Important")
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isFlagHovering = hovering
                     }
                 }
@@ -1787,7 +1787,7 @@ struct ClipboardPreviewView: View {
                 if !isEditing && (item.type == .text || item.type == .url) {
                     Button {
                         editedContent = item.content ?? ""
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isEditing = true
                         }
                     } label: {
@@ -1807,7 +1807,7 @@ struct ClipboardPreviewView: View {
                     .buttonStyle(.plain)
                     .help("Edit Content")
                     .onHover { hovering in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isEditHovering = hovering
                         }
                     }
@@ -1818,7 +1818,7 @@ struct ClipboardPreviewView: View {
                     // Save
                     Button {
                         manager.updateItemContent(item, newContent: editedContent)
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isEditing = false
                         }
                     } label: {
@@ -1841,7 +1841,7 @@ struct ClipboardPreviewView: View {
                     
                     // Cancel
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isEditing = false
                         }
                     } label: {
@@ -1884,7 +1884,7 @@ struct ClipboardPreviewView: View {
                 .buttonStyle(.plain)
                 .help("Delete (Backspace)")
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isTrashHovering = hovering
                     }
                 }
@@ -2102,7 +2102,7 @@ struct MultiSelectPreviewView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isPasteHovering = hovering
                     }
                 }
@@ -2127,7 +2127,7 @@ struct MultiSelectPreviewView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isCopyHovering = hovering
                     }
                 }
@@ -2151,7 +2151,7 @@ struct MultiSelectPreviewView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isSaveHovering = hovering
                     }
                 }
@@ -2174,7 +2174,7 @@ struct MultiSelectPreviewView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isDeleteHovering = hovering
                     }
                 }

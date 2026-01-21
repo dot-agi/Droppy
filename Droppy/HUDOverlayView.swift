@@ -238,7 +238,7 @@ class HUDStateManager {
         self.hudType = type
         self.value = value
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(DroppyAnimation.state) {
             self.isVisible = true
         }
         
@@ -246,7 +246,7 @@ class HUDStateManager {
         hideTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(visibleDuration))
             guard !Task.isCancelled else { return }
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 self.isVisible = false
             }
         }
@@ -255,7 +255,7 @@ class HUDStateManager {
     /// Hide the HUD immediately
     func hide() {
         hideTask?.cancel()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(DroppyAnimation.state) {
             isVisible = false
         }
     }

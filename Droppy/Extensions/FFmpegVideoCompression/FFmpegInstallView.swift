@@ -408,7 +408,7 @@ struct FFmpegInstallView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isHoveringCopy = h
                     }
                 }
@@ -511,7 +511,7 @@ struct FFmpegInstallView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isHoveringCancel = h
                     }
                 }
@@ -539,7 +539,7 @@ struct FFmpegInstallView: View {
             }
             .buttonStyle(.plain)
             .onHover { h in
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.hover) {
                     isHoveringReviews = h
                 }
             }
@@ -571,7 +571,7 @@ struct FFmpegInstallView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isHoveringAction = h
                     }
                 }

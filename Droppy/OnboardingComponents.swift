@@ -19,7 +19,7 @@ struct OnboardingToggle: View {
                 iconBounce = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     isOn.toggle()
                 }
@@ -59,7 +59,7 @@ struct OnboardingToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
         }
@@ -93,7 +93,7 @@ struct OnboardingDisplayModeButton<Icon: View>: View {
                 iconBounce = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
                     iconBounce = false
                     action()
                 }
@@ -132,7 +132,7 @@ struct OnboardingDisplayModeButton<Icon: View>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering = hovering
             }
         }

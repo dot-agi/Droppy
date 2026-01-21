@@ -282,7 +282,7 @@ class NotchDragContainer: NSView {
         // Toggle the shelf expansion for THIS specific screen
         let displayID = notchWindow.targetDisplayID
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            withAnimation(DroppyAnimation.transition) {
                 DroppyState.shared.toggleShelfExpansion(for: displayID)
             }
         }
@@ -603,7 +603,7 @@ class NotchDragContainer: NSView {
             if let notchWindow = self.window as? NotchWindow,
                let displayID = notchWindow.notchScreen?.displayID {
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.expandShelf(for: displayID)
                         DroppyState.shared.isDropTargeted = true
                     }
@@ -612,7 +612,7 @@ class NotchDragContainer: NSView {
         } else if overExpandedArea {
             // Highlight UI when over expanded drop zone
             DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     DroppyState.shared.isDropTargeted = true
                 }
             }
@@ -635,14 +635,14 @@ class NotchDragContainer: NSView {
             // - Over expanded shelf area (expanded state drop zone)
             let shouldBeTargeted = (overNotch && !isExpanded) || (overExpandedArea && !overAirDropZone)
             if DroppyState.shared.isDropTargeted != shouldBeTargeted {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     DroppyState.shared.isDropTargeted = shouldBeTargeted
                 }
             }
             
             // Track AirDrop zone hover state
             if DroppyState.shared.isShelfAirDropZoneTargeted != overAirDropZone {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     DroppyState.shared.isShelfAirDropZoneTargeted = overAirDropZone
                 }
             }
@@ -656,7 +656,7 @@ class NotchDragContainer: NSView {
     override func draggingExited(_ sender: NSDraggingInfo?) {
         // Remove highlight and AirDrop zone state
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 DroppyState.shared.isDropTargeted = false
                 DroppyState.shared.isShelfAirDropZoneTargeted = false
             }
@@ -666,7 +666,7 @@ class NotchDragContainer: NSView {
     override func draggingEnded(_ sender: NSDraggingInfo) {
         // Ensure highlight and AirDrop zone state is removed
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 DroppyState.shared.isDropTargeted = false
                 DroppyState.shared.isShelfAirDropZoneTargeted = false
             }
@@ -689,7 +689,7 @@ class NotchDragContainer: NSView {
         
         // Remove highlight and AirDrop zone state
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 DroppyState.shared.isDropTargeted = false
                 DroppyState.shared.isShelfAirDropZoneTargeted = false
             }
@@ -721,7 +721,7 @@ class NotchDragContainer: NSView {
                 let savedFiles = await MailHelper.shared.exportSelectedEmails(to: dropLocation)
                 
                 if !savedFiles.isEmpty {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.addItems(from: savedFiles)
                     }
                 } else {
@@ -748,7 +748,7 @@ class NotchDragContainer: NSView {
                     }
                     print("📦 Successfully received: \(fileURL)")
                     DispatchQueue.main.async {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        withAnimation(DroppyAnimation.transition) {
                             DroppyState.shared.addItems(from: [fileURL])
                         }
                     }
@@ -762,7 +762,7 @@ class NotchDragContainer: NSView {
             .urlReadingFileURLsOnly: true
         ]) as? [URL], !urls.isEmpty {
             DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                withAnimation(DroppyAnimation.transition) {
                     DroppyState.shared.addItems(from: urls)
                 }
             }
@@ -785,7 +785,7 @@ class NotchDragContainer: NSView {
             do {
                 try text.write(to: fileURL, atomically: true, encoding: .utf8)
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.addItems(from: [fileURL])
                     }
                 }

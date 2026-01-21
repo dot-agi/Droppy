@@ -78,13 +78,13 @@ struct PoofEffect: View {
         }
         
         // Center flash animation
-        withAnimation(.easeOut(duration: 0.15)) {
+        withAnimation(DroppyAnimation.easeOut) {
             centerScale = 1.5
             centerOpacity = 1.0
         }
         
         // Particles burst outward - reduced distance to fit 44x44 area
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+        withAnimation(DroppyAnimation.stateEmphasis) {
             for i in particles.indices {
                 let distance = CGFloat.random(in: 18...32)
                 particles[i].offset = CGSize(

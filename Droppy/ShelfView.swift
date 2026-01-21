@@ -24,7 +24,7 @@ struct ShelfView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.black))
         .dropDestination(for: URL.self) { urls, _ in
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            withAnimation(DroppyAnimation.transition) {
                 state.addItems(from: urls)
             }
             return true
@@ -42,7 +42,7 @@ struct ShelfView: View {
                             state.toggleSelection(item)
                         },
                         onRemove: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            withAnimation(DroppyAnimation.state) {
                                 state.removeItem(item)
                             }
                         }

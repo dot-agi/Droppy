@@ -113,7 +113,7 @@ struct TargetSizeDialogView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isCancelButtonHovering = h
                     }
                 }
@@ -141,7 +141,7 @@ struct TargetSizeDialogView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { h in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isCompressButtonHovering = h
                     }
                 }

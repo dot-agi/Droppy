@@ -128,7 +128,7 @@ struct BasketItemView: View {
                 // Auto-clean: remove only the dragged items, not everything (skip pinned items)
                 let enableAutoClean = UserDefaults.standard.bool(forKey: "enableAutoClean")
                 if enableAutoClean {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         // If this item was selected, remove all selected non-pinned items
                         if state.selectedBasketItems.contains(item.id) {
                             let idsToRemove = state.selectedBasketItems
@@ -184,7 +184,7 @@ struct BasketItemView: View {
                 return true
             } isTargeted: { targeted in
                 guard enablePowerFolders && item.isPinned && item.isDirectory else { return }
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(DroppyAnimation.easeOut) {
                     isDropTargeted = targeted
                 }
                 // Cancel folder preview when drop is happening
@@ -206,7 +206,7 @@ struct BasketItemView: View {
                 // CRITICAL: Ignore interaction if blocked (e.g. context menu open)
                 guard !state.isInteractionBlocked else { return }
                 
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(DroppyAnimation.easeOut) {
                     isHovering = hovering
                 }
                 
@@ -241,7 +241,7 @@ struct BasketItemView: View {
             .onChange(of: state.poofingItemIds) { _, newIds in
                 // Trigger local poof animation when this item is marked for poof (from bulk operations)
                 if newIds.contains(item.id) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                     // Clear the poof state after triggering
@@ -253,7 +253,7 @@ struct BasketItemView: View {
                 if state.poofingItemIds.contains(item.id) {
                     // Small delay to ensure view is fully rendered before animation
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isPoofing = true
                         }
                         state.clearPoof(for: item.id)
@@ -702,7 +702,7 @@ struct BasketItemView: View {
                     state.endFileOperation()
                     pendingConvertedItem = newItem
                     // Trigger poof animation
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                 }
@@ -733,7 +733,7 @@ struct BasketItemView: View {
                     isExtractingText = false
                     state.endFileOperation()
                     // Trigger poof animation for successful extraction
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                     OCRWindowController.shared.show(with: text)
@@ -848,7 +848,7 @@ struct BasketItemView: View {
                     isCompressing = false
                     state.endFileOperation()
                     pendingConvertedItem = newItem
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                 }
@@ -857,7 +857,7 @@ struct BasketItemView: View {
                     isCompressing = false
                     state.endFileOperation()
                     // Trigger Feedback: Shake + Shield
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    withAnimation(DroppyAnimation.stateEmphasis) {
                         isShakeAnimating = true
                     }
                     
@@ -899,7 +899,7 @@ struct BasketItemView: View {
                     isRemovingBackground = false
                     state.endFileOperation()
                     pendingConvertedItem = newItem
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         isPoofing = true
                     }
                 }
@@ -909,7 +909,7 @@ struct BasketItemView: View {
                     state.endFileOperation()
                     print("Background removal failed: \(error.localizedDescription)")
                     // Trigger shake animation for failure feedback
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    withAnimation(DroppyAnimation.stateEmphasis) {
                         isShakeAnimating = true
                     }
                     Task {
@@ -1059,7 +1059,7 @@ struct BasketItemView: View {
         
         if let renamedItem = item.renamed(to: trimmedName) {
             print("Rename: Success! New item: \(renamedItem.name)")
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.state) {
                 state.replaceBasketItem(item, with: renamedItem)
             }
         } else {
@@ -1217,7 +1217,7 @@ private struct BasketItemContent: View {
         .poofEffect(isPoofing: $isPoofing) {
             // Replace item when poof completes
             if let newItem = pendingConvertedItem {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     state.replaceBasketItem(item, with: newItem)
                 }
                 pendingConvertedItem = nil

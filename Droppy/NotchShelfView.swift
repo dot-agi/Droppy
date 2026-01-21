@@ -519,7 +519,7 @@ struct NotchShelfView: View {
                         
                         // Toggle terminal button (shows terminal icon when hidden, X when visible)
                         Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DroppyAnimation.listChange) {
                                 terminalManager.toggle()
                             }
                         }) {
@@ -537,7 +537,7 @@ struct NotchShelfView: View {
                     // Close button (only in sticky mode AND when terminal is not visible)
                     if !autoCollapseShelf && !terminalManager.isVisible {
                         Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(DroppyAnimation.listChange) {
                                 state.expandedDisplayID = nil
                                 state.hoveringDisplayID = nil  // Clear hover on all screens when closing
                             }
@@ -588,20 +588,20 @@ struct NotchShelfView: View {
             .onChange(of: state.items.count) { oldCount, newCount in
                 if newCount > oldCount && !isExpandedOnThisScreen {
                     if let displayID = targetScreen?.displayID {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        withAnimation(DroppyAnimation.transition) {
                             state.expandShelf(for: displayID)
                         }
                     }
                 }
                 if newCount == 0 && state.isExpanded {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DroppyAnimation.listChange) {
                         state.expandedDisplayID = nil
                     }
                 }
             }
             .onChange(of: dragMonitor.isDragging) { _, isDragging in
                 if showMediaPlayer && musicManager.isPlaying && !isExpandedOnThisScreen {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    withAnimation(DroppyAnimation.state) {
                         mediaHUDIsHovered = isDragging
                     }
                 }
@@ -644,11 +644,11 @@ struct NotchShelfView: View {
         shelfContentWithHUDObservers
             .onChange(of: musicManager.songTitle) { oldTitle, newTitle in
                 if !oldTitle.isEmpty && !newTitle.isEmpty && oldTitle != newTitle {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isSongTransitioning = true
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isSongTransitioning = false
                         }
                     }
@@ -666,7 +666,7 @@ struct NotchShelfView: View {
                     mediaDebounceWorkItem?.cancel()
                     isMediaStable = false
                     let workItem = DispatchWorkItem { [self] in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(DroppyAnimation.listChange) {
                             isMediaStable = true
                         }
                     }
@@ -686,7 +686,7 @@ struct NotchShelfView: View {
                     }
                 } else if !isEnabled && wasEnabled {
                     mediaFadeWorkItem?.cancel()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DroppyAnimation.listChange) {
                         mediaHUDFadedOut = false
                     }
                 }
@@ -735,7 +735,7 @@ struct NotchShelfView: View {
         hudType = .volume
         // Show 0% when muted to display muted icon, otherwise show actual volume
         hudValue = volumeManager.isMuted ? 0 : CGFloat(volumeManager.rawVolume)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(DroppyAnimation.state) {
             hudIsVisible = true
             // Reset hover states to prevent layout shift when HUD appears
             state.hoveringDisplayID = nil  // Clear hover on all screens
@@ -755,7 +755,7 @@ struct NotchShelfView: View {
         hudWorkItem?.cancel()
         hudType = .brightness
         hudValue = CGFloat(brightnessManager.rawBrightness)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(DroppyAnimation.state) {
             hudIsVisible = true
             // Reset hover states to prevent layout shift when HUD appears
             state.hoveringDisplayID = nil  // Clear hover on all screens
@@ -834,7 +834,7 @@ struct NotchShelfView: View {
             let hasActiveMenu = NSApp.windows.contains { $0.level.rawValue >= NSWindow.Level.popUpMenu.rawValue }
             guard !hasActiveMenu else { return }
             
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            withAnimation(DroppyAnimation.listChange) {
                 state.expandedDisplayID = nil  // Collapse shelf on all screens
                 state.hoveringDisplayID = nil  // Reset hover state to go directly to regular notch
             }
@@ -1165,7 +1165,7 @@ struct NotchShelfView: View {
             guard enableNotchShelf else { return }
             // Toggle expansion on this specific screen
             if let displayID = targetScreen?.displayID {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                withAnimation(DroppyAnimation.transition) {
                     state.toggleShelfExpansion(for: displayID)
                 }
             }
@@ -1177,7 +1177,7 @@ struct NotchShelfView: View {
             if !dragMonitor.isDragging && !hudIsVisible {
                 // Get the displayID for this specific screen
                 if let displayID = targetScreen?.displayID ?? NSScreen.builtInWithNotch?.displayID {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    withAnimation(DroppyAnimation.state) {
                         // Only set mouse hovering if shelf is enabled
                         if enableNotchShelf {
                             state.setHovering(for: displayID, isHovering: isHovering)
@@ -1193,7 +1193,7 @@ struct NotchShelfView: View {
                 // This handles edge case where cursor was already over area when HUD appeared
                 if let displayID = targetScreen?.displayID ?? NSScreen.builtInWithNotch?.displayID {
                     if state.isHovering(for: displayID) || mediaHUDIsHovered {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                        withAnimation(DroppyAnimation.state) {
                             state.setHovering(for: displayID, isHovering: false)
                             mediaHUDIsHovered = false
                         }
@@ -1353,7 +1353,7 @@ struct NotchShelfView: View {
             // Clear shelf (when items exist)
             if !state.items.isEmpty {
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.state) {
                         state.clearAll()
                     }
                 } label: {
@@ -1439,7 +1439,7 @@ struct NotchShelfView: View {
                             state: state,
                             renamingItemId: $renamingItemId,
                             onRemove: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                withAnimation(DroppyAnimation.state) {
                                     state.removeItem(item)
                                 }
                             }

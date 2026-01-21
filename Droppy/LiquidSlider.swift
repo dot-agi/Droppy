@@ -102,7 +102,7 @@ struct LiquidSlider: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isDragging = true
                         }
                         let newValue = gesture.location.x / width
@@ -111,7 +111,7 @@ struct LiquidSlider: View {
                         onDragChange?(clampedValue)
                     }
                     .onEnded { _ in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             isDragging = false
                         }
                         onChange?(value)

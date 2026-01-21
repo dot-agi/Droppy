@@ -116,7 +116,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { hovering in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isCoffeeHovering = hovering
                         }
                     }
@@ -142,7 +142,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { hovering in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isUpdateHovering = hovering
                         }
                     }
@@ -276,7 +276,7 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            withAnimation(DroppyAnimation.hover) {
                 isHovering.wrappedValue = hovering
             }
         }
@@ -1115,7 +1115,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         isIntroHovering = hovering
                     }
                 }
@@ -1180,7 +1180,7 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.plain)
                             .onHover { hovering in
-                                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                withAnimation(DroppyAnimation.hover) {
                                     isCoffeeHovering = hovering
                                 }
                             }
@@ -1437,7 +1437,7 @@ struct SettingsView: View {
                     
                     // Remove button
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.state) {
                             clipboardManager.removeExcludedApp(bundleID)
                         }
                     } label: {
@@ -1486,7 +1486,7 @@ struct SettingsView: View {
                     ForEach(runningApps, id: \.bundleIdentifier) { app in
                         Button {
                             if let bundleID = app.bundleIdentifier {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                withAnimation(DroppyAnimation.state) {
                                     clipboardManager.addExcludedApp(bundleID)
                                 }
                                 showAppPicker = false

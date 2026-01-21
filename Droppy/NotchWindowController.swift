@@ -457,7 +457,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             if isInNotchZone {
                 // Click on notch - toggle shelf for THIS screen only
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.toggleShelfExpansion(for: targetScreen.displayID)
                     }
                 }
@@ -475,7 +475,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                     // Check if drag started during the delay - if so, don't close
                     guard !DragMonitor.shared.isDragging else { return }
                     
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    withAnimation(DroppyAnimation.transition) {
                         DroppyState.shared.expandedDisplayID = nil
                         DroppyState.shared.isMouseHovering = false
                     }
@@ -610,7 +610,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                 if isInNotchZone {
                     // Click on notch - toggle shelf for THIS screen only
                     DispatchQueue.main.async {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        withAnimation(DroppyAnimation.transition) {
                             DroppyState.shared.toggleShelfExpansion(for: targetScreen.displayID)
                         }
                     }
@@ -628,7 +628,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                         // Check if drag started during the delay - if so, don't close
                         guard !DragMonitor.shared.isDragging else { return }
                         
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        withAnimation(DroppyAnimation.transition) {
                             DroppyState.shared.expandedDisplayID = nil
                             DroppyState.shared.isMouseHovering = false
                         }
@@ -750,7 +750,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                     let displayID = screen.displayID  // Capture for async block
                     DispatchQueue.main.async { [weak self] in
                         DroppyState.shared.validateItems()
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             DroppyState.shared.setHovering(for: displayID, isHovering: true)
                         }
                         // Start auto-expand timer with screen context
@@ -1025,7 +1025,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Only expand if still hovering and not already expanded
             if DroppyState.shared.isMouseHovering && !DroppyState.shared.isExpanded {
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    withAnimation(DroppyAnimation.transition) {
                         if let displayID = displayID {
                             // Expand on the specific screen
                             DroppyState.shared.expandShelf(for: displayID)
@@ -1062,7 +1062,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             // and ensures hover state doesn't get stuck when mouse leaves all notch areas
             if DroppyState.shared.isMouseHovering {
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         DroppyState.shared.isMouseHovering = false
                     }
                 }
@@ -1142,7 +1142,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Swipe LEFT -> Show MEDIA player
             accumulatedScrollX = 0  // Reset after action
             DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                withAnimation(DroppyAnimation.transition) {
                     // Show media: set forced true, hidden false
                     musicManager.isMediaHUDForced = true
                     musicManager.isMediaHUDHidden = false
@@ -1152,7 +1152,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Swipe RIGHT -> Show SHELF (hide media)
             accumulatedScrollX = 0  // Reset after action
             DispatchQueue.main.async {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                withAnimation(DroppyAnimation.transition) {
                     // Hide media: set forced false, hidden true
                     musicManager.isMediaHUDForced = false
                     musicManager.isMediaHUDHidden = true
@@ -1472,7 +1472,7 @@ class NotchWindow: NSPanel {
                     // Validate items before showing shelf (remove ghost files)
                     DroppyState.shared.validateItems()
 
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         DroppyState.shared.setHovering(for: targetScreen.displayID, isHovering: true)
                     }
                     // Start auto-expand timer with THIS screen's displayID
@@ -1482,7 +1482,7 @@ class NotchWindow: NSPanel {
             } else if !isOverNotch && currentlyHovering && !DroppyState.shared.isExpanded {
                 // Only reset hover if not expanded (expanded has its own area)
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    withAnimation(DroppyAnimation.hover) {
                         DroppyState.shared.setHovering(for: targetScreen.displayID, isHovering: false)
                     }
                     NotchWindowController.shared.cancelAutoExpandTimer()

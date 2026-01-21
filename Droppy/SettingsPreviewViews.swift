@@ -354,7 +354,7 @@ struct MediaPlayerPreview: View {
         .padding(.vertical, 16)
         .onAppear {
             Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     isPlaying.toggle()
                 }
             }
@@ -543,7 +543,7 @@ struct BatteryHUDPreview: View {
         .onAppear {
             // Animate charging state and battery level
             Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.transition) {
                     isCharging.toggle()
                     // Animate battery level when charging
                     if isCharging {
@@ -622,7 +622,7 @@ struct CapsLockHUDPreview: View {
         .onAppear {
             // Animate ON/OFF state
             Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.transition) {
                     isCapsLockOn.toggle()
                 }
             }
@@ -1103,7 +1103,7 @@ struct DropIndicatorPreview: View {
                     .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
             )
             .onHover { hovering in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(DroppyAnimation.state) {
                     isHovered = hovering
                 }
             }

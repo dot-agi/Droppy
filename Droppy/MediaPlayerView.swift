@@ -259,7 +259,7 @@ struct MediaPlayerView: View {
         inlineHUDValue = value
         
         // Animate visibility on (same as regular HUD: spring 0.3, 0.7)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(DroppyAnimation.state) {
             // Already set, but this triggers the animation
         }
         
@@ -444,7 +444,7 @@ struct MediaPlayerView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.press) {
                             isDragging = true
                         }
                         let fraction = max(0, min(1, value.location.x / width))
@@ -454,7 +454,7 @@ struct MediaPlayerView: View {
                         let fraction = max(0, min(1, value.location.x / width))
                         let seekTime = Double(fraction) * musicManager.songDuration
                         musicManager.seek(to: seekTime)
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isDragging = false
                         }
                         lastDragTime = Date()

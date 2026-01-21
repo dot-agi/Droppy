@@ -131,7 +131,7 @@ struct UpdateView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { h in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isOkHovering = h
                         }
                     }
@@ -153,7 +153,7 @@ struct UpdateView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { h in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isLaterHovering = h
                         }
                     }
@@ -184,7 +184,7 @@ struct UpdateView: View {
                     }
                     .buttonStyle(.plain)
                     .onHover { h in
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                        withAnimation(DroppyAnimation.hover) {
                             isUpdateHovering = h
                         }
                     }
