@@ -1120,41 +1120,44 @@ struct NotchShelfView: View {
     
     // MARK: - Morphing Outline
     
-    /// Marching ants outline for drag/hover state
+    /// Premium hover indicator - subtle inner glow (no marching ants)
+    /// Inspired by Atoll's clean, minimal hover feedback
     private var morphingOutline: some View {
         ZStack {
-            // Dynamic Island: Fully rounded outline
-            DynamicIslandOutlineShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
+            // Dynamic Island: Soft inner glow
+            DynamicIslandShape(cornerRadius: isExpandedOnThisScreen ? 40 : 50)
                 .stroke(
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        lineCap: .round,
-                        lineJoin: .round,
-                        dash: [3, 5],
-                        dashPhase: dashPhase
-                    )
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.25),
+                            Color.white.opacity(0.1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
                 )
-                .foregroundStyle(Color.blue)
                 .opacity(isDynamicIslandMode ? 1 : 0)
             
-            // Notch mode: U-shaped outline (no top edge)
-            NotchOutlineShape(bottomRadius: isExpandedOnThisScreen ? 40 : 16)
-                .trim(from: 0, to: 1)
+            // Notch mode: U-shaped subtle glow
+            NotchShape(bottomRadius: isExpandedOnThisScreen ? 40 : 16)
                 .stroke(
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        lineCap: .round,
-                        lineJoin: .round,
-                        dash: [3, 5],
-                        dashPhase: dashPhase
-                    )
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.2),
+                            Color.white.opacity(0.08)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
                 )
-                .foregroundStyle(Color.blue)
                 .opacity(isDynamicIslandMode ? 0 : 1)
         }
+        // Show on hover/drag when collapsed (premium fade in/out)
         .opacity((enableNotchShelf && shouldShowVisualNotch && !isExpandedOnThisScreen && (dragMonitor.isDragging || isHoveringOnThisScreen)) ? 1 : 0)
-        .animation(DroppyAnimation.hoverBouncy, value: dragMonitor.isDragging)
-        .animation(DroppyAnimation.hoverBouncy, value: isHoveringOnThisScreen)
+        .animation(DroppyAnimation.hover, value: dragMonitor.isDragging)
+        .animation(DroppyAnimation.hover, value: isHoveringOnThisScreen)
     }
 
     // MARK: - Drop Zone
