@@ -325,9 +325,13 @@ private func mediaKeyCallback(
     // We extract the key code directly from the CGEvent's integer field to check if this
     // is a media playback key (F7-F9) that should pass through WITHOUT any modification.
     //
-    // For system-defined events (type 14), the data is stored in integer field 1.
-    // The key code is in the upper 16 bits of data1.
-    let rawData1 = event.getIntegerValueField(.data1)
+    // For system-defined events (type 14), the NSEvent.data1 field corresponds to
+    // CGEventField with raw value 133 (kCGEventUnacceleratedPointerMovementX is closest).
+    // However, the safest approach is to create NSEvent briefly just for data extraction
+    // but only check the key code - this minimal NSEvent creation shouldn't affect delivery.
+    //
+    // Alternative: Use raw field access. CGEventField(rawValue: 133) corresponds to data1.
+    let rawData1 = event.getIntegerValueField(CGEventField(rawValue: 133)!)
     let earlyKeyCode = UInt32((rawData1 & 0xFFFF0000) >> 16)
     
     // Media playback keys (F7=previous, F8=play/pause, F9=next) must pass through
