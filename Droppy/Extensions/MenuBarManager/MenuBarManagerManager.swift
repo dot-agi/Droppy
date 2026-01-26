@@ -136,7 +136,17 @@ final class MenuBarManager: ObservableObject {
     // MARK: - Status Items Creation
     
     private func createStatusItems() {
-        // Create the toggle button (always visible, shows chevron)
+        // IMPORTANT: Set initial preferred positions if not already set
+        // This ensures the toggle (position 0) and divider (position 1) are immediately adjacent
+        // so users only need to drag icons just to the left of the dot to hide them
+        if StatusItemDefaults.preferredPosition(for: toggleAutosaveName) == nil {
+            StatusItemDefaults.setPreferredPosition(0, for: toggleAutosaveName)
+        }
+        if StatusItemDefaults.preferredPosition(for: dividerAutosaveName) == nil {
+            StatusItemDefaults.setPreferredPosition(1, for: dividerAutosaveName)
+        }
+        
+        // Create the toggle button (always visible, shows dot indicator)
         toggleItem = NSStatusBar.system.statusItem(withLength: toggleLength)
         toggleItem?.autosaveName = toggleAutosaveName
         
@@ -150,7 +160,7 @@ final class MenuBarManager: ObservableObject {
         }
         
         // Create the divider (expands to hide items)
-        // This should be positioned to the LEFT of the toggle
+        // Positioned immediately to the LEFT of the toggle (position 1 vs toggle's position 0)
         dividerItem = NSStatusBar.system.statusItem(withLength: dividerStandardLength)
         dividerItem?.autosaveName = dividerAutosaveName
         
@@ -191,16 +201,23 @@ final class MenuBarManager: ObservableObject {
     private func updateToggleIcon() {
         guard let button = toggleItem?.button else { return }
         
-        let config = NSImage.SymbolConfiguration(pointSize: 10, weight: .medium)
+        // Use heavier weight and template mode for menu bar visibility
+        let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
         
         if isExpanded {
-            // Items visible (expanded) - show filled circle indicating icons are visible
-            button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Hide menu bar icons")?
-                .withSymbolConfiguration(config)
+            // Items visible (expanded) - show filled circle
+            if let image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Hide menu bar icons")?
+                .withSymbolConfiguration(config) {
+                image.isTemplate = true
+                button.image = image
+            }
         } else {
-            // Items hidden (collapsed) - show empty circle indicating icons are hidden
-            button.image = NSImage(systemSymbolName: "circle", accessibilityDescription: "Show menu bar icons")?
-                .withSymbolConfiguration(config)
+            // Items hidden (collapsed) - show hollow circle with thicker stroke
+            if let image = NSImage(systemSymbolName: "circle", accessibilityDescription: "Show menu bar icons")?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)) {
+                image.isTemplate = true
+                button.image = image
+            }
         }
     }
     
