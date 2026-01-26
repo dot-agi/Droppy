@@ -2,107 +2,83 @@
 //  MenuBarItemClicker.swift
 //  Droppy
 //
-//  Handles clicking menu bar items by temporarily showing them.
-//  Based on Ice's tempShowItem mechanism.
+//  Handles clicking menu bar items.
+//  Simplified implementation based on Ice's approach.
 //
 
 import Cocoa
 
-/// Handles clicking hidden menu bar items by temporarily moving them to visible area
+/// Handles clicking menu bar items
 @MainActor
 final class MenuBarItemClicker {
     
     /// Shared instance
     static let shared = MenuBarItemClicker()
     
-    /// Context for a temporarily shown item
-    private struct TempShownItemContext {
-        let info: MenuBarItemInfo
-        let originalFrame: CGRect
-    }
-    
-    /// Currently temp-shown items waiting to be returned
-    private var tempShownContexts: [TempShownItemContext] = []
-    
-    /// Timer to return items to their original position
-    private var returnTimer: Timer?
-    
-    /// Default interval before returning items (seconds)
-    private let returnInterval: TimeInterval = 5.0
-    
     private init() {}
     
     // MARK: - Public API
     
-    /// Click a menu bar item by temporarily showing it
+    /// Click a menu bar item
     /// - Parameters:
     ///   - item: The menu bar item to click
     ///   - mouseButton: Which mouse button to use (.left or .right)
     func clickItem(_ item: MenuBarItem, mouseButton: CGMouseButton = .left) {
         Task { @MainActor in
-            // If item is already visible, just click it directly
-            if item.isOnScreen, let currentFrame = MenuBarItem.getCurrentFrame(for: item.windowID) {
-                await performClick(at: currentFrame, mouseButton: mouseButton, ownerPID: item.ownerPID)
-                return
-            }
-            
-            // Item is hidden - we need to show it first
-            await tempShowAndClick(item: item, mouseButton: mouseButton)
+            await performClick(item: item, mouseButton: mouseButton)
         }
     }
     
     // MARK: - Private Implementation
     
-    /// Temporarily show an item, click it, then schedule return
-    private func tempShowAndClick(item: MenuBarItem, mouseButton: CGMouseButton) async {
-        // First, expand the menu bar to show hidden items
-        MenuBarManager.shared.setExpanded(true)
-        
-        // Wait for expansion
-        try? await Task.sleep(for: .milliseconds(150))
-        
-        // Try to get the item's current (now visible) frame
+    /// Perform a click on the item
+    private func performClick(item: MenuBarItem, mouseButton: CGMouseButton) async {
+        // Get current frame (item may have moved)
         guard let currentFrame = MenuBarItem.getCurrentFrame(for: item.windowID),
               currentFrame.width > 0 else {
-            print("[Clicker] Could not get visible frame for \(item.displayName)")
-            // Fallback: just activate the app
+            print("[Clicker] Could not get frame for \(item.displayName)")
+            // Fallback: activate the app
             if let app = item.owningApplication {
                 app.activate()
             }
             return
         }
         
-        // Click the item
-        await performClick(at: currentFrame, mouseButton: mouseButton, ownerPID: item.ownerPID)
+        // Save current cursor position
+        guard let cursorLocation = CGEvent(source: nil)?.location else {
+            print("[Clicker] Could not get cursor location")
+            return
+        }
         
-        // Store context for returning later
-        let context = TempShownItemContext(info: item.info, originalFrame: item.frame)
-        tempShownContexts.append(context)
+        // Calculate click point (center of item in CoreGraphics coordinates)
+        let clickPoint = CGPoint(x: currentFrame.midX, y: currentFrame.midY)
         
-        // Schedule return (collapse menu bar after delay)
-        scheduleReturn()
+        print("[Clicker] Clicking \(item.displayName) at (\(clickPoint.x), \(clickPoint.y))")
         
-        print("[Clicker] Clicked \(item.displayName)")
-    }
-    
-    /// Perform a click at the given frame
-    private func performClick(at frame: CGRect, mouseButton: CGMouseButton, ownerPID: pid_t) async {
-        let clickPoint = CGPoint(x: frame.midX, y: frame.midY)
-        
-        // Create mouse events
-        let mouseDownType: CGEventType = mouseButton == .left ? .leftMouseDown : .rightMouseDown
-        let mouseUpType: CGEventType = mouseButton == .left ? .leftMouseUp : .rightMouseUp
-        
-        // Create a proper event source
-        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+        // Create event source
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
             print("[Clicker] Could not create event source")
             return
         }
         
-        // Create mouse down event
+        // Permit events during suppression states (like Ice does)
+        source.setLocalEventsFilterDuringSuppressionState(
+            .permitLocalMouseEvents,
+            state: .eventSuppressionStateRemoteMouseDrag
+        )
+        source.setLocalEventsFilterDuringSuppressionState(
+            .permitLocalMouseEvents,
+            state: .eventSuppressionStateSuppressionInterval
+        )
+        source.localEventsSuppressionInterval = 0
+        
+        // Get mouse button event types
+        let (downType, upType) = getEventTypes(for: mouseButton)
+        
+        // Create events
         guard let mouseDown = CGEvent(
             mouseEventSource: source,
-            mouseType: mouseDownType,
+            mouseType: downType,
             mouseCursorPosition: clickPoint,
             mouseButton: mouseButton
         ) else {
@@ -110,10 +86,9 @@ final class MenuBarItemClicker {
             return
         }
         
-        // Create mouse up event
         guard let mouseUp = CGEvent(
             mouseEventSource: source,
-            mouseType: mouseUpType,
+            mouseType: upType,
             mouseCursorPosition: clickPoint,
             mouseButton: mouseButton
         ) else {
@@ -121,54 +96,53 @@ final class MenuBarItemClicker {
             return
         }
         
-        // Set target PID for the events
-        mouseDown.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(ownerPID))
-        mouseUp.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(ownerPID))
+        // Set target fields (like Ice does)
+        let windowNumber = Int64(item.windowID)
+        mouseDown.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(item.ownerPID))
+        mouseUp.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(item.ownerPID))
         
-        // Set window ID fields
-        // Note: We'd need the window ID here for full accuracy, but PID targeting usually works
+        // Also set window-related fields for better targeting
+        mouseDown.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: windowNumber)
+        mouseUp.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: windowNumber)
+        
+        // Hide cursor (like Ice)
+        CGDisplayHideCursor(CGMainDisplayID())
+        
+        // Warp cursor to click point
+        CGWarpMouseCursorPosition(clickPoint)
+        
+        // Small delay for warp to settle
+        try? await Task.sleep(for: .milliseconds(10))
         
         // Post events
-        mouseDown.post(tap: .cghidEventTap)
+        mouseDown.post(tap: .cgSessionEventTap)
         
+        // Small delay between down and up
         try? await Task.sleep(for: .milliseconds(50))
         
-        mouseUp.post(tap: .cghidEventTap)
+        mouseUp.post(tap: .cgSessionEventTap)
         
-        print("[Clicker] Posted click at (\(clickPoint.x), \(clickPoint.y))")
+        // Wait a bit then restore cursor
+        try? await Task.sleep(for: .milliseconds(100))
+        
+        // Restore cursor position
+        CGWarpMouseCursorPosition(cursorLocation)
+        CGDisplayShowCursor(CGMainDisplayID())
+        
+        print("[Clicker] Click complete for \(item.displayName)")
     }
     
-    /// Schedule collapsing the menu bar after a delay
-    private func scheduleReturn() {
-        returnTimer?.invalidate()
-        
-        returnTimer = Timer.scheduledTimer(withTimeInterval: returnInterval, repeats: false) { [weak self] timer in
-            guard let self else {
-                timer.invalidate()
-                return
-            }
-            Task { @MainActor [weak self] in
-                self?.returnTempShownItems()
-            }
+    /// Get event types for mouse button
+    private func getEventTypes(for button: CGMouseButton) -> (down: CGEventType, up: CGEventType) {
+        switch button {
+        case .left:
+            return (.leftMouseDown, .leftMouseUp)
+        case .right:
+            return (.rightMouseDown, .rightMouseUp)
+        case .center:
+            return (.otherMouseDown, .otherMouseUp)
+        @unknown default:
+            return (.leftMouseDown, .leftMouseUp)
         }
-    }
-    
-    /// Return all temp-shown items (collapse menu bar)
-    private func returnTempShownItems() {
-        guard !tempShownContexts.isEmpty else { return }
-        
-        print("[Clicker] Returning \(tempShownContexts.count) temp-shown items")
-        
-        // Clear contexts
-        tempShownContexts.removeAll()
-        
-        // Collapse the menu bar
-        // Only if user hasn't manually expanded it
-        let savedState = UserDefaults.standard.bool(forKey: "menuBarManagerExpanded")
-        if !savedState {
-            MenuBarManager.shared.setExpanded(false)
-        }
-        
-        returnTimer = nil
     }
 }

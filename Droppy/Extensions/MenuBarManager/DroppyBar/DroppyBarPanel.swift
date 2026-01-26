@@ -203,8 +203,6 @@ struct DroppyBarItemView: View {
     @ObservedObject var imageCache: MenuBarItemImageCache
     let closePanel: () -> Void
     
-    @State private var isHovering = false
-    
     private var image: NSImage? {
         imageCache.getImage(for: item)
     }
@@ -228,35 +226,84 @@ struct DroppyBarItemView: View {
                 }
             }
         }
-        .background(isHovering ? Color.white.opacity(0.1) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .contentShape(Rectangle())
-        .onHover { hovering in
-            isHovering = hovering
-        }
-        .onTapGesture {
-            handleClick(rightClick: false)
-        }
-        .contextMenu {
-            Button("Open \(item.displayName)") {
-                handleClick(rightClick: false)
-            }
+        .overlay {
+            DroppyBarClickHandler(item: item, closePanel: closePanel)
         }
         .help(item.displayName)
     }
+}
+
+// MARK: - DroppyBarClickHandler
+
+/// NSViewRepresentable for proper mouse event handling
+struct DroppyBarClickHandler: NSViewRepresentable {
+    let item: MenuBarItem
+    let closePanel: () -> Void
     
-    private func handleClick(rightClick: Bool) {
+    func makeNSView(context: Context) -> DroppyBarClickView {
+        DroppyBarClickView(item: item, closePanel: closePanel)
+    }
+    
+    func updateNSView(_ nsView: DroppyBarClickView, context: Context) {}
+}
+
+/// NSView that handles mouse clicks
+final class DroppyBarClickView: NSView {
+    let item: MenuBarItem
+    let closePanel: () -> Void
+    
+    private var lastMouseDownDate = Date.now
+    private var lastMouseDownLocation = CGPoint.zero
+    
+    init(item: MenuBarItem, closePanel: @escaping () -> Void) {
+        self.item = item
+        self.closePanel = closePanel
+        super.init(frame: .zero)
+        self.toolTip = item.displayName
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        lastMouseDownDate = .now
+        lastMouseDownLocation = NSEvent.mouseLocation
+    }
+    
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        // Only trigger if quick click (not drag)
+        let elapsed = Date.now.timeIntervalSince(lastMouseDownDate)
+        let distance = hypot(NSEvent.mouseLocation.x - lastMouseDownLocation.x,
+                            NSEvent.mouseLocation.y - lastMouseDownLocation.y)
+        
+        guard elapsed < 0.5 && distance < 5 else { return }
+        
+        performClick(mouseButton: .left)
+    }
+    
+    override func rightMouseUp(with event: NSEvent) {
+        super.rightMouseUp(with: event)
+        performClick(mouseButton: .right)
+    }
+    
+    private func performClick(mouseButton: CGMouseButton) {
+        // Close panel first
         closePanel()
         
-        // Simple approach: activate the owning app
-        if let app = item.owningApplication {
-            app.activate()
-        }
-        
-        // Also try to click the actual menu bar item
+        // Click the menu bar item
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(100))
-            MenuBarItemClicker.shared.clickItem(item, mouseButton: rightClick ? .right : .left)
+            // Small delay for panel to close
+            try? await Task.sleep(for: .milliseconds(50))
+            MenuBarItemClicker.shared.clickItem(item, mouseButton: mouseButton)
         }
     }
 }
