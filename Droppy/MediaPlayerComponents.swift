@@ -37,20 +37,24 @@ struct LoadingSpinner: View {
 struct InlineHUDView: View {
     let type: InlineHUDType
     let value: CGFloat
+    var isMuted: Bool = false  // PREMIUM: Explicit mute state from VolumeManager
     
     /// Animation trigger value for CapsLock/Focus (boolean-based)
     private var boolTrigger: Bool {
         value > 0
     }
     
-    /// Whether volume is muted (for red color override)
-    private var isMuted: Bool {
-        type == .volume && value <= 0
+    /// Whether to show muted state (explicit mute OR value is 0)
+    private var shouldShowMuted: Bool {
+        type == .volume && (isMuted || value <= 0)
     }
     
-    /// PREMIUM: Fill color based on HUD type (matching HUDSlider)
+    /// PREMIUM: Delayed mute state for drain-then-color effect
+    @State private var displayedMuted = false
+    
+    /// PREMIUM: Fill color based on HUD type (uses displayedMuted for delayed transition)
     private var fillColor: Color {
-        if isMuted {
+        if displayedMuted {
             return Color(red: 0.85, green: 0.25, blue: 0.25)  // Subtle red for muted
         }
         switch type {
@@ -67,7 +71,7 @@ struct InlineHUDView: View {
     
     /// PREMIUM: Track color (darker, faded version)
     private var trackColor: Color {
-        if isMuted {
+        if displayedMuted {
             return Color(red: 0.25, green: 0.1, blue: 0.1)  // Dark muted red
         }
         switch type {
@@ -80,16 +84,13 @@ struct InlineHUDView: View {
         }
     }
     
-    /// PREMIUM: Icon color (matching slider fill)
+    /// PREMIUM: Icon color (white for volume, yellow for brightness)
     private var iconColor: Color {
-        if isMuted {
-            return Color(red: 0.85, green: 0.25, blue: 0.25)
-        }
         switch type {
         case .brightness:
             return Color(red: 1.0, green: 0.85, blue: 0.0)
         case .volume:
-            return Color(red: 0.2, green: 0.9, blue: 0.4)
+            return .white  // Volume icon is always white
         default:
             return type.accentColor
         }
@@ -194,6 +195,25 @@ struct InlineHUDView: View {
         }
         // Match width of center controls
         .frame(width: type.showsSlider ? 160 : 80)
+        // PREMIUM: Delayed mute color transition - bar drains first, then color changes
+        .onChange(of: shouldShowMuted) { _, newMuted in
+            if newMuted {
+                // When muting: delay color change so bar drains to 0 first
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        displayedMuted = true
+                    }
+                }
+            } else {
+                // When unmuting: immediately show green
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    displayedMuted = false
+                }
+            }
+        }
+        .onAppear {
+            displayedMuted = shouldShowMuted
+        }
     }
 }
 

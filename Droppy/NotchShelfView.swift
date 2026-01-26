@@ -230,7 +230,21 @@ struct NotchShelfView: View {
     /// Top margin for Dynamic Island from SSOT - creates floating effect like iPhone
     private var dynamicIslandTopMargin: CGFloat { NotchLayoutConstants.dynamicIslandTopMargin }
     
-    private let expandedWidth: CGFloat = 450
+    /// Width when showing files (narrower - 5 items × 64px + 4 gaps × 8px + 2 × 20px padding = 392px)
+    private let shelfWidth: CGFloat = 392
+    
+    /// Width when showing media player (wider for album art + controls)
+    private let mediaPlayerWidth: CGFloat = 450
+    
+    /// Current expanded width based on what's shown
+    private var expandedWidth: CGFloat {
+        // Media player gets full width, shelf gets narrower width
+        if showMediaPlayer && !musicManager.isPlayerIdle && !state.isDropTargeted && !state.isShelfAirDropZoneTargeted && !dragMonitor.isDragging &&
+           (musicManager.isMediaHUDForced || ((musicManager.isPlaying || musicManager.wasRecentlyPlaying) && !musicManager.isMediaHUDHidden && state.items.isEmpty)) {
+            return mediaPlayerWidth
+        }
+        return shelfWidth
+    }
     
     /// Media player horizontal layout dimensions (v8.1.5 redesign)
     /// Wider but shorter for horizontal album art + controls layout

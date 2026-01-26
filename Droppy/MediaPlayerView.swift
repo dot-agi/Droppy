@@ -209,6 +209,7 @@ struct MediaPlayerView: View {
     // Handles all HUD types: volume, brightness, battery, caps lock, etc.
     @State private var inlineHUDType: InlineHUDType? = nil
     @State private var inlineHUDValue: CGFloat = 0.5
+    @State private var inlineHUDMuted: Bool = false  // PREMIUM: Explicit mute state for volume
     @State private var inlineHUDHideWorkItem: DispatchWorkItem?
     
     /// Dominant color from album art for visualizer
@@ -326,7 +327,9 @@ struct MediaPlayerView: View {
         // MARK: - Universal Inline HUD Observers
         // Uses local @ObservedObject references for snappy updates
         .onChange(of: volumeManager.lastChangeAt) { _, _ in
-            triggerInlineHUD(.volume, value: CGFloat(volumeManager.rawVolume))
+            // When muted, pass 0 so bar drains and percentage shows 0
+            let volumeValue = volumeManager.isMuted ? 0.0 : CGFloat(volumeManager.rawVolume)
+            triggerInlineHUD(.volume, value: volumeValue, muted: volumeManager.isMuted)
         }
         .onChange(of: brightnessManager.lastChangeAt) { _, _ in
             triggerInlineHUD(.brightness, value: CGFloat(brightnessManager.rawBrightness))
@@ -405,13 +408,14 @@ struct MediaPlayerView: View {
     
     /// Trigger any inline HUD type in the media player
     /// Matches exact timing from NotchShelfView's triggerVolumeHUD
-    private func triggerInlineHUD(_ type: InlineHUDType, value: CGFloat) {
+    private func triggerInlineHUD(_ type: InlineHUDType, value: CGFloat, muted: Bool = false) {
         // Cancel any pending hide
         inlineHUDHideWorkItem?.cancel()
         
-        // Update type and value INSTANTLY (no animation - matches regular HUD)
+        // Update type, value, and mute state INSTANTLY (no animation - matches regular HUD)
         inlineHUDType = type
         inlineHUDValue = value
+        inlineHUDMuted = muted
         
         // Animate visibility on (same as regular HUD: spring 0.3, 0.7)
         withAnimation(DroppyAnimation.state) {
@@ -776,7 +780,7 @@ struct MediaPlayerView: View {
             
             // MARK: - Universal Inline HUD (morphs in for any HUD type)
             if let hudType = inlineHUDType {
-                InlineHUDView(type: hudType, value: inlineHUDValue)
+                InlineHUDView(type: hudType, value: inlineHUDValue, isMuted: inlineHUDMuted)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
@@ -844,7 +848,7 @@ struct MediaPlayerView: View {
             
             // Inline HUD overlay
             if let hudType = inlineHUDType {
-                InlineHUDView(type: hudType, value: inlineHUDValue)
+                InlineHUDView(type: hudType, value: inlineHUDValue, isMuted: inlineHUDMuted)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }

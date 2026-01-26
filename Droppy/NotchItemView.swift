@@ -14,6 +14,7 @@ struct NotchItemView: View {
     
     @State private var thumbnail: NSImage?
     @State private var isHovering = false
+    @State private var isHoveringPopover = false
     @State private var isConverting = false
     @State private var isExtractingText = false
     @State private var isCreatingZIP = false
@@ -295,14 +296,13 @@ struct NotchItemView: View {
                         )
                 }
             }
-            // Drop target for pinned folders - drop files INTO the folder
+            // Drop target for ANY folder - drop files INTO the folder
             .dropDestination(for: URL.self) { urls, location in
-                guard enablePowerFolders && item.isPinned && item.isDirectory else { return false }
+                guard item.isDirectory else { return false }
                 moveFilesToFolder(urls: urls, destination: item.url)
                 return true
             } isTargeted: { targeted in
-                // Only show targeting if Power Folders is enabled and this is a pinned folder
-                guard enablePowerFolders && item.isPinned && item.isDirectory else { return }
+                guard item.isDirectory else { return }
                 withAnimation(DroppyAnimation.easeOut) {
                     isDropTargeted = targeted
                 }
@@ -313,12 +313,12 @@ struct NotchItemView: View {
                 }
             }
             .overlay {
-                // Visual feedback when dropping files onto pinned folder
-                if isDropTargeted && item.isPinned {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.yellow, lineWidth: 3)
-                        .frame(width: 60, height: 60)
-                        .offset(y: -12)
+                // Visual feedback when dropping files onto ANY folder (Dark overlay)
+                if isDropTargeted {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.black.opacity(0.3))
+                        .frame(width: 56, height: 56)
+                        .offset(y: -14)
                 }
             }
             .onHover { hovering in
@@ -343,10 +343,19 @@ struct NotchItemView: View {
                             }
                         }
                     } else {
-                        // Clean dismiss - cancel pending task and hide popover
+                        // Grace period before dismissal to allow checking isHoveringPopover
                         hoverTask?.cancel()
-                        hoverTask = nil
-                        showFolderPreview = false
+                        hoverTask = Task {
+                            // Short grace period (0.1s)
+                            try? await Task.sleep(nanoseconds: 100_000_000)
+                            
+                            // Check if we moved INTO the popover or back to the item
+                            if !Task.isCancelled && !isHoveringPopover && !isHovering {
+                                await MainActor.run {
+                                    showFolderPreview = false
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -359,7 +368,11 @@ struct NotchItemView: View {
                 }
             }
             .popover(isPresented: $showFolderPreview, arrowEdge: .bottom) {
-                FolderPreviewPopover(folderURL: item.url)
+                FolderPreviewPopover(
+                    folderURL: item.url,
+                    isPinned: item.isPinned,
+                    isHovering: $isHoveringPopover
+                )
             }
             .onChange(of: state.poofingItemIds) { _, newIds in
                 if newIds.contains(item.id) {
@@ -1126,6 +1139,8 @@ private struct NotchItemContent: View {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                             .resizable()
                             .aspectRatio(contentMode: .fit)
+                            // AUTO-TINT for Pinned Folders: Blue -> Yellow (+180 deg)
+                            .hueRotation(item.isPinned && item.isDirectory ? .degrees(180) : .degrees(0))
                     }
                 }
                 .frame(width: 48, height: 48)

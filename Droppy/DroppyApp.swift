@@ -35,7 +35,12 @@ struct DroppyMenuContent: View {
     @AppStorage(AppPreferenceKey.enableNotchShelf) private var enableNotchShelf = PreferenceDefault.enableNotchShelf
     
     // Check if Quickshare menu bar is enabled
+    // Check if Quickshare menu bar is enabled
     @AppStorage(AppPreferenceKey.showQuickshareInMenuBar) private var showQuickshareInMenuBar = PreferenceDefault.showQuickshareInMenuBar
+
+    // Check if Clipboard menu bar is enabled
+    @AppStorage(AppPreferenceKey.showClipboardInMenuBar) private var showClipboardInMenuBar = PreferenceDefault.showClipboardInMenuBar
+    @ObservedObject private var clipboardManager = ClipboardManager.shared
     
     // Check if extensions are disabled
     private var isElementCaptureDisabled: Bool {
@@ -107,6 +112,47 @@ struct DroppyMenuContent: View {
                 QuickshareMenuContent()
             } label: {
                 Label("Quickshare", systemImage: "drop.fill")
+            }
+        }
+        
+        // Clipboard Menu (New)
+        if showClipboardInMenuBar {
+            Menu {
+                // Recent History
+                let history = clipboardManager.history.prefix(15)
+                
+                if history.isEmpty {
+                    Text("Clipboard is empty")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(history) { item in
+                        Button {
+                            clipboardManager.paste(item: item)
+                        } label: {
+                            // Show icon based on type
+                            Label(item.title, systemImage: iconFor(item: item))
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    Button(role: .destructive) {
+                        clipboardManager.history.removeAll()
+                    } label: {
+                        Label("Clear History", systemImage: "trash")
+                    }
+                }
+                
+                Divider()
+                
+                Button {
+                    ClipboardWindowController.shared.show()
+                } label: {
+                    Label("Manage...", systemImage: "list.bullet.rectangle")
+                }
+                
+            } label: {
+                Label("Clipboard", systemImage: "clipboard")
             }
         }
         
@@ -217,6 +263,17 @@ struct DroppyMenuContent: View {
             } label: {
                 Label("Element Capture", systemImage: "viewfinder")
             }
+        }
+    }
+    
+    // Helper for icon based on type
+    private func iconFor(item: ClipboardItem) -> String {
+        switch item.type {
+        case .text: return "text.alignleft"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .url: return "link"
+        case .color: return "paintpalette"
         }
     }
 }

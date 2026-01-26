@@ -48,6 +48,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.autoExpandShelf) private var autoExpandShelf = PreferenceDefault.autoExpandShelf
     @AppStorage(AppPreferenceKey.autoExpandDelay) private var autoExpandDelay = PreferenceDefault.autoExpandDelay
     @AppStorage(AppPreferenceKey.autoHideOnFullscreen) private var autoHideOnFullscreen = PreferenceDefault.autoHideOnFullscreen
+    @AppStorage(AppPreferenceKey.hideMediaOnlyOnFullscreen) private var hideMediaOnlyOnFullscreen = PreferenceDefault.hideMediaOnlyOnFullscreen
     @AppStorage(AppPreferenceKey.enableFinderServices) private var enableFinderServices = PreferenceDefault.enableFinderServices
 
 
@@ -849,6 +850,19 @@ struct SettingsView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                        
+                        // Sub-option: Hide media only (keep volume/brightness HUDs visible)
+                        if autoHideOnFullscreen {
+                            Toggle(isOn: $hideMediaOnlyOnFullscreen) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Media Only")
+                                    Text("Still show volume, brightness, and other HUDs")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.leading, 20)
                         }
                         
                         Toggle(isOn: $enableRealAudioVisualizer) {
@@ -1670,6 +1684,7 @@ struct SettingsView: View {
     }
     
     // MARK: - Clipboard
+    @AppStorage(AppPreferenceKey.showClipboardInMenuBar) private var showClipboardInMenuBar = PreferenceDefault.showClipboardInMenuBar
     @AppStorage(AppPreferenceKey.enableClipboard) private var enableClipboard = PreferenceDefault.enableClipboard
     @AppStorage(AppPreferenceKey.clipboardHistoryLimit) private var clipboardHistoryLimit = PreferenceDefault.clipboardHistoryLimit
     @AppStorage(AppPreferenceKey.clipboardAutoFocusSearch) private var autoFocusSearch = PreferenceDefault.clipboardAutoFocusSearch
@@ -1735,6 +1750,17 @@ struct SettingsView: View {
                     }
                 }
             }
+            
+            Toggle(isOn: $showClipboardInMenuBar) {
+                VStack(alignment: .leading) {
+                    Text("Show in Menu Bar")
+                    Text("Access clipboard history from the menu bar")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.leading, 28)
+            .disabled(!enableClipboard)
             .onChange(of: enableClipboard) { oldValue, newValue in
                 if newValue {
                     // Check for Accessibility Permissions using centralized manager

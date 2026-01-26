@@ -1999,7 +1999,14 @@ class NotchWindow: NSPanel {
             break
         }
         
-        let shouldHide = isFullscreen
+        // Check if "hide media only" mode is enabled
+        // When enabled, the window stays visible but we still return isFullscreen
+        // so the media player knows to hide (via fullscreenDisplayIDs in NotchShelfView)
+        let hideMediaOnly = (UserDefaults.standard.object(forKey: AppPreferenceKey.hideMediaOnlyOnFullscreen) as? Bool) ?? PreferenceDefault.hideMediaOnlyOnFullscreen
+        
+        // If hideMediaOnly is enabled, don't hide the window - just report fullscreen status
+        // This allows volume/brightness HUDs to still appear while media is hidden
+        let shouldHide = isFullscreen && !hideMediaOnly
         let newTargetAlpha: CGFloat = shouldHide ? 0.0 : 1.0
         
         // Only trigger animation if the TARGET has changed
@@ -2010,7 +2017,9 @@ class NotchWindow: NSPanel {
             self.alphaValue = newTargetAlpha
         }
         
-        return shouldHide
+        // Return the fullscreen status (not whether we're hiding)
+        // This is used by NotchWindowController to track fullscreenDisplayIDs
+        return isFullscreen
     }
     
     // Ensure the window can become key to receive input - but only when appropriate

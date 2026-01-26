@@ -372,63 +372,35 @@ final class DroppyState {
     
     /// Adds a new item to the shelf
     func addItem(_ item: DroppedItem) {
-        // Check for Power Folder (pinned directory)
-        let enablePowerFolders = UserDefaults.standard.object(forKey: AppPreferenceKey.enablePowerFolders) as? Bool ?? true
-        if item.isDirectory && enablePowerFolders {
-            // Power Folders go to separate list
-            guard !shelfPowerFolders.contains(where: { $0.url == item.url }) else { return }
-            var pinnedItem = item
-            pinnedItem.isPinned = true
-            shelfPowerFolders.append(pinnedItem)
-        } else {
-            // Regular items - avoid duplicates
-            guard !shelfItems.contains(where: { $0.url == item.url }) else { return }
-            shelfItems.append(item)
-        }
+        // Check for Power Folder (pinned directory) -> DISABLED AUTO-PIN (User Request)
+        // Folders are now treated as regular items unless manually pinned
+        guard !shelfItems.contains(where: { $0.url == item.url }) else { return }
+        shelfItems.append(item)
         triggerAutoExpand()
         HapticFeedback.drop()
     }
     
     /// Adds multiple items from file URLs
     func addItems(from urls: [URL]) {
-        let enablePowerFolders = UserDefaults.standard.object(forKey: AppPreferenceKey.enablePowerFolders) as? Bool ?? true
-        
         var regularItems: [DroppedItem] = []
-        var powerFolders: [DroppedItem] = []
         
-        // Get all existing URLs to check for duplicates
-        let existingURLs = Set(shelfItems.map { $0.url } + shelfPowerFolders.map { $0.url })
-        
+        // DISABLED AUTO-PIN for batch add as well
         for url in urls {
-            // Skip duplicates
-            guard !existingURLs.contains(url) else { continue }
-            
-            let item = DroppedItem(url: url)
-            
-            // Power Folders: Directories go to separate list
-            if item.isDirectory && enablePowerFolders {
-                var pinnedItem = item
-                pinnedItem.isPinned = true
-                powerFolders.append(pinnedItem)
-            } else {
-                regularItems.append(item)
-            }
-        }
-        
-        // Add Power Folders
-        shelfPowerFolders.append(contentsOf: powerFolders)
-        
-        // Add regular items
-        if !regularItems.isEmpty {
-            shelfItems.append(contentsOf: regularItems)
-            triggerAutoExpand()
-            HapticFeedback.drop()
-        }
-        
-        if !powerFolders.isEmpty {
-            triggerAutoExpand()
-            HapticFeedback.drop()
-        }
+             // Create item
+             let item = DroppedItem(url: url)
+             
+             // Avoid duplicates in regular list
+             if !shelfItems.contains(where: { $0.url == item.url }) && 
+                !shelfPowerFolders.contains(where: { $0.url == item.url }) {
+                 regularItems.append(item)
+             }
+         }
+         
+         if !regularItems.isEmpty {
+             shelfItems.append(contentsOf: regularItems)
+             triggerAutoExpand()
+             HapticFeedback.drop()
+         }
     }
     
     /// Removes an item from the shelf

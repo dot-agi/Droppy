@@ -29,6 +29,7 @@ enum AppPreferenceKey {
     static let externalDisplayUseDynamicIsland = "externalDisplayUseDynamicIsland"
     static let enableProgressiveBlur = "enableProgressiveBlur"
     static let autoHideOnFullscreen = "autoHideOnFullscreen"
+    static let hideMediaOnlyOnFullscreen = "hideMediaOnlyOnFullscreen"  // Sub-option: only hide media, not HUDs
     static let enableParallaxEffect = "enableParallaxEffect"
     static let enableRightClickHide = "enableRightClickHide"
     
@@ -70,6 +71,7 @@ enum AppPreferenceKey {
     static let clipboardAutoFocusSearch = "clipboardAutoFocusSearch"
     static let clipboardHistoryLimit = "clipboardHistoryLimit"
     static let clipboardCopyFavoriteEnabled = "clipboardCopyFavoriteEnabled"
+    static let showClipboardInMenuBar = "showClipboardInMenuBar"
     
     // MARK: - UI Elements
     static let showClipboardButton = "showClipboardButton"
@@ -128,6 +130,7 @@ enum PreferenceDefault {
     static let externalDisplayUseDynamicIsland = true
     static let enableProgressiveBlur = true  // iOS-style progressive blur around notch
     static let autoHideOnFullscreen = true   // Hide notch in fullscreen apps/games
+    static let hideMediaOnlyOnFullscreen = false  // Sub-option: only hide media, keep volume/brightness HUDs
     static let enableParallaxEffect = true   // 3D parallax tilt on hover (album art, etc.)
     static let enableRightClickHide = false  // Right-click to quickly hide notch/island
     static let enableHapticFeedback = true   // Haptic feedback for trackpad (on by default)
@@ -171,6 +174,7 @@ enum PreferenceDefault {
     static let clipboardAutoFocusSearch = false
     static let clipboardHistoryLimit = 50
     static let clipboardCopyFavoriteEnabled = false
+    static let showClipboardInMenuBar = false
     
     // MARK: - UI Elements
     static let showClipboardButton = false
