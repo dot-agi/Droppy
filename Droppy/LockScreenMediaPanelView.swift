@@ -16,11 +16,11 @@ struct LockScreenMediaPanelView: View {
     @ObservedObject var animator: LockScreenMediaPanelAnimator
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
     
-    // MARK: - Layout Constants (precise iPhone matching)
+    // MARK: - Layout Constants (pixel-perfect)
     private let panelWidth: CGFloat = 380
     private let panelHeight: CGFloat = 160
     private let cornerRadius: CGFloat = 24
-    private let edgePadding: CGFloat = 16  // Consistent padding on all edges
+    private let edgePadding: CGFloat = 16  // Same padding on ALL edges
     private let albumArtSize: CGFloat = 56
     private let albumArtRadius: CGFloat = 10
     
@@ -33,7 +33,7 @@ struct LockScreenMediaPanelView: View {
                 ? min(1, max(0, estimatedTime / musicManager.songDuration)) 
                 : 0
             
-            VStack(spacing: 12) {
+            VStack(spacing: 0) {
                 // Row 1: Album Art + Track Info + Visualizer
                 HStack(spacing: 12) {
                     // Album art
@@ -52,9 +52,9 @@ struct LockScreenMediaPanelView: View {
                             .lineLimit(1)
                     }
                     
-                    Spacer()
+                    Spacer(minLength: 0)
                     
-                    // Visualizer (5 bars)
+                    // Visualizer (5 bars) - aligned to right edge
                     AudioSpectrumView(
                         isPlaying: musicManager.isPlaying,
                         barCount: 5,
@@ -64,6 +64,8 @@ struct LockScreenMediaPanelView: View {
                         color: .white
                     )
                 }
+                
+                Spacer(minLength: 0)
                 
                 // Row 2: Progress bar with timestamps
                 HStack(spacing: 8) {
@@ -93,6 +95,8 @@ struct LockScreenMediaPanelView: View {
                         .frame(width: 36, alignment: .trailing)
                 }
                 
+                Spacer(minLength: 0)
+                
                 // Row 3: Media controls (centered)
                 HStack(spacing: 36) {
                     // Previous
@@ -102,7 +106,7 @@ struct LockScreenMediaPanelView: View {
                         Image(systemName: "backward.fill")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 44, height: 32)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -114,7 +118,7 @@ struct LockScreenMediaPanelView: View {
                         Image(systemName: musicManager.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 26, weight: .medium))
                             .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 44, height: 32)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -126,7 +130,7 @@ struct LockScreenMediaPanelView: View {
                         Image(systemName: "forward.fill")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 44, height: 32)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
