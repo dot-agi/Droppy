@@ -215,6 +215,28 @@ final class MenuBarManager: ObservableObject {
         print("[MenuBarManager] Toggled: \(isExpanded ? "expanded" : "collapsed")")
     }
     
+    /// Set the expansion state directly (used by Droppy Bar click handler)
+    func setExpanded(_ expanded: Bool) {
+        guard expanded != isExpanded else { return }
+        
+        isExpanded = expanded
+        isHoverExpanded = false
+        UserDefaults.standard.set(isExpanded, forKey: expandedKey)
+        applyExpansionState()
+        
+        // Also toggle Droppy Bar if enabled
+        if droppyBarEnabled {
+            if isExpanded {
+                showDroppyBar()
+            } else {
+                hideDroppyBar()
+            }
+        }
+        
+        NotificationCenter.default.post(name: .menuBarManagerStateChanged, object: nil)
+        print("[MenuBarManager] Set expanded: \(isExpanded)")
+    }
+    
     /// Clean up all resources
     func cleanup() {
         stopHoverMonitoring()

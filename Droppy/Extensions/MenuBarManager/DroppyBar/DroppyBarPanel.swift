@@ -199,7 +199,7 @@ struct DroppyBarItemClickHandler: NSViewRepresentable {
     func updateNSView(_ nsView: DroppyBarClickView, context: Context) {}
 }
 
-/// NSView that handles mouse events and forwards clicks to the actual menu bar item
+/// NSView that handles mouse events and activates the menu bar item's app
 final class DroppyBarClickView: NSView {
     let item: MenuBarItemScanner.ScannedMenuItem
     
@@ -242,7 +242,7 @@ final class DroppyBarClickView: NSView {
         else {
             return
         }
-        clickMenuItem(isLeftClick: true)
+        activateMenuItem()
     }
     
     override func rightMouseUp(with event: NSEvent) {
@@ -253,52 +253,23 @@ final class DroppyBarClickView: NSView {
         else {
             return
         }
-        clickMenuItem(isLeftClick: false)
+        activateMenuItem()
     }
     
-    /// Click the actual menu bar item by posting a click event to its position
-    private func clickMenuItem(isLeftClick: Bool) {
+    /// Activate the menu bar item's app - this will show the item's menu 
+    private func activateMenuItem() {
+        // Expand the menu bar first so the item becomes visible
+        MenuBarManager.shared.setExpanded(true)
+        
+        // Small delay to allow items to appear, then activate the app
         Task { @MainActor in
-            // Get the item's position in the menu bar
-            let frame = item.frame
+            try? await Task.sleep(for: .milliseconds(100))
             
-            // Check if frame is valid (non-zero)
-            guard frame.width > 0 && frame.height > 0 else {
-                // Fallback: just activate the app
-                if let app = NSRunningApplication(processIdentifier: pid_t(item.ownerPID)) {
-                    app.activate()
-                }
-                return
+            if let app = NSRunningApplication(processIdentifier: pid_t(item.ownerPID)) {
+                // Activate the app - this brings its menu bar item to front
+                app.activate()
+                print("[DroppyBar] Activated: \(item.ownerName)")
             }
-            
-            // Calculate click position (center of the item)
-            let clickX = frame.midX
-            let clickY = frame.midY
-            
-            // Post a mouse click event at the item's location
-            // First, we need to convert to screen coordinates for CGEvent
-            guard let screen = NSScreen.main else { return }
-            let screenHeight = screen.frame.height
-            let cgClickY = screenHeight - clickY  // Flip for CG coordinate system
-            
-            let clickPoint = CGPoint(x: clickX, y: cgClickY)
-            
-            // Create and post mouse events
-            let mouseDownType: CGEventType = isLeftClick ? .leftMouseDown : .rightMouseDown
-            let mouseUpType: CGEventType = isLeftClick ? .leftMouseUp : .rightMouseUp
-            let mouseButton: CGMouseButton = isLeftClick ? .left : .right
-            
-            if let mouseDown = CGEvent(mouseEventSource: nil, mouseType: mouseDownType, mouseCursorPosition: clickPoint, mouseButton: mouseButton) {
-                mouseDown.post(tap: .cghidEventTap)
-            }
-            
-            try? await Task.sleep(for: .milliseconds(50))
-            
-            if let mouseUp = CGEvent(mouseEventSource: nil, mouseType: mouseUpType, mouseCursorPosition: clickPoint, mouseButton: mouseButton) {
-                mouseUp.post(tap: .cghidEventTap)
-            }
-            
-            print("[DroppyBar] Clicked \(item.ownerName) at (\(clickX), \(clickY)) with \(isLeftClick ? "left" : "right") button")
         }
     }
 }
@@ -311,3 +282,4 @@ extension NSScreen {
         return 24  // Standard menu bar height
     }
 }
+
