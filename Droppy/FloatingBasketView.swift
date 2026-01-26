@@ -637,7 +637,7 @@ struct FloatingBasketView: View {
         }
         
         Menu("More") {
-            ForEach(NSSharingService.sharingServices(forItems: state.basketItems.map(\.url)), id: \.title) { service in
+            ForEach(sharingServicesForItems(state.basketItems.map(\.url)), id: \.title) { service in
                 Button {
                     service.perform(withItems: state.basketItems.map(\.url))
                 } label: {

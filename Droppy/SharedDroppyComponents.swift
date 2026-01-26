@@ -5,9 +5,18 @@ import AppKit
 var sharingServicesCache: [String: (services: [NSSharingService], timestamp: Date)] = [:]
 let sharingServicesCacheTTL: TimeInterval = 60
 
-// Use a wrapper function to silence the deprecation warning
-// The deprecated API is the ONLY way to properly show share services in SwiftUI context menus
-@available(macOS, deprecated: 13.0, message: "NSSharingService.sharingServices is deprecated but required for context menu integration")
+/// Wrapper function that uses the deprecated sharingServices(forItems:) API.
+/// Apple recommends NSSharingServicePicker.standardShareMenuItem but that doesn't work
+/// with SwiftUI context menus which require explicit ForEach over services.
+/// This wrapper isolates the deprecation warning to one location.
+#if swift(>=5.9)
+@available(macOS, deprecated: 13.0)
+private func _legacySharingServices(forItems items: [Any]) -> [NSSharingService] {
+    NSSharingService.sharingServices(forItems: items)
+}
+#endif
+
+/// Get sharing services for items with caching. Uses deprecated API but no alternative exists for context menus.
 func sharingServicesForItems(_ items: [Any]) -> [NSSharingService] {
     // Check if first item is a URL for caching
     if let url = items.first as? URL {
@@ -16,11 +25,19 @@ func sharingServicesForItems(_ items: [Any]) -> [NSSharingService] {
            Date().timeIntervalSince(cached.timestamp) < sharingServicesCacheTTL {
             return cached.services
         }
+        #if swift(>=5.9)
+        let services = _legacySharingServices(forItems: items)
+        #else
         let services = NSSharingService.sharingServices(forItems: items)
+        #endif
         sharingServicesCache[ext] = (services: services, timestamp: Date())
         return services
     }
+    #if swift(>=5.9)
+    return _legacySharingServices(forItems: items)
+    #else
     return NSSharingService.sharingServices(forItems: items)
+    #endif
 }
 
 // MARK: - Magic Processing Overlay
