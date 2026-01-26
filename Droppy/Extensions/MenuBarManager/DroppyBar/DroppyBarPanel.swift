@@ -213,19 +213,22 @@ struct DroppyBarContentView: View {
         
         print("[DroppyBar] Looking for \(configuredOwnerNames.count) configured items: \(configuredOwnerNames)")
         
-        // Filter to only show configured items
+        // Filter to only show configured items and DEDUPLICATE
         if configuredOwnerNames.isEmpty {
             items = []
             print("[DroppyBar] No configured items, showing empty")
         } else {
-            items = allItems.filter { item in
-                let isMatch = configuredOwnerNames.contains(item.ownerName)
-                if isMatch {
-                    print("[DroppyBar] Match: \(item.ownerName)")
-                }
-                return isMatch
+            // Group by owner name to remove duplicates
+            let groups = Dictionary(grouping: allItems.filter { configuredOwnerNames.contains($0.ownerName) }) { $0.ownerName }
+            
+            // For each configured owner, pick the best window (e.g. valid size)
+            items = configuredOwnerNames.compactMap { ownerName in
+                guard let candidates = groups[ownerName], !candidates.isEmpty else { return nil }
+                // Use the first valid candidate (sorting by X in MenuBarItem helps pick the right one usually)
+                return candidates.first
             }
-            print("[DroppyBar] Showing \(items.count) matched items")
+            
+            print("[DroppyBar] Showing \(items.count) unique matched items")
         }
     }
 }

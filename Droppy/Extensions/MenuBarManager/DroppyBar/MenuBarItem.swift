@@ -116,7 +116,7 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
             // Menu bar is usually height 24, but some items might be overlays
             let isAtTop = y >= 0 && y < 40
             let isReasonableHeight = height > 0 && height < 100 // Allow taller popovers initially
-            let isReasonableWidth = width > 0
+            let isReasonableWidth = width > 0 && width < 400 // Filter out full-width app windows
             
             guard isAtTop && isReasonableHeight && isReasonableWidth else {
                 continue
@@ -126,7 +126,8 @@ struct MenuBarItem: Identifiable, Equatable, Hashable {
             if ownerName == "Window Server" || 
                ownerName == "Dock" ||
                ownerName == "Droppy" ||
-               ownerName == "Wallpaper" {
+               ownerName == "Wallpaper" ||
+               ownerName == "Control Centre" { // Control Center has many hidden windows, skip for now to reduce noise
                 continue
             }
             
