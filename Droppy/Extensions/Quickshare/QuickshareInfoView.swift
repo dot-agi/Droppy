@@ -293,6 +293,7 @@ struct QuickshareInfoView: View {
                 featureRow(icon: "link", text: "Instant short links copied to clipboard")
                 featureRow(icon: "archivebox", text: "Auto-zips multiple files or folders")
                 featureRow(icon: "list.bullet", text: "Built-in history and file management")
+                featureRow(icon: "square.grid.2x2", text: "Quick access via basket actions")
             }
             
             // Screenshot
