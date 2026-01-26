@@ -225,16 +225,19 @@ final class MenuBarManager: ObservableObject {
     
     private func handleMouseMove(_ event: NSEvent) {
         guard isEnabled, hoverToRevealEnabled else { return }
-        guard let screen = NSScreen.main else { return }
         
         let mouseLocation = NSEvent.mouseLocation
+        
+        // Find the screen containing the mouse (supports external monitors)
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) else { return }
         
         // Check if mouse is in menu bar area (top 24px of screen)
         let menuBarHeight: CGFloat = 24
         let isInMenuBar = mouseLocation.y >= (screen.frame.maxY - menuBarHeight)
         
         // Check if mouse is in the right portion of the screen (where icons are)
-        let isInIconArea = mouseLocation.x >= hoverThresholdX
+        let screenThresholdX = screen.frame.minX + (screen.frame.width * 0.5)
+        let isInIconArea = mouseLocation.x >= screenThresholdX
         
         if isInMenuBar && isInIconArea {
             // Cancel any pending collapse
