@@ -1174,28 +1174,26 @@ struct ClipboardItemRow: View {
             }
             
             // Title or rename field
-            ZStack(alignment: .leading) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    
-                    HStack(spacing: 4) {
-                        if let app = item.sourceApp {
-                            Text(app)
-                                .font(.system(size: 10))
-                        }
-                        Text(item.date, style: .time)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                
+                HStack(spacing: 4) {
+                    if let app = item.sourceApp {
+                        Text(app)
                             .font(.system(size: 10))
+                            .lineLimit(1)
                     }
-                    .foregroundStyle(.secondary)
+                    Text(item.date, style: .time)
+                        .font(.system(size: 10))
                 }
+                .foregroundStyle(.secondary)
             }
-            // Ensure minimum width for title area so it doesn't collapse excessively
-            .frame(maxWidth: .infinity, alignment: .leading)
             
-            Spacer()
+            Spacer(minLength: 8)
             
             // Status icons (key + flag + star)
             HStack(spacing: 4) {
