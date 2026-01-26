@@ -166,7 +166,7 @@ struct DroppyBarContentView: View {
             
             // Refresh button
             Button(action: {
-                scanner.scan()
+                performScan()
             }) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 10, weight: .medium))
@@ -183,6 +183,15 @@ struct DroppyBarContentView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .onAppear {
+            performScan()
+        }
+    }
+    
+    /// Perform scan with capture if permission available, otherwise regular scan
+    private func performScan() {
+        if scanner.hasScreenCapturePermission {
+            scanner.scanWithCapture()
+        } else {
             scanner.scan()
         }
     }
