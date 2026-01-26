@@ -123,10 +123,10 @@ struct ExtensionsShopView: View {
                 )
             }
             
-            // Row 2: Menu Bar Manager (NEW) + Termi-Notch
+            // Row 2: Menu Bar Manager + Termi-Notch
             HStack(spacing: 12) {
                 FeaturedExtensionCardCompact(
-                    category: "NEW",
+                    category: "",
                     title: "Menu Bar Manager",
                     subtitle: "Clean up menu bar",
                     iconURL: "https://getdroppy.app/assets/icons/menu-bar-manager.jpg",
@@ -676,7 +676,7 @@ struct FeaturedExtensionCardWide<DetailView: View>: View {
                                     .padding(.vertical, 4)
                                     .background(
                                         Capsule()
-                                            .fill(accentColor)
+                                            .fill(Color.blue)
                                     )
                             }
                         }
