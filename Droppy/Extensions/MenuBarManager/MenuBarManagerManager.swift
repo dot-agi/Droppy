@@ -24,17 +24,6 @@ final class MenuBarManager: ObservableObject {
     /// Whether hidden icons are currently expanded (visible)
     @Published private(set) var isExpanded = true
     
-    /// Discovered menu bar items
-    @Published private(set) var discoveredItems: [MenuBarItem] = []
-    
-    /// Item section assignments (itemID -> section)
-    @Published private(set) var itemAssignments: [String: MenuBarSection] = [:]
-    
-    // MARK: - IceBar
-    
-    /// The IceBar panel for showing hidden items
-    private(set) var iceBar: IceBarPanel?
-    
     // MARK: - Status Items
     
     /// The visible toggle button - always shows chevron, click to toggle
@@ -66,9 +55,6 @@ final class MenuBarManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        // Load saved assignments
-        itemAssignments = MenuBarItem.loadAssignments()
-        
         // Only start if extension is not removed
         guard !ExtensionType.menuBarManager.isRemoved else { return }
         
@@ -105,13 +91,7 @@ final class MenuBarManager: ObservableObject {
         }
         applyExpansionState()
         
-        // Create IceBar
-        iceBar = IceBarPanel()
-        
-        // Discover menu bar items
-        refreshDiscoveredItems()
-        
-        print("[MenuBarManager] Enabled, expanded: \(isExpanded), items: \(discoveredItems.count)")
+        print("[MenuBarManager] Enabled, expanded: \(isExpanded)")
     }
     
     /// Disable the menu bar manager
@@ -120,10 +100,6 @@ final class MenuBarManager: ObservableObject {
         
         isEnabled = false
         UserDefaults.standard.set(false, forKey: enabledKey)
-        
-        // Hide and cleanup IceBar
-        iceBar?.hide()
-        iceBar = nil
         
         // Show all items before removing
         if !isExpanded {
@@ -324,113 +300,15 @@ final class MenuBarManager: ObservableObject {
         print("  isRemoved: \(ExtensionType.menuBarManager.isRemoved)")
         print("  isEnabled: \(isEnabled)")
         print("  isExpanded: \(isExpanded)")
-        print("  discoveredItems: \(discoveredItems.count)")
         print("  toggleItem exists: \(toggleItem != nil)")
         print("  toggleItem.button exists: \(toggleItem?.button != nil)")
         print("  toggleItem.button.target set: \(toggleItem?.button?.target != nil)")
         print("  toggleItem.button.action set: \(toggleItem?.button?.action != nil)")
         print("  dividerItem exists: \(dividerItem != nil)")
         print("  dividerItem.length: \(dividerItem?.length ?? -1)")
-        print("  iceBar exists: \(iceBar != nil)")
         print("  UserDefaults enabledKey: \(UserDefaults.standard.bool(forKey: enabledKey))")
         print("  UserDefaults expandedKey: \(UserDefaults.standard.object(forKey: expandedKey) ?? "nil")")
         print("[MenuBarManager] === END DIAGNOSTICS ===")
-    }
-    
-    // MARK: - Item Discovery
-    
-    /// Refresh discovered menu bar items using CGS APIs
-    func refreshDiscoveredItems() {
-        let windowInfos = CGSBridging.discoverMenuBarItems()
-        
-        // Convert to MenuBarItem and apply saved sections
-        var items = windowInfos.map { MenuBarItem.from($0) }
-        
-        // Apply saved section assignments
-        for i in items.indices {
-            if let savedSection = itemAssignments[items[i].id] {
-                items[i].section = savedSection
-            }
-        }
-        
-        // Filter out our own toggle/divider items
-        items = items.filter { item in
-            !item.ownerName.contains("Droppy") || 
-            (item.windowName != nil && !item.windowName!.isEmpty)
-        }
-        
-        discoveredItems = items
-        print("[MenuBarManager] Discovered \(items.count) items")
-    }
-    
-    // MARK: - Section Management
-    
-    /// Assign an item to a section
-    /// Note: This controls which items appear in the IceBar and UI organization.
-    /// Actual menu bar hiding still requires ⌘+dragging items to the left of the divider.
-    func setItemSection(_ itemID: String, section: MenuBarSection) {
-        itemAssignments[itemID] = section
-        MenuBarItem.saveAssignments(itemAssignments)
-        
-        // Update local cache
-        if let index = discoveredItems.firstIndex(where: { $0.id == itemID }) {
-            discoveredItems[index].section = section
-        }
-        
-        objectWillChange.send()
-        print("[MenuBarManager] Set item \(itemID) to section \(section)")
-        
-        // If user marks item as hidden, collapse to hide items (if not already)
-        // and show the IceBar so they can see the effect
-        if section == .hidden || section == .alwaysHidden {
-            if isExpanded {
-                toggleExpanded() // Collapse to hide
-            }
-            // Brief delay then show IceBar
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.showIceBar()
-            }
-        }
-    }
-    
-    /// Get items for a specific section
-    func items(in section: MenuBarSection) -> [MenuBarItem] {
-        discoveredItems.filter { $0.section == section }
-    }
-    
-    // MARK: - IceBar
-    
-    /// Show the IceBar with hidden items
-    func showIceBar() {
-        guard let iceBar = iceBar,
-              let screen = NSScreen.main,
-              let toggleButton = toggleItem?.button,
-              let toggleWindow = toggleButton.window else {
-            print("[MenuBarManager] Cannot show IceBar - missing components")
-            return
-        }
-        
-        let hiddenItems = items(in: .hidden) + items(in: .alwaysHidden)
-        guard !hiddenItems.isEmpty else {
-            print("[MenuBarManager] No hidden items to show")
-            return
-        }
-        
-        iceBar.show(items: hiddenItems, anchorFrame: toggleWindow.frame, screen: screen)
-    }
-    
-    /// Hide the IceBar
-    func hideIceBar() {
-        iceBar?.hide()
-    }
-    
-    /// Toggle IceBar visibility
-    func toggleIceBar() {
-        if iceBar?.isVisible == true {
-            hideIceBar()
-        } else {
-            showIceBar()
-        }
     }
 }
 
