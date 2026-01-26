@@ -117,7 +117,9 @@ struct StackedItemView: View {
             selectionSignature: state.selectedStacks.hashValue
         ) {
             // Stack content - Clean glass design matching collapse button
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
+                Spacer(minLength: 0)
+                
                 // 56x56 icon container with count badge
                 ZStack {
                     // Glass background matching basket style
@@ -166,7 +168,6 @@ struct StackedItemView: View {
                     .lineLimit(1)
                     .frame(width: 60)
             }
-            .padding(2)
             .frame(width: 64, height: 80)  // Match grid slot exactly
             // Drop target visual feedback - scale up and blue glow when files dragged over
             .scaleEffect(isDropTargeted ? 1.08 : 1.0)
