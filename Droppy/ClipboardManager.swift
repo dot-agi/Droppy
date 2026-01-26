@@ -760,11 +760,18 @@ class ClipboardManager: ObservableObject {
     }
     
     func rename(item: ClipboardItem, to newTitle: String) {
+        print("📝 Rename called: item.id=\(item.id), newTitle='\(newTitle)'")
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("📝 Found item at index \(index), setting customTitle to: '\(trimmed.isEmpty ? "nil" : trimmed)'")
             history[index].customTitle = trimmed.isEmpty ? nil : trimmed
             // Force SwiftUI to re-render after mutation
             objectWillChange.send()
+            // Trigger debounced save to persist the change
+            scheduleSave()
+            print("📝 Rename complete, customTitle is now: \(history[index].customTitle ?? "nil")")
+        } else {
+            print("⚠️ Rename failed: item with id \(item.id) not found in history")
         }
     }
 
