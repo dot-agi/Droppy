@@ -288,7 +288,7 @@ struct MediaPlayerView: View {
                     HStack(spacing: 8) {
                         Text(elapsedTimeString(at: currentDate))
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(musicManager.visualizerColor.opacity(0.7))
                             .monospacedDigit()
                             .frame(width: 40, alignment: .leading)
                         
@@ -296,7 +296,7 @@ struct MediaPlayerView: View {
                         
                         Text(remainingTimeString())
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(musicManager.visualizerColor.opacity(0.7))
                             .monospacedDigit()
                             .frame(width: 40, alignment: .trailing)
                     }
@@ -570,7 +570,7 @@ struct MediaPlayerView: View {
         let artistName = musicManager.artistName.isEmpty ? "—" : musicManager.artistName
         return MarqueeText(text: artistName, speed: 25)
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(musicManager.visualizerColor.opacity(0.8))
             .frame(height: 18)
     }
     
