@@ -306,41 +306,58 @@ struct NotchShelfView: View {
         hudType == .brightness ? brightnessHudWidth : volumeHudWidth
     }
     
-    /// Battery HUD - slightly narrower wings
+    /// Battery HUD - slightly narrower wings (battery icon + percentage)
     private var batteryHudWidth: CGFloat {
-        // External displays need wider layout to fit properly
-        if isExternalDisplay {
-            return 180  // Wider for external displays
-        }
+        // Base content width for DI layout
+        let diContentWidth: CGFloat = 100
+        let curvedCornerCompensation: CGFloat = 20
+        
         if isDynamicIslandMode {
-            return 100  // Compact for Dynamic Island on built-in
+            return diContentWidth
         }
+        if isExternalDisplay {
+            // External with notch style: DI content + curved corner compensation
+            return diContentWidth + curvedCornerCompensation
+        }
+        // Built-in notch: geometry-based
         return notchWidth + (batteryWingWidth * 2)
     }
     
     /// Media HUD - compact wings for album art / visualizer
     private var hudWidth: CGFloat {
-        // External displays need wider layout for album art + title + visualizer
-        if isExternalDisplay {
-            return 340  // Wide enough for media content on external
-        }
+        // Base content width for Dynamic Island layout (album art + title + visualizer)
+        let diContentWidth: CGFloat = 260
+        // Curved corner compensation: 10pt each side when using notch visual style
+        let curvedCornerCompensation: CGFloat = 20
+        
         if isDynamicIslandMode {
-            return 260  // Smaller for Dynamic Island on built-in
+            // Pure DI mode: no curved corners to compensate for
+            return diContentWidth
         }
+        if isExternalDisplay {
+            // External with notch style: DI content + compensation for curved corners
+            return diContentWidth + curvedCornerCompensation
+        }
+        // Built-in notch mode: use notch geometry
         return notchWidth + (mediaWingWidth * 2)
     }
     private let hudHeight: CGFloat = 73
     
     /// Update HUD - wider wings to fit "Update" + icon on left and "Droppy X.X.X" on right
     private var updateHudWidth: CGFloat {
-        // External displays need wider layout
-        if isExternalDisplay {
-            return 300  // Wider for external displays
-        }
+        // Base content width for DI layout
+        let diContentWidth: CGFloat = 240
+        let curvedCornerCompensation: CGFloat = 20
+        
         if isDynamicIslandMode {
-            return 240  // Narrower for Dynamic Island on built-in (compact)
+            return diContentWidth
         }
-        return notchWidth + (updateWingWidth * 2)  // Wide wings for notch mode
+        if isExternalDisplay {
+            // External with notch style: DI content + curved corner compensation
+            return diContentWidth + curvedCornerCompensation
+        }
+        // Built-in notch: geometry-based
+        return notchWidth + (updateWingWidth * 2)
     }
     
     /// Whether media player HUD should be shown
