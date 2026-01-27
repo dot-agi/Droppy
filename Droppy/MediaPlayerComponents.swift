@@ -309,33 +309,19 @@ struct SpotifyBadge: View {
 }
 
 /// Small Apple Music badge for album art overlay
-/// Uses SF Symbol with Apple Music gradient for consistent appearance
+/// Uses bundled official Apple Music icon for reliable visibility
 struct AppleMusicBadge: View {
     var size: CGFloat = 24
     
-    // Apple Music gradient colors (pink to red-orange)
-    private let appleMusicGradient = LinearGradient(
-        colors: [
-            Color(red: 0.98, green: 0.34, blue: 0.40),  // Pink
-            Color(red: 0.98, green: 0.24, blue: 0.35)   // Deeper pink-red
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    
     var body: some View {
-        ZStack {
-            // Background with Apple Music colors
-            RoundedRectangle(cornerRadius: size * 0.2, style: .continuous)
-                .fill(appleMusicGradient)
-            
-            // Music note icon
-            Image(systemName: "music.note")
-                .font(.system(size: size * 0.5, weight: .bold))
-                .foregroundStyle(.white)
-        }
-        .frame(width: size, height: size)
-        .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+        Image("AppleMusicIcon")
+            .resizable()
+            .renderingMode(.original)  // Preserve original colors
+            .antialiased(true)         // Smooth edges
+            .aspectRatio(contentMode: .fit)
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.2, style: .continuous))
+            .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
     }
 }
 

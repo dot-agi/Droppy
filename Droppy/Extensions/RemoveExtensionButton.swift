@@ -82,6 +82,8 @@ struct DisableExtensionButton: View {
             return "This will remove all keyboard shortcuts. You can set them up again later."
         case .spotify:
             return "This will sign out of Spotify and remove connection. You can reconnect later."
+        case .appleMusic:
+            return "This will disable Apple Music controls. You can enable it again later."
         case .aiBackgroundRemoval:
             return "This will uninstall the AI package. You can reinstall it later."
         case .alfred, .finder, .finderServices:
@@ -142,6 +144,9 @@ struct DisableExtensionButton: View {
             case .spotify:
                 // Spotify will auto-refresh when music plays
                 SpotifyController.shared.refreshState()
+            case .appleMusic:
+                // Apple Music will auto-refresh when music plays
+                AppleMusicController.shared.refreshState()
             case .menuBarManager:
                 // Re-enable the menu bar manager
                 MenuBarManager.shared.enable()
