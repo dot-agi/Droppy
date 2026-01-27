@@ -1908,75 +1908,107 @@ struct SettingsView: View {
         Group {
             // MARK: About
             Section {
-                HStack(spacing: 14) {
+                HStack(spacing: 16) {
                     // App Icon
                     if let appIcon = NSApp.applicationIconImage {
                         Image(nsImage: appIcon)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: 48, height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Droppy")
-                            .font(.headline)
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.primary)
                         Text("Version \(UpdateChecker.shared.currentVersion)")
-                            .font(.subheadline)
+                            .font(.system(size: 13))
                             .foregroundStyle(.secondary)
+                        if let downloads = downloadCount {
+                            Text("\(downloads) users")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                     
                     Spacer()
-                    
-                    Button {
-                        OnboardingWindowController.shared.show()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "sparkles")
-                            Text("Introduction")
-                        }
-                    }
-                    .buttonStyle(DroppyAccentButtonStyle(color: .blue, size: .small))
                 }
+                .padding(.vertical, 4)
                 
                 LabeledContent("Developer", value: "Jordy Spruit")
                 
-                if let downloads = downloadCount {
-                    LabeledContent("Downloads", value: "\(downloads) Users")
+                HStack {
+                    Text("Introduction")
+                    Spacer()
+                    Button {
+                        OnboardingWindowController.shared.show()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11))
+                            Text("Open")
+                        }
+                    }
+                    .buttonStyle(DroppyAccentButtonStyle(color: .blue, size: .small))
                 }
             } header: {
                 Text("About")
             }
             
-            // MARK: Support
+            // MARK: Links
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Hi, I'm Jordy — a solo developer building Droppy because I believe essential tools should be free.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("I don't sell this app, but if you enjoy using it, a coffee would mean the world to me ❤️")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Link(destination: URL(string: "https://buymeacoffee.com/droppy")!) {
+                Link(destination: URL(string: "https://getdroppy.app")!) {
                     HStack {
-                        HStack(spacing: 8) {
-                            Image(systemName: "cup.and.saucer.fill")
-                                .font(.system(size: 14))
-                            Text("Buy me a coffee")
-                                .fontWeight(.medium)
-                        }
+                        Label("Website", systemImage: "globe")
                         Spacer()
                         Image(systemName: "arrow.up.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                
+                Link(destination: URL(string: "https://github.com/iordv/Droppy")!) {
+                    HStack {
+                        Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                
+                Link(destination: URL(string: "https://discord.gg/uxqynmJb")!) {
+                    HStack {
+                        Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tertiary)
                     }
                 }
             } header: {
-                Text("Support Development")
+                Text("Links")
+            }
+            
+            // MARK: Support
+            Section {
+                Text("I'm Jordy, a solo developer building Droppy because I believe essential tools should be free. If you enjoy using it, a coffee would mean the world ❤️")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                
+                Link(destination: URL(string: "https://buymeacoffee.com/droppy")!) {
+                    HStack {
+                        Label("Buy me a coffee", systemImage: "cup.and.saucer.fill")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            } header: {
+                Text("Support")
             }
             
             // MARK: Reset
@@ -1993,7 +2025,7 @@ struct SettingsView: View {
                 HStack {
                     VStack(alignment: .leading) {
                         Text("Hard Reset")
-                        Text("Reset all Droppy settings to defaults")
+                        Text("Reset all settings to defaults")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -2010,7 +2042,7 @@ struct SettingsView: View {
             } header: {
                 Text("Troubleshooting")
             } footer: {
-                Text("Use this if settings become stuck or broken after an update. Extensions will need to be reinstalled.")
+                Text("Use this if settings become stuck or broken after an update.")
             }
             .alert("Hard Reset Droppy?", isPresented: $showHardResetConfirmation) {
                 Button("Cancel", role: .cancel) {}
