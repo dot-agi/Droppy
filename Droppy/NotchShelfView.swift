@@ -308,16 +308,19 @@ struct NotchShelfView: View {
     
     /// Battery HUD - slightly narrower wings (battery icon + percentage)
     private var batteryHudWidth: CGFloat {
-        // Base content width for DI layout
+        // Base content widths:
+        // - DI built-in: 100pt (compact)
+        // - External notch style: needs 160pt base (was 180pt with compensation)
         let diContentWidth: CGFloat = 100
+        let externalNotchWidth: CGFloat = 180  // Matches original working width
         let curvedCornerCompensation: CGFloat = 20
         
         if isDynamicIslandMode {
             return diContentWidth
         }
         if isExternalDisplay {
-            // External with notch style: DI content + curved corner compensation
-            return diContentWidth + curvedCornerCompensation
+            // External with notch style: use full width that was tested to work
+            return externalNotchWidth
         }
         // Built-in notch: geometry-based
         return notchWidth + (batteryWingWidth * 2)
