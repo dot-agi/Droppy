@@ -949,6 +949,13 @@ final class MusicManager: ObservableObject {
         // Check if this source is allowed by the filter
         if !isBundleAllowed(payload.launchableBundleIdentifier) {
             print("MusicManager: Skipping update from filtered source: \(payload.launchableBundleIdentifier ?? "unknown")")
+            
+            // FIX: If the blocked source matches the currently displayed source, clear the display
+            // This handles the case where filter is enabled while content from a blocked source is already showing
+            if payload.launchableBundleIdentifier == bundleIdentifier {
+                print("MusicManager: Current display is from blocked source - clearing")
+                clearMediaDisplay()
+            }
             return
         }
 
