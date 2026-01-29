@@ -23,10 +23,10 @@ struct CaffeineNotchView: View {
     private let hourPresets: [CaffeineDuration] = [.hours(1), .hours(2), .hours(3), .hours(4), .hours(5)]
     
     var body: some View {
-        // TERMINAL PARITY PROTOCOL (SSOT v21.97):
-        // Root VStack with content + Spacer for grounding, then outer contentPadding
-        VStack(spacing: 0) {
-            // Content with 24pt internal buffer (Internal Buffer Mandate v22.01)
+        // EXACT SAME PATTERN AS TerminalNotchView.initialCommandView:
+        // ZStack naturally centers content within parent's frame
+        ZStack {
+            // Content (ZStack centers this automatically)
             HStack(alignment: .center, spacing: 16) {
                 // Toggle Section
                 VStack(spacing: 6) {
@@ -89,11 +89,8 @@ struct CaffeineNotchView: View {
                     }
                 }
             }
-            .padding(24)  // Internal 24pt buffer (SSOT v22.01)
-            
-            Spacer(minLength: 0)  // Grounding spacer
         }
-        // SSOT contentPadding: notchHeight top, 30pt sides, 20pt bottom
+        // SSOT contentPadding applied to ZStack (same as Terminal)
         .padding(contentPadding)
     }
     
