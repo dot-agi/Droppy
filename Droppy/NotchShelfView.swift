@@ -2011,7 +2011,7 @@ struct NotchShelfView: View {
         let caffeineEnabled = UserDefaults.standard.preference(AppPreferenceKey.caffeineEnabled, default: PreferenceDefault.caffeineEnabled)
         let caffeineShouldShow = UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled) && caffeineEnabled
         
-        ZStack {
+        return ZStack {
             // TERMINAL VIEW: Highest priority - takes over the shelf when active
             if terminalManager.isInstalled && terminalEnabled && terminalManager.isVisible {
                 // SSOT: contentLayoutNotchHeight for consistent terminal content layout
