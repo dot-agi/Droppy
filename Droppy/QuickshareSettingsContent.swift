@@ -77,7 +77,7 @@ struct QuickshareSettingsContent: View {
                             onOpenInBrowser: { openInBrowser(item) },
                             onDelete: { showDeleteConfirmation = item }
                         )
-                        .listRowSeparator(.hidden, edges: .all)
+                        .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     }
                 }
@@ -92,6 +92,7 @@ struct QuickshareSettingsContent: View {
                     }
                 }
             }
+            .listSectionSeparator(.hidden)
             
             // MARK: - About Section
             Section {
