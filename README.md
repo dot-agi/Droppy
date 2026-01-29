@@ -34,19 +34,37 @@
 ## Core Features
 
 ### File Shelf
-Drop files into your notch for quick access. Hover to peek, drag out to use anywhere.
+Drop files into your notch for quick access. Your notch becomes a persistent staging area.
+- Hover to peek at file contents without opening
+- Drag files out to use anywhere in macOS
+- Auto-sync with tracked folders
+- Quick actions: compress, convert, share, and more
 
-### Floating Basket  
+### Floating Basket
 Jiggle your mouse to summon a floating basket for temporary file staging.
+- Appears anywhere on screen when you need it
+- Grid or list view for easy organization
+- Quick actions bar for batch operations
+- Disappears when not in use
 
 ### Clipboard Manager
-`⌘⇧Space` opens your clipboard history. Search, pin favorites, and paste with a click.
+`⌘⇧Space` opens your clipboard history with powerful organization features.
+- Unlimited clipboard history with search
+- Pin frequently used items as favorites
+- Tag system for categorizing clips
+- Rich previews for images, links, and documents
+- One-click paste or drag to any app
 
 ### Beautiful HUDs
-Gorgeous replacements for macOS volume, brightness, and media controls — all in your notch.
+Gorgeous replacements for macOS system indicators — all displayed elegantly in your notch.
+- Volume and brightness controls with smooth animations
+- Now playing with album art and playback controls
+- Battery status with charging indicators
+- Caps Lock, Focus mode, and AirPods status
+- Real-time audio visualizer synced to your music
 
 ### Powerful Extensions
-Modular extensions add even more functionality. See the full list below.
+Modular extensions add even more functionality. Install only what you need.
 
 ---
 
