@@ -285,6 +285,7 @@ struct NotchShelfView: View {
     /// Using fixed sizes ensures consistent content positioning across all screen resolutions
     private let volumeWingWidth: CGFloat = 135  // For volume/brightness - wide for icon + label + slider
     private let batteryWingWidth: CGFloat = 55  // For battery icon + percentage  
+    private let highAlertWingWidth: CGFloat = 70  // For High Alert - icon + "Active/Inactive" text
     private let mediaWingWidth: CGFloat = 50    // For album art + visualizer
     private let updateWingWidth: CGFloat = 110  // For Update HUD - icon + "Update" + "Droppy X.X.X"
     
@@ -333,6 +334,23 @@ struct NotchShelfView: View {
         }
         // Built-in notch: geometry-based
         return notchWidth + (batteryWingWidth * 2)
+    }
+    
+    /// High Alert HUD - wider wings than Caps Lock for "Active/Inactive" text
+    private var highAlertHudWidth: CGFloat {
+        // Base content widths:
+        // - DI/external: 200pt (wider for "Active/Inactive" text)
+        let diContentWidth: CGFloat = 140
+        let externalNotchWidth: CGFloat = 200
+        
+        if isDynamicIslandMode {
+            return diContentWidth
+        }
+        if isExternalDisplay {
+            return externalNotchWidth
+        }
+        // Built-in notch: geometry-based
+        return notchWidth + (highAlertWingWidth * 2)
     }
     
     /// Media HUD - compact wings for album art / visualizer
@@ -418,6 +436,8 @@ struct NotchShelfView: View {
             return batteryHudWidth  // Battery HUD uses slightly narrower width than volume
         } else if HUDManager.shared.isCapsLockHUDVisible && enableCapsLockHUD {
             return batteryHudWidth  // Caps Lock HUD uses same width as battery HUD
+        } else if HUDManager.shared.isHighAlertHUDVisible && CaffeineManager.shared.isInstalled && caffeineEnabled {
+            return highAlertHudWidth  // High Alert HUD uses wider width for "Active/Inactive" text
         } else if HUDManager.shared.isDNDHUDVisible && enableDNDHUD {
             return batteryHudWidth  // Focus/DND HUD uses same width as battery HUD
         } else if HUDManager.shared.isUpdateHUDVisible && enableUpdateHUD {
@@ -456,6 +476,8 @@ struct NotchShelfView: View {
             return notchHeight  // Battery HUD just uses notch height (no slider)
         } else if HUDManager.shared.isCapsLockHUDVisible && enableCapsLockHUD {
             return notchHeight  // Caps Lock HUD just uses notch height (no slider)
+        } else if HUDManager.shared.isHighAlertHUDVisible && CaffeineManager.shared.isInstalled && caffeineEnabled {
+            return notchHeight  // High Alert HUD just uses notch height (no slider)
         } else if HUDManager.shared.isDNDHUDVisible && enableDNDHUD {
             return notchHeight  // Focus/DND HUD just uses notch height (no slider)
         } else if HUDManager.shared.isUpdateHUDVisible && enableUpdateHUD {
@@ -1238,6 +1260,18 @@ struct NotchShelfView: View {
             .frame(width: batteryHudWidth, height: notchHeight)
             .transition(.premiumHUD.animation(DroppyAnimation.notchState))
             .zIndex(5)
+        }
+        
+        // High Alert HUD - uses centralized HUDManager
+        if HUDManager.shared.isHighAlertHUDVisible && CaffeineManager.shared.isInstalled && caffeineEnabled && !hudIsVisible && !isExpandedOnThisScreen {
+            HighAlertHUDView(
+                isActive: caffeineManager.isActive,
+                hudWidth: highAlertHudWidth,
+                targetScreen: targetScreen
+            )
+            .frame(width: highAlertHudWidth, height: notchHeight)
+            .transition(.premiumHUD.animation(DroppyAnimation.notchState))
+            .zIndex(5.2)
         }
         
         // Focus/DND HUD - uses centralized HUDManager

@@ -119,6 +119,9 @@ final class CaffeineManager {
         
         isActive = true
         
+        // Trigger notch HUD to show activation
+        HUDManager.shared.show(.highAlert)
+        
         // Handle timer
         if let totalSeconds = duration.totalSeconds {
             remainingSeconds = totalSeconds
@@ -146,7 +149,14 @@ final class CaffeineManager {
         endTime = nil
         remainingSeconds = 0
         
+        // Only trigger HUD if we were actually active (to avoid HUD on init)
+        let wasActive = isActive
         isActive = false
+        
+        // Trigger notch HUD to show deactivation
+        if wasActive {
+            HUDManager.shared.show(.highAlert)
+        }
     }
     
     func toggle(duration: CaffeineDuration = .indefinite, mode: CaffeineMode = .both) {

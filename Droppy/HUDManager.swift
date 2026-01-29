@@ -26,6 +26,7 @@ final class HUDManager {
         case airPods = 80            // Connection events
         case battery = 70            // Charge state changes
         case capsLock = 60           // Keyboard state
+        case highAlert = 55          // High Alert (stay awake) state changes
         case lockScreen = 50         // Lock/unlock events
         case notification = 45       // Notification HUD (extension)
         case dnd = 40                // Focus mode changes
@@ -41,6 +42,7 @@ final class HUDManager {
             case .airPods: return 3.0           // Longer to show battery info
             case .battery: return 2.5           // Medium duration
             case .capsLock: return 1.0          // Very short, just confirmation
+            case .highAlert: return 2.0         // Medium, shows active/inactive state
             case .lockScreen: return 2.0        // Medium
             case .notification: return 3.0      // Notification from external app
             case .dnd: return 2.0               // Medium
@@ -259,6 +261,11 @@ final class HUDManager {
     /// Whether CapsLock HUD is visible
     var isCapsLockHUDVisible: Bool {
         activeHUD?.type == .capsLock
+    }
+    
+    /// Whether High Alert HUD is visible
+    var isHighAlertHUDVisible: Bool {
+        activeHUD?.type == .highAlert
     }
     
     /// Whether AirPods HUD is visible
