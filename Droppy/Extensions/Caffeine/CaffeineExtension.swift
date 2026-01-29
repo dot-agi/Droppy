@@ -35,4 +35,10 @@ struct CaffeineExtension: ExtensionDefinition {
     static func cleanup() {
         CaffeineManager.shared.deactivate()
     }
+    
+    // MARK: - Community Extension
+    
+    static let isCommunity = true
+    static let creatorName: String? = "Valetivivek"
+    static let creatorURL: URL? = URL(string: "https://github.com/valetivivek")
 }
