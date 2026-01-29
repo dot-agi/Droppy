@@ -54,20 +54,19 @@ Modular extensions add even more functionality. See the full list below.
 
 | Icon | Extension | Description |
 |:----:|-----------|-------------|
-| 🍎 | **Apple Music** | Full playback controls, shuffle, repeat, love tracks |
-| 🟢 | **Spotify** | Spotify integration with album art & visualizer |
-| 🔔 | **Notify Me!** | Beautiful notification banners in your notch |
-| 🪟 | **Window Snap** | Keyboard shortcuts for window management |
-| 💤 | **High Alert** | Keep your Mac awake with timers |
-| 🖥️ | **Termi-Notch** | Quick terminal access from the notch |
-| ✈️ | **AirDrop Zone** | Drop files to share instantly via AirDrop |
-| 🔋 | **Battery HUD** | Elegant battery status indicator |
-| ⌨️ | **Caps Lock HUD** | Visual Caps Lock indicator |
-| 🌙 | **Focus HUD** | Do Not Disturb status in your notch |
-| 🎧 | **AirPods HUD** | AirPods connection status |
-| 🔒 | **Lock Screen Widget** | Media controls on the lock screen |
-| 🎙️ | **Voice Transcribe** | Transcribe audio using AI *(coming soon)* |
-| 🪄 | **Background Removal** | AI-powered background removal *(coming soon)* |
+| <img src="docs/assets/icons/apple-music.png" width="24"> | **Apple Music** | Full playback controls, shuffle, repeat, love tracks |
+| <img src="docs/assets/icons/spotify.png" width="24"> | **Spotify** | Spotify integration with album art & visualizer |
+| <img src="docs/assets/icons/notification-hud.png" width="24"> | **Notify Me!** | Beautiful notification banners in your notch |
+| <img src="docs/assets/icons/window-snap.jpg" width="24"> | **Window Snap** | Keyboard shortcuts for window management |
+| <img src="docs/assets/icons/high-alert.jpg" width="24"> | **High Alert** | Keep your Mac awake with timers |
+| <img src="docs/assets/icons/termi-notch.jpg" width="24"> | **Termi-Notch** | Quick terminal access from the notch |
+| <img src="docs/assets/icons/alfred.png" width="24"> | **Alfred** | Deep Alfred integration for workflows |
+| <img src="docs/assets/icons/finder.png" width="24"> | **Finder Services** | Quick actions for Finder items |
+| <img src="docs/assets/icons/quickshare.jpg" width="24"> | **Quickshare** | Share files instantly via cloud services |
+| <img src="docs/assets/icons/video-target-size.png" width="24"> | **Video Target Size** | Compress videos to exact file sizes |
+| <img src="docs/assets/icons/element-capture.jpg" width="24"> | **Element Capture** | Capture UI elements from any app |
+| <img src="docs/assets/icons/voice-transcribe.jpg" width="24"> | **Voice Transcribe** | Transcribe audio using AI |
+| <img src="docs/assets/icons/ai-bg.jpg" width="24"> | **Background Removal** | AI-powered background removal |
 
 ---
 
@@ -111,7 +110,7 @@ Droppy is **completely free** and built by a single developer. If you find it us
 
 <p align="center">
   <a href="https://buymeacoffee.com/droppy">
-    <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=droppy&button_colour=FFDD00&font_colour=000000&font_family=Inter&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me A Coffee" />
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200" />
   </a>
 </p>
 
@@ -145,7 +144,7 @@ The original project that pioneered notch creativity on macOS.
 
 ## 📜 License
 
-Droppy is released under the [MIT License](LICENSE).
+Droppy is released under the [GPL-3.0 License with Commons Clause](LICENSE).
 
 ---
 

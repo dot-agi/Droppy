@@ -2109,7 +2109,7 @@ struct SettingsView: View {
                     LinkButton(
                         title: "Discord",
                         icon: "bubble.left.and.bubble.right.fill",
-                        url: "https://discord.gg/uxqynmJb"
+                        url: "https://discord.gg/7dVMKJmHqR"
                     )
                     
                     LinkButton(
