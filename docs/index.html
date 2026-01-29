@@ -455,18 +455,15 @@
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border);
             border-radius: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            overflow: hidden;
             box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
             pointer-events: auto;
         }
 
-        .video-box svg {
-            width: 72px;
-            height: 72px;
-            color: var(--muted);
-            opacity: 0.5;
+        .video-box iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
         }
 
         .credits-btn {
@@ -1356,11 +1353,11 @@
             <p class="headline"><span class="dim">The <span class="free">free</span> native productivity layer</span>
                 macOS is missing.</p>
             <div class="video-box">
-                <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    <path
-                        d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" />
-                </svg>
+                <iframe width="100%" height="100%" src="https://www.youtube.com/embed/k-BQ-TvSVpY?si=NsnqYBTIwcL44rt5"
+                    title="Droppy Demo" frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="border-radius: 24px;">
+                </iframe>
             </div>
             <button class="credits-btn" id="credits-btn">Credits & Acknowledgements</button>
         </div>
