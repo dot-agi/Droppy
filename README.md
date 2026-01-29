@@ -25,7 +25,7 @@
 
 ## See Droppy in Action
 
-https://github.com/user-attachments/assets/0d98eb89-5309-4bea-be74-6700897a5319
+https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16
 
 ---
 
