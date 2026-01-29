@@ -450,6 +450,10 @@ struct NotchShelfView: View {
         } else if shouldShowMediaHUD {
             return hudWidth  // Media HUD uses tighter wings
         } else if enableNotchShelf && isHoveringOnThisScreen {
+            // When High Alert is active, expand enough to show timer on hover
+            if CaffeineManager.shared.isActive && caffeineEnabled {
+                return highAlertHudWidth
+            }
             // Only expand on mouse hover, NOT when dragging files (prevents sliding animation)
             return notchWidth + 20
         } else {
