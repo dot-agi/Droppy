@@ -68,7 +68,7 @@ struct CaffeineInfoView: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             // Icon
-            CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/icons/high-alert.png")) { image in
+            CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/icons/high-alert.jpg")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Image(systemName: "eyes").font(.system(size: 32)).foregroundStyle(.orange)
@@ -124,6 +124,24 @@ struct CaffeineInfoView: View {
             Text("Prevent your Mac from sleeping")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            
+            // Community Extension Badge
+            HStack(spacing: 6) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 11))
+                Text("Community Extension")
+                    .font(.caption.weight(.medium))
+                Text("by")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Link("Valetivivek", destination: URL(string: "https://github.com/valetivivek")!)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.orange)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.purple.opacity(0.12)))
         }
         .padding(.top, 24)
         .padding(.bottom, 20)
@@ -138,7 +156,7 @@ struct CaffeineInfoView: View {
             featureRow(icon: "bolt.fill", text: "Low resource usage")
             
             // Screenshot
-            CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/images/high-alert-screenshot.png")) { image in
+            CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/images/high-alert-screenshot.gif")) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fit)

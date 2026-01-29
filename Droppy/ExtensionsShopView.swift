@@ -473,13 +473,14 @@ struct ExtensionsShopView: View {
             },
             ExtensionListItem(
                 id: "caffeine",
-                iconURL: "https://getdroppy.app/assets/icons/high-alert.png",
+                iconURL: "https://getdroppy.app/assets/icons/high-alert.jpg",
                 title: "High Alert",
                 subtitle: "Keep your Mac awake",
                 category: .productivity,
                 isInstalled: isCaffeineInstalled,
                 analyticsKey: "caffeine",
-                extensionType: .caffeine
+                extensionType: .caffeine,
+                isCommunity: true
             ) {
                 AnyView(CaffeineInfoView(
                     installCount: extensionCounts["caffeine"],
