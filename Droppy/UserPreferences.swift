@@ -109,6 +109,10 @@ enum AppPreferenceKey {
     static let notificationHUDEnabled = "notificationHUD_enabled"
     static let notificationHUDShowPreview = "notificationHUD_showPreview"
     
+    // MARK: - Extension: Caffeine
+    static let caffeineInstalled = "caffeine_installed"
+    static let caffeineMode = "caffeine_mode"  // CaffeineMode rawValue
+    
     // MARK: - Extension: Video Compression (Legacy - migrated to Smart Export)
     static let compressionAutoSaveToFolder = "compressionAutoSaveToFolder"
     static let compressionAutoSaveFolder = "compressionAutoSaveFolder"  // URL path string
@@ -226,6 +230,10 @@ enum PreferenceDefault {
     static let notificationHUDInstalled = false
     static let notificationHUDEnabled = true  // Enabled by default when installed
     static let notificationHUDShowPreview = true
+    
+    // MARK: - Extension: Caffeine
+    static let caffeineInstalled = false  // Disabled by default, user installs from Extension Store
+    static let caffeineMode = "Both"  // CaffeineMode.both.rawValue
     
     // MARK: - Extension: Video Compression (Legacy)
     static let compressionAutoSaveToFolder = false

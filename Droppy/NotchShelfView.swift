@@ -107,6 +107,9 @@ struct NotchShelfView: View {
     @State private var albumArtTapScale: CGFloat = 1.0  // Subtle grow effect when clicking to open source
     @State private var mediaOverlayAppeared: Bool = false  // Scale+opacity appear animation for morphing overlays
     
+    // Caffeine extension view state
+    @State private var showCaffeineView: Bool = false
+    
     // MORPH: Namespace for album art morphing between HUD and expanded player
     @Namespace private var albumArtNamespace
     
@@ -636,15 +639,22 @@ struct NotchShelfView: View {
     var body: some View {
         ZStack(alignment: .top) {
             shelfContent
+                .onChange(of: isExpandedOnThisScreen) { _, isExpanded in
+                    // RESET RULE: When shelf collapses, reset Caffeine view so next open shows default shelf
+                    if !isExpanded {
+                        showCaffeineView = false
+                    }
+                }
             
             // Floating buttons (Bottom Centered)
             // QUICK ACTIONS: Show when dragging files over expanded shelf (even if empty)
-            // REGULAR BUTTONS: Show otherwise (terminal/close buttons)
+            // REGULAR BUTTONS: Show otherwise (terminal/caffeine/close buttons)
             // SMOOTH MORPH: Uses spring animation for seamless transition
+            let caffeineInstalled = UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled)
             if enableNotchShelf && isExpandedOnThisScreen {
                 // FLOATING BUTTONS: ZStack enables smooth crossfade between button states
                 // - Quick Actions: Shown when dragging files
-                // - Regular Buttons: Terminal + Close when NOT dragging
+                // - Regular Buttons: Terminal + Caffeine + Close when NOT dragging
                 ZStack {
                     // Quick Actions Bar - appears when dragging files
                     if dragMonitor.isDragging {
@@ -667,9 +677,34 @@ struct NotchShelfView: View {
                             ))
                     }
                     
-                    // Regular floating buttons (terminal/close) - appear when NOT dragging
-                    if !dragMonitor.isDragging && (terminalManager.isInstalled || !autoCollapseShelf) {
+                    // Regular floating buttons (caffeine/terminal/close) - appear when NOT dragging
+                    if !dragMonitor.isDragging && (caffeineInstalled || terminalManager.isInstalled || !autoCollapseShelf) {
                         HStack(spacing: 12) {
+                            // Caffeine button (if extension installed)
+                            if caffeineInstalled {
+                                let isHighlight = showCaffeineView || CaffeineManager.shared.isActive
+                                
+                                Button(action: {
+                                    HapticFeedback.tap()
+                                    withAnimation(DroppyAnimation.notchState) {
+                                        showCaffeineView.toggle()
+                                        // If activating caffeine view, close terminal if open
+                                        if showCaffeineView {
+                                            terminalManager.hide()
+                                        }
+                                    }
+                                }) {
+                                    Image(systemName: "cup.and.saucer.fill")
+                                }
+                                .buttonStyle(DroppyCircleButtonStyle(
+                                    size: 32,
+                                    useTransparent: shouldUseFloatingButtonTransparent,
+                                    solidFill: isHighlight ? .orange : (isDynamicIslandMode ? dynamicIslandGray : .black)
+                                ))
+                                .help(CaffeineManager.shared.isActive ? "Caffeine: \(CaffeineManager.shared.formattedRemaining)" : "Caffeine")
+                                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                            }
+                            
                             // Terminal button (if extension installed)
                             if terminalManager.isInstalled {
                                 // Open in Terminal.app button (only when terminal is visible)
@@ -1266,6 +1301,36 @@ struct NotchShelfView: View {
             .frame(width: notifWidth, height: notifHeight)
             .transition(.premiumHUD.animation(DroppyAnimation.notchState))
             .zIndex(5.7)
+        }
+        
+        // Caffeine Hover Indicators (Strict UI Requirement)
+        // Shows only when:
+        // 1. Hovering (state.isMouseHovering)
+        // 2. Caffeine is ACTIVE
+        // 3. Shelf is NOT expanded
+        // 4. No other HUD visible
+        if state.isMouseHovering && CaffeineManager.shared.isActive && !isExpandedOnThisScreen && !hudIsVisible {
+            // Center vertically in the notch bar (approx 16pt height for content)
+            let yOffset: CGFloat = (notchHeight - 16) / 2
+            
+            // Left: Cup Icon
+            Image(systemName: "cup.and.saucer.fill")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.orange)
+                // +26 pushes it INWARD from the left edge (safe from corner clipping)
+                .offset(x: -(notchWidth / 2) + 26, y: yOffset)
+                .transition(.opacity)
+                .zIndex(6)
+            
+            // Right: Timer Text
+            Text(CaffeineManager.shared.formattedRemaining)
+                .font(.system(size: CaffeineManager.shared.formattedRemaining == "∞" ? 22 : 13, weight: .medium, design: .monospaced))
+                .foregroundStyle(.orange)
+                .offset(y: (CaffeineManager.shared.formattedRemaining == "∞" ? -4 : 0)) // Adjusted -4 to center larger symbol
+                // -26 pushes it INWARD from the right edge
+                .offset(x: (notchWidth / 2) - 26, y: yOffset)
+                .transition(.opacity)
+                .zIndex(6)
         }
     }
     
@@ -1942,6 +2007,13 @@ struct NotchShelfView: View {
                     .frame(height: currentExpandedHeight, alignment: .top)
                     .id("terminal-view")
                     // PREMIUM: Scale(0.8, anchor: .top) + blur + opacity - ultra-smooth feel
+                    .notchTransition()
+            }
+            // CAFFEINE VIEW: Show when user clicks caffeine button in shelf
+            else if showCaffeineView && UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled) {
+                CaffeineNotchView(manager: CaffeineManager.shared, isVisible: $showCaffeineView, notchHeight: contentLayoutNotchHeight, isExternalWithNotchStyle: isExternalDisplay && !externalDisplayUseDynamicIsland)
+                    .frame(height: currentExpandedHeight, alignment: .top)
+                    .id("caffeine-view")
                     .notchTransition()
             }
             // Show drop zone when dragging over (takes priority)

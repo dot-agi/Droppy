@@ -50,5 +50,7 @@
 	<string>Droppy needs to communicate with this app to export items when you drag them to the shelf or basket.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voice Transcribe needs access to your microphone to record audio for transcription.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Droppy uses Bluetooth to detect AirPods connections and show battery status.</string>
 </dict>
 </plist>
