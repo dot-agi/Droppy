@@ -135,8 +135,10 @@ struct BasketQuickActionsBar: View {
             }
         }
         // COLLAPSE when quick action targeting ends (drag left the buttons)
+        // BUT only if drag also left the bar area (handles gaps between buttons)
+        // AND not still targeting the bolt (handles transition from bolt to expanded)
         .onChange(of: DroppyState.shared.isQuickActionsTargeted) { _, targeted in
-            if !targeted && !isHovering && isExpanded {
+            if !targeted && !isHovering && !isBarAreaTargeted && !isBoltTargeted && isExpanded {
                 DroppyState.shared.hoveredQuickAction = nil
                 withAnimation(DroppyAnimation.state) {
                     isExpanded = false

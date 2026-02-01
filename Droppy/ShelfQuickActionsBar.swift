@@ -19,28 +19,54 @@ struct ShelfQuickActionsBar: View {
     private let buttonSize: CGFloat = 32
     private let spacing: CGFloat = 12
     
+    @State private var isBarAreaTargeted = false  // Track when drag is over the bar area (between buttons)
+    
+    /// Computed width of bar area: 4 buttons + 3 gaps
+    private var barWidth: CGFloat {
+        (buttonSize * 4) + (spacing * 3) + 16  // Extra padding for safety
+    }
+    
     var body: some View {
-        HStack(spacing: spacing) {
-            ShelfQuickActionButton(actionType: .airdrop, useTransparent: useTransparent, shareAction: shareViaAirDrop)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion),
-                    removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
-                ))
-            ShelfQuickActionButton(actionType: .messages, useTransparent: useTransparent, shareAction: shareViaMessages)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.03)),
-                    removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
-                ))
-            ShelfQuickActionButton(actionType: .mail, useTransparent: useTransparent, shareAction: shareViaMail)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.06)),
-                    removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
-                ))
-            ShelfQuickActionButton(actionType: .quickshare, useTransparent: useTransparent, shareAction: quickShareTo0x0)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.09)),
-                    removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
-                ))
+        ZStack {
+            // Transparent hit area background - captures drags between buttons
+            Capsule()
+                .fill(Color.white.opacity(0.001)) // Nearly invisible but captures events
+                .frame(width: barWidth, height: buttonSize + 8)
+                // Track when drag is over the bar area
+                .onDrop(of: [UTType.fileURL, UTType.image, UTType.movie, UTType.data], isTargeted: $isBarAreaTargeted) { _ in
+                    return false  // Don't handle drop here
+                }
+                // Keep shelf quick actions state alive while drag is over bar area
+                .onChange(of: isBarAreaTargeted) { _, targeted in
+                    if targeted {
+                        // Drag entered bar area
+                        DroppyState.shared.isShelfQuickActionsTargeted = true
+                    }
+                    // Don't clear on exit - buttons will handle that
+                }
+            
+            HStack(spacing: spacing) {
+                ShelfQuickActionButton(actionType: .airdrop, useTransparent: useTransparent, shareAction: shareViaAirDrop)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion),
+                        removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
+                    ))
+                ShelfQuickActionButton(actionType: .messages, useTransparent: useTransparent, shareAction: shareViaMessages)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.03)),
+                        removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
+                    ))
+                ShelfQuickActionButton(actionType: .mail, useTransparent: useTransparent, shareAction: shareViaMail)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.06)),
+                        removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
+                    ))
+                ShelfQuickActionButton(actionType: .quickshare, useTransparent: useTransparent, shareAction: quickShareTo0x0)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.itemInsertion.delay(0.09)),
+                        removal: .scale(scale: 0.5).combined(with: .opacity).animation(.easeOut(duration: 0.15))
+                    ))
+            }
         }
         .animation(DroppyAnimation.state, value: items.count)
     }

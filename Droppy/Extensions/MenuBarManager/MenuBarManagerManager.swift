@@ -1,9 +1,8 @@
 //
-//  MenuBarManager.swift
+//  MenuBarManagerManager.swift
 //  Droppy
 //
-//  Menu Bar Manager - Hide/show menu bar icons using ICE-style divider expansion
-//  Uses two NSStatusItems: a visible toggle button and an expanding divider
+//  Menu Bar Manager - Hide/show menu bar icons using divider expansion pattern
 //
 
 import SwiftUI
@@ -16,45 +15,46 @@ import Combine
 final class MenuBarManager: ObservableObject {
     static let shared = MenuBarManager()
     
-    // MARK: - Published State
+    // MARK: - State
+    
+    enum HidingState {
+        case hideItems  // Separator expanded to 10,000pt, icons pushed off
+        case showItems  // Separator at normal width, icons visible
+    }
     
     /// Whether the extension is enabled
     @Published private(set) var isEnabled = false
     
-    /// Whether hidden icons are currently expanded (visible)
-    @Published private(set) var isExpanded = true
+    /// Current hiding state
+    @Published private(set) var state = HidingState.showItems
+    
+    /// Convenience: whether icons are currently visible
+    var isExpanded: Bool { state == .showItems }
     
     // MARK: - Status Items
     
-    /// The visible toggle button - always shows eye icon, click to toggle
-    private var toggleItem: NSStatusItem?
+    /// The main toggle button (rightmost, user clicks to toggle visibility)
+    private var mainItem: NSStatusItem?
     
-    /// The chevron indicator - visible only when icons are hidden (to the left of toggle)
-    private var chevronItem: NSStatusItem?
-    
-    /// The invisible divider that expands to push items off-screen
+    /// The hidden section divider (to the LEFT of main, expands to push icons off screen)
     private var dividerItem: NSStatusItem?
     
-    /// Autosave names for position persistence
-    private let toggleAutosaveName = "DroppyMenuBarToggle"
-    private let chevronAutosaveName = "DroppyMenuBarChevron"
-    private let dividerAutosaveName = "DroppyMenuBarDivider"
+    // Autosave names - following Ice's pattern
+    private static let mainAutosaveName = "DroppyMBM_Icon"
+    private static let dividerAutosaveName = "DroppyMBM_Hidden"
     
-    // MARK: - Constants
+    // MARK: - Constants (from Ice)
     
-    /// Standard length for toggle (shows chevron)
-    private let toggleLength: CGFloat = NSStatusItem.variableLength
+    /// Standard length for visible control items
+    private let lengthStandard = NSStatusItem.variableLength
     
-    /// Standard length for divider (thin, almost invisible)
-    private let dividerStandardLength: CGFloat = 1
-    
-    /// Expanded length to push items off-screen (ICE uses 10,000)
-    private let dividerExpandedLength: CGFloat = 10_000
+    /// Expanded length to push items off screen (Ice uses 10_000)
+    private let lengthExpanded: CGFloat = 10_000
     
     // MARK: - Persistence Keys
     
     private let enabledKey = "menuBarManagerEnabled"
-    private let expandedKey = "menuBarManagerExpanded"
+    private let stateKey = "menuBarManagerState"  // "hideItems" or "showItems"
     
     // MARK: - Initialization
     
@@ -67,6 +67,39 @@ final class MenuBarManager: ObservableObject {
         }
     }
     
+    // MARK: - Position Management (Ice Pattern)
+    
+    /// Get the preferred position from UserDefaults
+    private static func getPreferredPosition(for autosaveName: String) -> CGFloat? {
+        let key = "NSStatusItem Preferred Position \(autosaveName)"
+        return UserDefaults.standard.object(forKey: key) as? CGFloat
+    }
+    
+    /// Set the preferred position in UserDefaults
+    private static func setPreferredPosition(_ position: CGFloat?, for autosaveName: String) {
+        let key = "NSStatusItem Preferred Position \(autosaveName)"
+        if let position = position {
+            UserDefaults.standard.set(position, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+    
+    /// Seed initial positions BEFORE creating items (Ice pattern)
+    /// Only seeds if positions are not already set
+    private static func seedPositionsIfNeeded() {
+        // Main icon at position 0 (rightmost)
+        if getPreferredPosition(for: mainAutosaveName) == nil {
+            setPreferredPosition(0, for: mainAutosaveName)
+            print("[MenuBarManager] Seeded main icon position")
+        }
+        // Divider at position 1 (to the left of main)
+        if getPreferredPosition(for: dividerAutosaveName) == nil {
+            setPreferredPosition(1, for: dividerAutosaveName)
+            print("[MenuBarManager] Seeded divider position")
+        }
+    }
+    
     // MARK: - Public API
     
     /// Enable the menu bar manager
@@ -76,60 +109,68 @@ final class MenuBarManager: ObservableObject {
         isEnabled = true
         UserDefaults.standard.set(true, forKey: enabledKey)
         
-        // Clear any stale chevron position to force it next to toggle
-        // (The autosave mechanism may have cached a far-left position)
-        UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position \(chevronAutosaveName)")
+        // Seed positions BEFORE creating items (critical Ice pattern)
+        Self.seedPositionsIfNeeded()
         
-        // Create all status items
+        // Create status items
         createStatusItems()
         
-        // Restore previous expansion state, or default to expanded (showing all icons)
-        if UserDefaults.standard.object(forKey: expandedKey) != nil {
-            isExpanded = UserDefaults.standard.bool(forKey: expandedKey)
+        // Restore previous state
+        if let savedState = UserDefaults.standard.string(forKey: stateKey) {
+            state = savedState == "hideItems" ? .hideItems : .showItems
         } else {
-            isExpanded = true
+            state = .showItems  // Default: show all icons
         }
-        applyExpansionState()
+        applyState()
         
-        print("[MenuBarManager] Enabled, expanded: \(isExpanded)")
+        print("[MenuBarManager] Enabled, state: \(state)")
     }
     
     /// Disable the menu bar manager
     func disable() {
         guard isEnabled else { return }
         
+        // Show all items before disabling
+        if state == .hideItems {
+            state = .showItems
+            applyState()
+        }
+        
         isEnabled = false
         UserDefaults.standard.set(false, forKey: enabledKey)
         
-        // Show all items before removing
-        if !isExpanded {
-            isExpanded = true
-            applyExpansionState()
-        }
-        
-        // Remove both status items
+        // Remove status items (with position preservation)
         removeStatusItems()
         
         print("[MenuBarManager] Disabled")
     }
     
-    /// Toggle between expanded and collapsed states
-    func toggleExpanded() {
-        isExpanded.toggle()
-        UserDefaults.standard.set(isExpanded, forKey: expandedKey)
-        applyExpansionState()
+    /// Toggle between showing and hiding items
+    func toggle() {
+        state = (state == .showItems) ? .hideItems : .showItems
+        UserDefaults.standard.set(state == .hideItems ? "hideItems" : "showItems", forKey: stateKey)
+        applyState()
         
-        // Notify to refresh Droppy menu
+        // Notify for Droppy menu refresh
         NotificationCenter.default.post(name: .menuBarManagerStateChanged, object: nil)
         
-        print("[MenuBarManager] Toggled: \(isExpanded ? "expanded" : "collapsed")")
+        print("[MenuBarManager] Toggled to: \(state)")
+    }
+    
+    /// Legacy compatibility
+    func toggleExpanded() {
+        toggle()
     }
     
     /// Clean up all resources
     func cleanup() {
         disable()
         UserDefaults.standard.removeObject(forKey: enabledKey)
-        UserDefaults.standard.removeObject(forKey: expandedKey)
+        UserDefaults.standard.removeObject(forKey: stateKey)
+        
+        // Clear saved positions for fresh start on next enable
+        Self.setPreferredPosition(nil, for: Self.mainAutosaveName)
+        Self.setPreferredPosition(nil, for: Self.dividerAutosaveName)
         
         print("[MenuBarManager] Cleanup complete")
     }
@@ -137,174 +178,161 @@ final class MenuBarManager: ObservableObject {
     // MARK: - Status Items Creation
     
     private func createStatusItems() {
-        // Create the toggle button FIRST (so it appears rightmost, near system tray)
-        toggleItem = NSStatusBar.system.statusItem(withLength: toggleLength)
-        toggleItem?.autosaveName = toggleAutosaveName
+        // Create MAIN item (user's toggle button)
+        mainItem = NSStatusBar.system.statusItem(withLength: lengthStandard)
+        mainItem?.autosaveName = Self.mainAutosaveName
         
-        if let button = toggleItem?.button {
+        if let button = mainItem?.button {
             button.target = self
-            button.action = #selector(toggleClicked)
+            button.action = #selector(mainItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         
-        // Create the divider SECOND (expands to hide items, positioned to the left)
-        dividerItem = NSStatusBar.system.statusItem(withLength: dividerStandardLength)
-        dividerItem?.autosaveName = dividerAutosaveName
+        // Create DIVIDER item (the hidden section marker that expands)
+        dividerItem = NSStatusBar.system.statusItem(withLength: lengthStandard)
+        dividerItem?.autosaveName = Self.dividerAutosaveName
         
         if let button = dividerItem?.button {
-            // Make divider invisible
-            button.title = ""
-            button.image = nil
+            button.target = self
+            button.action = #selector(dividerClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        
-        // Create the chevron LAST so it appears directly to the LEFT of the toggle
-        // (NSStatusBar places items right-to-left based on creation order when no position is saved)
-        // Using autosaveName to persist position next to the toggle
-        chevronItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        chevronItem?.autosaveName = chevronAutosaveName
-        chevronItem?.isVisible = true // Start visible (default is expanded/showing all icons)
-        
-        if let button = chevronItem?.button {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-            button.image = NSImage(systemSymbolName: "chevron.compact.left", accessibilityDescription: "Drag icons left of here to hide them")?
-                .withSymbolConfiguration(config)
-        }
-        
-        updateToggleIcon()
         
         print("[MenuBarManager] Created status items")
     }
     
     private func removeStatusItems() {
-        if let item = toggleItem {
-            let autosaveName = item.autosaveName as String
-            let cached = StatusItemDefaults.preferredPosition(for: autosaveName)
-            NSStatusBar.system.removeStatusItem(item)
-            if let pos = cached { StatusItemDefaults.setPreferredPosition(pos, for: autosaveName) }
-            toggleItem = nil
-        }
+        // Ice pattern: Cache positions before removing, then restore after
+        // This prevents NSStatusBar from clearing the preferred positions
         
-        if let item = chevronItem {
-            let autosaveName = item.autosaveName as String
-            let cached = StatusItemDefaults.preferredPosition(for: autosaveName)
+        if let item = mainItem {
+            let autosave = item.autosaveName as String
+            let cached = Self.getPreferredPosition(for: autosave)
             NSStatusBar.system.removeStatusItem(item)
-            if let pos = cached { StatusItemDefaults.setPreferredPosition(pos, for: autosaveName) }
-            chevronItem = nil
+            Self.setPreferredPosition(cached, for: autosave)
+            mainItem = nil
         }
         
         if let item = dividerItem {
-            let autosaveName = item.autosaveName as String
-            let cached = StatusItemDefaults.preferredPosition(for: autosaveName)
+            let autosave = item.autosaveName as String
+            let cached = Self.getPreferredPosition(for: autosave)
             NSStatusBar.system.removeStatusItem(item)
-            if let pos = cached { StatusItemDefaults.setPreferredPosition(pos, for: autosaveName) }
+            Self.setPreferredPosition(cached, for: autosave)
             dividerItem = nil
         }
         
         print("[MenuBarManager] Removed status items")
     }
     
-    private func updateToggleIcon() {
-        guard let button = toggleItem?.button else { return }
+    // MARK: - State Application (Ice Pattern)
+    
+    private func applyState() {
+        updateMainItem()
+        updateDividerItem()
+    }
+    
+    private func updateMainItem() {
+        guard let button = mainItem?.button else { return }
         
         let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
         
-        if isExpanded {
-            // Items visible - show open eye (click to hide)
+        switch state {
+        case .showItems:
+            // Icons are visible - show eye icon
             button.image = NSImage(systemSymbolName: "eye.fill", accessibilityDescription: "Hide menu bar icons")?
                 .withSymbolConfiguration(config)
-        } else {
-            // Items hidden - show slashed eye (click to show)
+        case .hideItems:
+            // Icons are hidden - show slashed eye
             button.image = NSImage(systemSymbolName: "eye.slash.fill", accessibilityDescription: "Show menu bar icons")?
                 .withSymbolConfiguration(config)
         }
+        button.image?.isTemplate = true
     }
     
-    private func applyExpansionState() {
-        guard let dividerItem = dividerItem else { return }
+    private func updateDividerItem() {
+        guard let dividerItem = dividerItem, let button = dividerItem.button else { return }
         
-        if isExpanded {
-            // Show all icons - divider at minimal length, SHOW chevron (indicates drag zone)
-            dividerItem.length = dividerStandardLength
-            chevronItem?.isVisible = true // Show chevron when icons are visible
-        } else {
-            // Hide icons - expand divider, hide chevron (no need to show drag zone)
-            dividerItem.length = dividerExpandedLength
-            chevronItem?.isVisible = false // Hide chevron when icons are hidden
+        switch state {
+        case .showItems:
+            // Normal width - show chevron indicator
+            dividerItem.length = lengthStandard
+            button.cell?.isEnabled = true
+            button.alphaValue = 0.7
+            
+            let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            button.image = NSImage(systemSymbolName: "chevron.compact.left", accessibilityDescription: "Drag icons left to hide")?
+                .withSymbolConfiguration(config)
+            button.image?.isTemplate = true
+            
+        case .hideItems:
+            // Expanded to push icons off - hide the button content (Ice pattern)
+            dividerItem.length = lengthExpanded
+            button.cell?.isEnabled = false  // Prevent highlighting
+            button.isHighlighted = false     // Force unhighlight
+            button.image = nil               // Hide the chevron
         }
-        
-        updateToggleIcon()
     }
     
     // MARK: - Actions
     
-    @objc private func toggleClicked() {
-        let event = NSApp.currentEvent
+    @objc private func mainItemClicked() {
+        guard let event = NSApp.currentEvent else { return }
         
-        if event?.type == .rightMouseUp {
-            // Right-click: show menu
+        switch event.type {
+        case .rightMouseUp:
             showContextMenu()
-        } else {
-            // Left-click: toggle expansion
-            toggleExpanded()
+        default:
+            toggle()
+        }
+    }
+    
+    @objc private func dividerClicked() {
+        guard let event = NSApp.currentEvent else { return }
+        
+        switch event.type {
+        case .rightMouseUp:
+            showContextMenu()
+        default:
+            toggle()
         }
     }
     
     private func showContextMenu() {
         let menu = NSMenu()
         
-        menu.addItem(withTitle: isExpanded ? "Hide Menu Bar Icons" : "Show Menu Bar Icons",
-                     action: #selector(toggleFromMenu),
-                     keyEquivalent: "")
+        let toggleTitle = (state == .showItems) ? "Hide Menu Bar Icons" : "Show Menu Bar Icons"
+        menu.addItem(withTitle: toggleTitle, action: #selector(toggleFromMenu), keyEquivalent: "")
         menu.items.last?.target = self
         
         menu.addItem(.separator())
         
-        menu.addItem(withTitle: "How to Use",
-                     action: #selector(showHowTo),
-                     keyEquivalent: "")
+        menu.addItem(withTitle: "How to Use", action: #selector(showHowTo), keyEquivalent: "")
         menu.items.last?.target = self
         
         menu.addItem(.separator())
         
-        menu.addItem(withTitle: "Disable Menu Bar Manager",
-                     action: #selector(disableFromMenu),
-                     keyEquivalent: "")
+        menu.addItem(withTitle: "Disable Menu Bar Manager", action: #selector(disableFromMenu), keyEquivalent: "")
         menu.items.last?.target = self
         
-        toggleItem?.menu = menu
-        toggleItem?.button?.performClick(nil)
-        toggleItem?.menu = nil
+        mainItem?.menu = menu
+        mainItem?.button?.performClick(nil)
+        mainItem?.menu = nil
     }
     
     @objc private func toggleFromMenu() {
-        toggleExpanded()
+        toggle()
     }
     
     @objc private func showHowTo() {
-        // Show Droppy-style notification
         DroppyAlertController.shared.showSimple(
             style: .info,
             title: "How to Use Menu Bar Manager",
-            message: "1. Click the eye icon to hide icons (a chevron will appear)\n2. Hold ⌘ and drag icons LEFT of the chevron to hide them\n3. Click the eye again to show/hide those icons\n\nIcons to the right of the chevron stay visible."
+            message: "1. Hold ⌘ and drag icons to the LEFT of the chevron ‹\n2. Click the eye icon to hide/show those icons\n\nIcons to the RIGHT of the chevron stay visible."
         )
     }
     
     @objc private func disableFromMenu() {
         disable()
-    }
-}
-
-// MARK: - StatusItemDefaults Helper
-
-private enum StatusItemDefaults {
-    private static let positionPrefix = "NSStatusItem Preferred Position"
-    
-    static func preferredPosition(for autosaveName: String) -> Double? {
-        UserDefaults.standard.object(forKey: "\(positionPrefix) \(autosaveName)") as? Double
-    }
-    
-    static func setPreferredPosition(_ position: Double, for autosaveName: String) {
-        UserDefaults.standard.set(position, forKey: "\(positionPrefix) \(autosaveName)")
     }
 }
 
