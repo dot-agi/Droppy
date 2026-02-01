@@ -471,6 +471,9 @@ final class ControlItem {
 /// Manager for the state of the menu bar.
 @MainActor
 final class MenuBarManager: ObservableObject {
+    /// Shared singleton instance
+    static let shared = MenuBarManager()
+    
     /// The managed sections in the menu bar.
     private(set) var sections = [MenuBarSection]()
     
@@ -624,6 +627,12 @@ final class MenuBarManager: ObservableObject {
         
         UserDefaults.standard.set(true, forKey: "MenuBarManager_Removed")
         print("[MenuBarManager] Disabled")
+    }
+    
+    /// Cleanup when extension is removed
+    func cleanup() {
+        disable()
+        sections.removeAll()
     }
 }
 
