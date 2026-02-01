@@ -29,7 +29,6 @@
   <video src="https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16" width="100%" autoplay loop muted playsinline>
     Your browser does not support the video tag.
   </video>
-  <br>
   <sub>📱 Can't see the video? <a href="https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16">Watch it here</a></sub>
 </div>
 
