@@ -225,6 +225,8 @@ final class MediaKeyInterceptor {
             }
             
             // Check if brightness is supported on built-in display
+            // Bug #125: Try re-init if initial detection failed shortly after boot
+            BrightnessManager.shared.attemptReInitIfNeeded()
             if !BrightnessManager.shared.isSupported {
                 return false
             }

@@ -45,6 +45,13 @@ final class BrightnessManager: ObservableObject {
     private var pollFailCount: Int = 0
     private var isPollingInProgress = false // Mutex to prevent overlapping XPC calls
     
+    // MARK: - Lazy Re-initialization (Bug #125)
+    // After reboot, display detection may fail initially due to timing
+    // Allow retry within a grace period after launch
+    private let launchTime = Date()
+    private let reInitGracePeriod: TimeInterval = 30  // 30 seconds after launch
+    private var hasAttemptedReInit = false
+    
     // MARK: - Initialization
     private init() {
         loadFrameworks()
@@ -66,8 +73,51 @@ final class BrightnessManager: ObservableObject {
             print("BrightnessManager: Initialized with brightness \(rawBrightness), isSupported: true")
             startBrightnessPolling()
         } else {
-            print("BrightnessManager: Could not read brightness, isSupported: false")
+            print("BrightnessManager: Could not read brightness, isSupported: false (will retry within \(Int(reInitGracePeriod))s)")
             isSupported = false
+        }
+    }
+    
+    // MARK: - Lazy Re-initialization (Bug #125 Fix)
+    
+    /// Attempt to re-initialize brightness support if initial detection failed
+    /// Called when brightness keys are pressed and isSupported is false
+    func attemptReInitIfNeeded() {
+        // Already supported, nothing to do
+        guard !isSupported else { return }
+        
+        // Don't retry if we already tried once
+        guard !hasAttemptedReInit else { return }
+        
+        // Only retry within grace period after launch (display detection timing issues)
+        let timeSinceLaunch = Date().timeIntervalSince(launchTime)
+        guard timeSinceLaunch < reInitGracePeriod else {
+            print("BrightnessManager: Grace period expired (\(Int(timeSinceLaunch))s), not retrying")
+            hasAttemptedReInit = true
+            return
+        }
+        
+        print("BrightnessManager: Attempting re-initialization (\(Int(timeSinceLaunch))s since launch)")
+        hasAttemptedReInit = true
+        
+        // Try to find built-in display again
+        mainDisplayID = findBuiltInDisplayID() ?? {
+            if let screen = NSScreen.main,
+               let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
+                return displayID
+            }
+            return nil
+        }()
+        
+        // Try reading brightness
+        if let brightness = getCurrentBrightness() {
+            rawBrightness = brightness
+            lastPolledBrightness = brightness
+            isSupported = true
+            print("BrightnessManager: Re-initialization SUCCESS - brightness \(rawBrightness)")
+            startBrightnessPolling()
+        } else {
+            print("BrightnessManager: Re-initialization failed")
         }
     }
     
