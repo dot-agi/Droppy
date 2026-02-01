@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/droppy-logo-transparent.png" alt="Droppy" width="140" />
+  <img src="docs/assets/images/droppy-icon-dark.png" alt="Droppy" width="140" />
 </p>
 
 <h1 align="center">Droppy</h1>
