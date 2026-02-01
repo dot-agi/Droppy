@@ -26,9 +26,10 @@
 ## See Droppy in Action
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/813c3eea-6588-4f23-880f-135833d26a16" width="100%" autoplay loop muted playsinline>
-    Your browser does not support the video tag.
-  </video>
+  <a href="https://www.youtube.com/watch?v=k-BQ-TvSVpY">
+    <img src="https://img.youtube.com/vi/k-BQ-TvSVpY/maxresdefault.jpg" alt="Droppy Demo Video" width="100%" style="border-radius: 12px;" />
+  </a>
+  <p><sub>▶️ Click to watch on YouTube</sub></p>
 </div>
 
 ---
