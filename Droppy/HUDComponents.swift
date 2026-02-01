@@ -455,6 +455,7 @@ private class MiniAudioVisualizerState: ObservableObject {
 // MARK: - Subtle Scrolling Text for Long File Names
 
 /// A text view that subtly scrolls horizontally to reveal long file names
+/// - Centered when text fits, left-aligned with gradient fade when it overflows
 /// - Only scrolls when hovered (not in static state)
 /// - Very slow and subtle scroll speed for premium feel
 /// - Scrolls to show full text, pauses, then scrolls back
@@ -492,9 +493,14 @@ struct SubtleScrollingText: View {
         max(0, textWidth - containerWidth)
     }
     
+    /// Effective alignment: centered when text fits, leading when overflowing
+    private var effectiveAlignment: Alignment {
+        needsScroll ? .leading : (alignment == .center ? .center : .leading)
+    }
+    
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: alignment == .center ? .center : .leading) {
+            ZStack(alignment: effectiveAlignment) {
                 // Hidden text to measure full width
                 Text(text)
                     .font(font)
@@ -519,12 +525,12 @@ struct SubtleScrollingText: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .offset(x: -scrollOffset)
-                    // Only apply fade mask when text actually needs scrolling
-                    // This preserves crisp text rendering for non-scrolling text
+                    // Apply fade mask when text overflows - always show right fade, left fade only when scrolled
                     .mask(
                         Group {
                             if needsScroll {
                                 HStack(spacing: 0) {
+                                    // Left fade - only when scrolled away from start
                                     if scrollOffset > 0 {
                                         LinearGradient(
                                             colors: [.clear, .white],
@@ -538,6 +544,7 @@ struct SubtleScrollingText: View {
                                     
                                     Rectangle()
                                     
+                                    // Right fade - always show when text overflows (except at end)
                                     if scrollOffset < maxScrollOffset {
                                         LinearGradient(
                                             colors: [.white, .clear],
@@ -556,7 +563,7 @@ struct SubtleScrollingText: View {
                         }
                     )
             }
-            .frame(width: geo.size.width, height: geo.size.height, alignment: alignment == .center ? .center : .leading)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: effectiveAlignment)
             .clipped()
             .onAppear {
                 containerWidth = geo.size.width
