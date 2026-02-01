@@ -463,6 +463,34 @@ final class ControlItem {
         statusItem.isVisible = false
         StatusItemDefaults[.preferredPosition, autosaveName] = cached
     }
+    
+    /// Triggers the initial state update. Must be called after sections are populated.
+    func triggerInitialState() {
+        guard let section else {
+            print("[ControlItem] triggerInitialState: section is nil!")
+            return
+        }
+        
+        print("[ControlItem] Triggering initial state for \(section.name.rawValue)")
+        
+        // Set the length based on section
+        statusItem.length = switch section.name {
+        case .visible: Lengths.standard
+        case .hidden:
+            switch state {
+            case .hideItems: Lengths.expanded
+            case .showItems: Lengths.standard
+            }
+        }
+        
+        // Make sure constraint is active
+        constraint?.isActive = true
+        
+        // Update the appearance
+        updateStatusItem(with: state)
+        
+        print("[ControlItem] Status item length: \(statusItem.length), isVisible: \(statusItem.isVisible)")
+    }
 }
 
 // MARK: - MenuBarManager
@@ -609,6 +637,13 @@ final class MenuBarManager: ObservableObject {
         ]
         
         print("[MenuBarManager] Sections initialized: \(sections.map { $0.name.rawValue })")
+        
+        // CRITICAL: Trigger initial state update AFTER sections are populated
+        // This is necessary because the ControlItem's section lookup fails during init
+        // since sections array is not yet assigned
+        for section in sections {
+            section.controlItem.triggerInitialState()
+            }
     }
     
     /// Configures the internal observers for the manager.
