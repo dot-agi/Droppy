@@ -160,9 +160,12 @@ final class FloatingBasketWindowController: NSObject {
         if let panel = basketWindow ?? NSApp.windows.first(where: { $0 is BasketPanel }) as? NSPanel {
             basketWindow = panel
             panel.animator().alphaValue = 1.0 // Ensure visible
-            if !atLastPosition {
+            if atLastPosition && lastBasketFrame.width > 0 {
+                panel.setFrame(lastBasketFrame, display: true)
+            } else {
                 moveBasketToMouse()
             }
+            panel.orderFrontRegardless()
             return
         }
 
