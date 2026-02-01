@@ -1187,6 +1187,12 @@ struct NotchItemView: View {
             
             state.deselectAll()
             HapticFeedback.drop()
+            
+            // Auto-start renaming the new folder (like ZIP creation)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                renamingItemId = newFolderItem.id
+                state.isRenaming = true
+            }
         } catch {
             print("❌ Create folder error: \(error.localizedDescription)")
             HapticFeedback.error()
