@@ -318,14 +318,15 @@ final class MenuBarManager: ObservableObject {
     // MARK: - Status Items Creation
     
     private func createStatusItems() {
+        // ICE PATTERN: Create items with length 0, then applyState sets correct lengths
+        
         // Log current position seeds
         print("[MenuBarManager] Position seeds - main=\(String(describing: StatusItemDefaults[Self.mainAutosaveName])), divider=\(String(describing: StatusItemDefaults[Self.dividerAutosaveName]))")
         
         // Create DIVIDER item FIRST (will be to the LEFT of main)
-        // The hidden section divider expands to hide items to its LEFT
-        dividerItem = NSStatusBar.system.statusItem(withLength: lengthStandard)
+        // Following Ice pattern: length 0 initially
+        dividerItem = NSStatusBar.system.statusItem(withLength: 0)
         dividerItem?.autosaveName = Self.dividerAutosaveName
-        dividerItem?.isVisible = true
         
         if let button = dividerItem?.button {
             button.target = self
@@ -336,7 +337,7 @@ final class MenuBarManager: ObservableObject {
         
         // Create MAIN item SECOND (will be to the RIGHT of divider)
         // This stays visible when divider expands because it's to the RIGHT
-        mainItem = NSStatusBar.system.statusItem(withLength: lengthStandard)
+        mainItem = NSStatusBar.system.statusItem(withLength: 0)
         mainItem?.autosaveName = Self.mainAutosaveName
         
         if let button = mainItem?.button {
@@ -346,18 +347,7 @@ final class MenuBarManager: ObservableObject {
             print("[MenuBarManager] Created MAIN item, button=\(button)")
         }
         
-        print("[MenuBarManager] Created status items")
-        
-        // Debug: Check window positions after a brief delay (let system settle)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self else { return }
-            if let mainWindow = self.mainItem?.button?.window {
-                print("[MenuBarManager] MAIN window frame=\(mainWindow.frame)")
-            }
-            if let dividerWindow = self.dividerItem?.button?.window {
-                print("[MenuBarManager] DIVIDER window frame=\(dividerWindow.frame)")
-            }
-        }
+        print("[MenuBarManager] Created status items - now applyState will set lengths")
     }
     
     private func removeStatusItems() {
@@ -391,7 +381,10 @@ final class MenuBarManager: ObservableObject {
     }
     
     private func updateMainItem() {
-        guard let button = mainItem?.button else { return }
+        guard let mainItem = mainItem, let button = mainItem.button else { return }
+        
+        // ICE PATTERN: Main icon ALWAYS stays at standard length (never expands)
+        mainItem.length = lengthStandard
         
         let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
         
@@ -399,6 +392,8 @@ final class MenuBarManager: ObservableObject {
         button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: state == .showItems ? "Hide menu bar icons" : "Show menu bar icons")?
             .withSymbolConfiguration(config)
         button.image?.isTemplate = true
+        
+        print("[MenuBarManager] updateMainItem: length=\(mainItem.length), symbol=\(symbolName)")
     }
     
     private func updateDividerItem() {
