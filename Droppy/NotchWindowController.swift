@@ -538,6 +538,13 @@ final class NotchWindowController: NSObject, ObservableObject {
         
         // Global monitor catches mouse movement when Droppy is not frontmost
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
+            // PERFORMANCE (v10.x): Skip drag events unless already hovering over the notch.
+            // macOS fires hundreds of leftMouseDragged events per second during drag operations.
+            // Processing each one causes 100% CPU. We only care about drags that START on the notch.
+            if event.type == .leftMouseDragged && !DroppyState.shared.isMouseHovering {
+                return
+            }
+            
             // DEBUG: Log every 60 events to verify monitor is receiving events after unlock
             struct DebugCounter { static var count = 0 }
             DebugCounter.count += 1
