@@ -244,13 +244,62 @@ struct MenuBarManagerInfoView: View {
             
             Divider()
             
+            // Auto-hide delay
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Auto-Hide Delay")
+                            .font(.callout)
+                        Text("Automatically hide after revealing (0 = never)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(manager.autoHideDelay == 0 ? "Off" : String(format: "%.1fs", manager.autoHideDelay))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $manager.autoHideDelay, in: 0.0...5.0, step: 0.5)
+                    .controlSize(.small)
+            }
+            
+            Divider()
+            
+            // Chevron separator toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Show Chevron Separator")
+                        .font(.callout)
+                    Text("Display chevron between visible and hidden icons")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Toggle("", isOn: $manager.showChevronSeparator)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            
+            Divider()
+            
             // Icon picker
             VStack(alignment: .leading, spacing: 8) {
-                Text("Toggle Icon")
-                    .font(.callout)
+                HStack {
+                    Text("Toggle Icon")
+                        .font(.callout)
+                    Spacer()
+                    Toggle("Gradient", isOn: $manager.useGradientIcon)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .labelsHidden()
+                    Text("Gradient")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 
                 // Icon options in a grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 8) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 8) {
                     ForEach(MBMIconSet.allCases) { iconSet in
                         iconOption(iconSet)
                     }

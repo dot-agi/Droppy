@@ -422,6 +422,7 @@ final class ControlItem {
             keyEquivalent: ""
         )
         settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
         menu.addItem(settingsItem)
         
         menu.addItem(.separator())
@@ -432,6 +433,7 @@ final class ControlItem {
             keyEquivalent: ""
         )
         disableItem.target = self
+        disableItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Disable")
         menu.addItem(disableItem)
         
         statusItem.menu = menu
@@ -503,6 +505,10 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
     case chevron = "chevron"
     case circle = "circle"
     case line = "line"
+    case dot = "dot"
+    case arrow = "arrow"
+    case square = "square"
+    case diamond = "diamond"
     
     var id: String { rawValue }
     
@@ -511,7 +517,11 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
         case .eye: return "Eye"
         case .chevron: return "Chevron"
         case .circle: return "Circle"
-        case .line: return "Line"
+        case .line: return "Lines"
+        case .dot: return "Dot"
+        case .arrow: return "Arrow"
+        case .square: return "Square"
+        case .diamond: return "Diamond"
         }
     }
     
@@ -520,7 +530,11 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
         case .eye: return "eye.fill"
         case .chevron: return "chevron.right"
         case .circle: return "circle.fill"
-        case .line: return "line.horizontal.3"
+        case .line: return "line.3.horizontal"
+        case .dot: return "circle.fill"
+        case .arrow: return "arrowtriangle.right.fill"
+        case .square: return "square.fill"
+        case .diamond: return "diamond.fill"
         }
     }
     
@@ -529,7 +543,11 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
         case .eye: return "eye.slash.fill"
         case .chevron: return "chevron.left"
         case .circle: return "circle"
-        case .line: return "line.horizontal.3.decrease"
+        case .line: return "line.3.horizontal.decrease"
+        case .dot: return "circle.dotted"
+        case .arrow: return "arrowtriangle.left.fill"
+        case .square: return "square"
+        case .diamond: return "diamond"
         }
     }
 }
@@ -582,6 +600,26 @@ final class MenuBarManager: ObservableObject {
         }
     }
     
+    /// Whether to use gradient-colored icon
+    @Published var useGradientIcon: Bool {
+        didSet {
+            UserDefaults.standard.set(useGradientIcon, forKey: "MenuBarManager_UseGradientIcon")
+            updateIconAppearance()
+        }
+    }
+    
+    /// Auto-hide delay in seconds (0 means don't auto-hide)
+    @Published var autoHideDelay: Double {
+        didSet { UserDefaults.standard.set(autoHideDelay, forKey: "MenuBarManager_AutoHideDelay") }
+    }
+    
+    /// Whether to show chevron separator when icons are hidden
+    @Published var showChevronSeparator: Bool {
+        didSet {
+            UserDefaults.standard.set(showChevronSeparator, forKey: "MenuBarManager_ShowChevronSeparator")
+        }
+    }
+    
     /// Mouse monitoring
     private var mouseMonitor: Any?
     
@@ -598,6 +636,17 @@ final class MenuBarManager: ObservableObject {
         let storedDelay = UserDefaults.standard.double(forKey: "MenuBarManager_ShowOnHoverDelay")
         self.showOnHoverDelay = storedDelay == 0 ? 0.3 : storedDelay
         self.iconSet = MBMIconSet(rawValue: UserDefaults.standard.string(forKey: "MenuBarManager_IconSet") ?? "") ?? .eye
+        
+        // Load additional settings
+        self.useGradientIcon = UserDefaults.standard.bool(forKey: "MenuBarManager_UseGradientIcon")
+        let storedAutoHide = UserDefaults.standard.double(forKey: "MenuBarManager_AutoHideDelay")
+        self.autoHideDelay = storedAutoHide  // 0 means don't auto-hide
+        // Default to true for chevron separator
+        if UserDefaults.standard.object(forKey: "MenuBarManager_ShowChevronSeparator") == nil {
+            self.showChevronSeparator = true
+        } else {
+            self.showChevronSeparator = UserDefaults.standard.bool(forKey: "MenuBarManager_ShowChevronSeparator")
+        }
         
         print("[MenuBarManager] INIT CALLED, isEnabled: \(savedEnabled)")
         
