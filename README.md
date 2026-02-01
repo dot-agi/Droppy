@@ -26,10 +26,7 @@
 ## See Droppy in Action
 
 <div align="center">
-  <a href="https://www.youtube.com/watch?v=k-BQ-TvSVpY">
-    <img src="https://img.youtube.com/vi/k-BQ-TvSVpY/maxresdefault.jpg" alt="Droppy Demo Video" width="100%" style="border-radius: 12px;" />
-  </a>
-  <p><sub>▶️ Click to watch on YouTube</sub></p>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/k-BQ-TvSVpY?si=lkujdF3GYmkiyHQn" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
 ---
