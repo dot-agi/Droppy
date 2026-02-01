@@ -405,10 +405,11 @@ final class MenuBarManager: ObservableObject {
             button.alphaValue = 0.7
             
             let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-            button.image = NSImage(systemSymbolName: "chevron.compact.left", accessibilityDescription: "Drag icons left to hide")?
+            let chevronImage = NSImage(systemSymbolName: "chevron.compact.left", accessibilityDescription: "Drag icons left to hide")?
                 .withSymbolConfiguration(config)
+            button.image = chevronImage
             button.image?.isTemplate = true
-            print("[MenuBarManager] updateDividerItem: SET TO SHOW (length=\(dividerItem.length))")
+            print("[MenuBarManager] updateDividerItem: SET TO SHOW (length=\(dividerItem.length)), image=\(String(describing: chevronImage)), button.image=\(String(describing: button.image)), button.frame=\(button.frame)")
             
         case .hideItems:
             // Expanded to push icons off - Button Stealth Pattern
