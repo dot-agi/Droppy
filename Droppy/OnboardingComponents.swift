@@ -91,80 +91,8 @@ struct OnboardingToggle: View {
     }
 }
 
-// MARK: - Onboarding Display Mode Button
-
-/// Display mode button for onboarding with icon bounce animation
-/// Designed for the Notch/Dynamic Island selection
-struct OnboardingDisplayModeButton<Icon: View>: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    let icon: Icon
-    
-    @State private var iconBounce = false
-    @State private var isHovering = false
-    
-    init(title: String, isSelected: Bool, action: @escaping () -> Void, @ViewBuilder icon: () -> Icon) {
-        self.title = title
-        self.isSelected = isSelected
-        self.action = action
-        self.icon = icon()
-    }
-    
-    var body: some View {
-        Button {
-            // Trigger icon bounce
-            withAnimation(DroppyAnimation.onboardingPop) {
-                iconBounce = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(DroppyAnimation.stateEmphasis) {
-                    iconBounce = false
-                    action()
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
-                        .fill(isSelected ? Color.blue.opacity(0.2) : AdaptiveColors.buttonBackgroundAuto)
-                    
-                    icon
-                        .scaleEffect(iconBounce ? 1.2 : 1.0)
-                        .rotationEffect(.degrees(iconBounce ? -5 : 0))
-                }
-                .frame(width: 70, height: 40)
-                
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-                
-                Spacer()
-                
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(isSelected ? .green : .secondary.opacity(0.5))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background((isSelected ? AdaptiveColors.buttonBackgroundAuto : AdaptiveColors.buttonBackgroundAuto))
-            .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
-                    .stroke(isSelected ? Color.blue.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
-            )
-            .scaleEffect(isHovering ? 1.02 : 1.0)
-        }
-        .buttonStyle(DroppySelectableButtonStyle(isSelected: isSelected))
-        .onHover { hovering in
-            withAnimation(DroppyAnimation.hover) {
-                isHovering = hovering
-            }
-        }
-    }
-}
-
 // MARK: - Onboarding View
+
 
 struct OnboardingConfettiView: View {
     @State private var particles: [OnboardingParticle] = []

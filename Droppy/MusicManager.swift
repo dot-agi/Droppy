@@ -73,6 +73,8 @@ final class MusicManager: ObservableObject {
     /// Cached dominant color from album art for visualizer
     /// PERFORMANCE: Computed once per track change, not on every view body evaluation
     @Published private(set) var visualizerColor: Color = .white.opacity(0.7)
+    /// Cached secondary color from album art for gradient visualizer mode
+    @Published private(set) var visualizerSecondaryColor: Color = .gray.opacity(0.7)
     @Published private(set) var isPlaying: Bool = false {
         didSet {
             if oldValue && !isPlaying {
@@ -1221,13 +1223,16 @@ final class MusicManager: ObservableObject {
     
     // MARK: - Cached Visualizer Color
     
-    /// Updates the cached visualizer color from current album art
+    /// Updates the cached visualizer colors from current album art
     /// PERFORMANCE: Called once per track change instead of on every view body evaluation
     private func updateCachedVisualizerColor() {
         if albumArt.size.width > 0 {
-            visualizerColor = albumArt.dominantColor()
+            let colors = albumArt.extractTwoColors()
+            visualizerColor = colors.primary
+            visualizerSecondaryColor = colors.secondary
         } else {
             visualizerColor = .white.opacity(0.7)
+            visualizerSecondaryColor = .gray.opacity(0.7)
         }
     }
     

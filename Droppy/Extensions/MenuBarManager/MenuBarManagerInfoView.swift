@@ -237,6 +237,7 @@ struct MenuBarManagerInfoView: View {
                             .foregroundStyle(.secondary)
                     }
                     Slider(value: $manager.showOnHoverDelay, in: 0.0...1.0, step: 0.1)
+                        .sliderHaptics(value: manager.showOnHoverDelay, range: 0.0...1.0)
                         .controlSize(.small)
                 }
                 .padding(.leading, 4)
@@ -260,6 +261,7 @@ struct MenuBarManagerInfoView: View {
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: $manager.autoHideDelay, in: 0.0...5.0, step: 0.5)
+                    .sliderHaptics(value: manager.autoHideDelay, range: 0.0...5.0)
                     .controlSize(.small)
             }
             
@@ -330,6 +332,7 @@ struct MenuBarManagerInfoView: View {
                         get: { Double(manager.itemSpacingOffset) },
                         set: { manager.itemSpacingOffset = Int($0) }
                     ), in: -8...8, step: 1)
+                        .sliderHaptics(value: Double(manager.itemSpacingOffset), range: -8...8)
                         .controlSize(.small)
                     
                     Button {

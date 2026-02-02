@@ -27,8 +27,11 @@ enum NotchLayoutConstants {
     /// Dynamic Island collapsed width
     static let dynamicIslandWidth: CGFloat = 210
     
-    /// Dynamic Island collapsed height
-    static let dynamicIslandHeight: CGFloat = 37
+    /// Dynamic Island collapsed height (adjustable via user preference)
+    static var dynamicIslandHeight: CGFloat {
+        let offset = UserDefaults.standard.double(forKey: AppPreferenceKey.dynamicIslandHeightOffset)
+        return 37 + offset  // Base: 37pt, Range: 27pt to 47pt
+    }
     
     /// Dynamic Island top margin from screen edge (creates floating effect like iPhone)
     static let dynamicIslandTopMargin: CGFloat = 4

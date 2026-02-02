@@ -1,81 +1,12 @@
-📢 Important
-- Major update with 119 changes since v10.1.1 — the biggest Droppy update yet!
-
 ✨ New Features
-
-🖥️ Hide Physical Notch
-- Added black bar to hide the physical notch cutout on built-in displays
-- Optional support for external displays
-- Automatically adapts to screen changes and display mode
-
-🔒 Incognito Browser Media Filtering  
-- Hide media from private/incognito browsing windows
-- Supports Chrome, Safari, Firefox, Edge, Arc, Brave, Vivaldi, Opera
-- Toggle in Settings → Media → Hide Incognito Media
-
-⏱️ Advanced Autofade (Issue #79)
-- Configurable default autofade delay (1-30 seconds)
-- App-specific autofade rules — set different timers per app
-- Display-specific autofade rules — configure per monitor
-- Smart frontmost app monitoring
-
-📊 Menu Bar Manager — Complete Rewrite
-- Modern reactive architecture with Combine
-- 8 icon sets: Eye, Chevron, Circle, Lines, Dot, Arrow, Square, Diamond
-- Optional gradient icon styling
-- Hover-to-reveal with configurable delay (right side of notch only)
-- Auto-hide timer when cursor leaves menu bar
-- Lock visible mode — click eye icon to lock icons visible
-- Menu bar item spacing adjustment (compresses/expands icon gaps)
-- Chevron separator option
-
-📁 Folder & File Management
-- Interact with items directly inside folder previews
-- Create new folders from shelf/basket context menu with auto-rename
-- Unzip archives directly from context menu
-- Tracked folders now open basket at last scroll position
-
-🎨 Visual Refresh
-- All extension icons redesigned with premium new styles
-- Synced in-app icons with website assets
-- Extension accent colors match icon colors
-- Dark mode app icon on website and README
+- Added adjustable Island height slider with smooth live preview animation
+- Added subtle haptic feedback to all sliders for premium tactile experience
+- Added Gradient Visualizer toggle in Settings → Media for two-tone audio visualization
 
 🐛 Bug Fixes
-
-Performance
-- Fixed Brightness HUD failing after reboot (Issue #125)
-- Fixed drag causing high CPU with event throttling
-- Fixed video seeking causing media flicker (Issue #128)
-
-Multi-Monitor
-- Fixed Element Capture not working on external monitors
-- Fixed Window Snap Display 2 targeting wrong display
-- Added hardware-indexed display targeting
-
-UI & Interaction
-- Fixed shelf auto-collapse zone not including floating buttons
-- Fixed High Alert HUD overlapping with Media HUD
-- Fixed quick actions race condition
-- Fixed accessibility/screen recording prompts on every reboot
+- Fixed media title not vertically centered with album art in collapsed HUD
 
 🎯 Polish & Refinements
-- Reduced small HUD icon sizes for cleaner appearance
-- Long file names now left-align with smooth gradient fade
-- Media HUD uses HUDLayoutCalculator for consistent sizing
-- Removed unstable Classic Folder Stack feature
-- Updated website with mobile-responsive video embed
-- README updated with YouTube demo and dark mode icon
-
----
-
-v10.2.1 Hotfix
-
-🐛 Bug Fixes
-- Fixed Menu Bar Manager not enabled by default for new users
-- Fixed High Alert HUD not visible on MacBook notch (hardware notch width mismatch)
-- Fixed High Alert hover indicator not showing over media HUD on MacBook
-- Fixed High Alert hover affecting all displays instead of only hovered screen
-- Disabled problematic lock screen features (Skylight API causing crashes/hangs)
-- Lock Screen HUD and Media Widget are now disabled for all users
-- Existing users with lock screen features enabled will have them auto-disabled on update
+- Complete Settings redesign with high-density grids and modern button styles
+- Refined slider controls with consistent haptic responses across all settings
+- Improved visual hierarchy with new grouped layouts

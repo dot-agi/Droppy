@@ -20,6 +20,22 @@ enum DesignConstants {
     static let bounceDamping: Double = 0.4
 }
 
+// MARK: - Centered Toggle Style
+
+/// Custom toggle style that centers the switch vertically with its label
+/// Fixes the default SwiftUI behavior where the switch aligns to the top
+struct CenteredSwitchToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .center) {
+            configuration.label
+            Spacer()
+            Toggle("", isOn: configuration.$isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+        }
+    }
+}
+
 // MARK: - Legacy OptionButtonStyle removed - all usages migrated to DroppySelectableButtonStyle
 
 /// Reusable HUD toggle button with horizontal layout matching onboarding style
@@ -168,7 +184,249 @@ struct AnimatedHUDToggleWithSubtitle: View {
     }
 }
 
+// MARK: - Animated HUD Toggle with Custom Icon View
+
+/// HUD toggle that accepts a custom icon view (for premium animated icons)
+/// Uses horizontal layout matching other toggle styles
+struct AnimatedHUDToggleWithIconView<Icon: View>: View {
+    let icon: Icon
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+    var color: Color = .green
+    var isEnabled: Bool = true
+    
+    @State private var iconBounce = false
+    @State private var isHovering = false
+    
+    var body: some View {
+        Button {
+            guard isEnabled else { return }
+            withAnimation(DroppyAnimation.bounce) {
+                iconBounce = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
+                    iconBounce = false
+                    isOn.toggle()
+                }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                icon
+                    .scaleEffect(iconBounce ? 1.15 : 1.0)
+                    .rotationEffect(.degrees(iconBounce ? -5 : 0))
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(isOn ? .primary : .secondary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isOn ? .green : .secondary.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(AdaptiveColors.buttonBackgroundAuto)
+            .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                    .stroke(isOn ? color.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .opacity(isEnabled ? 1 : 0.4)
+            .scaleEffect(isHovering && isEnabled ? 1.02 : 1.0)
+            .animation(DroppyAnimation.hover, value: isHovering)
+        }
+        .buttonStyle(DroppySelectableButtonStyle(isSelected: isOn))
+        .contentShape(Rectangle())
+        .disabled(!isEnabled)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+// MARK: - Settings Segment Button
+
+/// Segmented button for settings grids - matches target design with cyan accent
+/// Label appears below the button, icon/preview inside taller button container
+struct SettingsSegmentButton: View {
+    let icon: String
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    @State private var isHovering = false
+    @State private var iconBounce = false
+    
+    private let accentColor = Color.blue // Droppy blue
+    
+    var body: some View {
+        Button {
+            withAnimation(DroppyAnimation.bounce) {
+                iconBounce = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
+                    iconBounce = false
+                    action()
+                }
+            }
+        } label: {
+            VStack(spacing: 8) {
+                // Button container with icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                        .fill(Color.black.opacity(0.35))
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(isSelected ? accentColor : .secondary)
+                        .scaleEffect(iconBounce ? 1.2 : 1.0)
+                }
+                .frame(height: 44)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                        .stroke(isSelected ? accentColor : Color.white.opacity(0.05), lineWidth: isSelected ? 1.5 : 1)
+                )
+                
+                // Label below button
+                Text(label)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .scaleEffect(isHovering ? 1.02 : 1.0)
+            .animation(DroppyAnimation.hover, value: isHovering)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+/// Segmented button variant that accepts custom content view (for visualizer previews, etc.)
+struct SettingsSegmentButtonWithContent<Content: View>: View {
+    let content: Content
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    @State private var isHovering = false
+    @State private var iconBounce = false
+    
+    private let accentColor = Color.blue // Droppy blue
+    
+    init(label: String, isSelected: Bool, action: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.isSelected = isSelected
+        self.action = action
+        self.content = content()
+    }
+    
+    var body: some View {
+        Button {
+            withAnimation(DroppyAnimation.bounce) {
+                iconBounce = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
+                    iconBounce = false
+                    action()
+                }
+            }
+        } label: {
+            VStack(spacing: 8) {
+                // Button container with custom content
+                ZStack {
+                    RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                        .fill(Color.black.opacity(0.35))
+                    
+                    content
+                        .scaleEffect(iconBounce ? 1.1 : 1.0)
+                }
+                .frame(height: 44)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                        .stroke(isSelected ? accentColor.opacity(0.6) : Color.white.opacity(0.05), lineWidth: isSelected ? 1.5 : 1)
+                )
+                
+                // Label below button
+                Text(label)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .scaleEffect(isHovering ? 1.02 : 1.0)
+            .animation(DroppyAnimation.hover, value: isHovering)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+// MARK: - Settings Visualizer Previews
+
+/// Live preview of mono visualizer bars (animated)
+struct VisualizerPreviewMono: View {
+    var isSelected: Bool = false
+    
+    var body: some View {
+        AudioSpectrumView(
+            isPlaying: true,  // Always animate in preview
+            barCount: 5,
+            barWidth: 3,
+            spacing: 2,
+            height: 20,
+            color: isSelected ? Color.blue : Color.secondary,
+            secondaryColor: nil,
+            gradientMode: false
+        )
+        .frame(width: 5 * 3 + 4 * 2, height: 20)
+    }
+}
+
+/// Live preview of gradient visualizer bars (animated with bottom-to-top gradient)
+struct VisualizerPreviewGradient: View {
+    var isSelected: Bool = false
+    
+    var body: some View {
+        // Use vibrant contrasting colors for preview (cyan/magenta)
+        let primaryColor = isSelected 
+            ? Color(red: 0.9, green: 0.3, blue: 0.6)  // Magenta (bottom)
+            : Color(red: 0.55, green: 0.35, blue: 0.45)
+        let secondaryColor = isSelected
+            ? Color(red: 0.2, green: 0.8, blue: 0.9)  // Cyan (top)
+            : Color(red: 0.3, green: 0.5, blue: 0.55)
+        
+        AudioSpectrumView(
+            isPlaying: true,  // Always animate in preview
+            barCount: 5,
+            barWidth: 3,
+            spacing: 2,
+            height: 20,
+            color: primaryColor,
+            secondaryColor: secondaryColor,
+            gradientMode: true
+        )
+        .frame(width: 5 * 3 + 4 * 2, height: 20)
+    }
+}
+
 // MARK: - Volume & Brightness Toggle
+
+
 
 /// Special toggle for Volume/Brightness that morphs between icons on tap
 /// Uses horizontal layout matching onboarding style
@@ -341,6 +599,71 @@ struct DisplayModeButton<Icon: View>: View {
     }
 }
 
+// MARK: - Media Player Toggle Button
+
+/// Premium toggle button for Now Playing with animated icon and info button
+struct MediaPlayerToggleButton: View {
+    @Binding var isOn: Bool
+    var color: Color = .green
+    
+    @State private var iconBounce = false
+    @State private var isHovering = false
+    
+    var body: some View {
+        Button {
+            withAnimation(DroppyAnimation.bounce) {
+                iconBounce = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(DroppyAnimation.stateEmphasis) {
+                    iconBounce = false
+                    isOn.toggle()
+                }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                NowPlayingIcon(size: 40)
+                    .scaleEffect(iconBounce ? 1.15 : 1.0)
+                    .rotationEffect(.degrees(iconBounce ? -5 : 0))
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text("Now Playing")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(isOn ? .primary : .secondary)
+                        SwipeGestureInfoButton()
+                    }
+                    Text("Show current song with album art")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isOn ? .green : .secondary.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(AdaptiveColors.buttonBackgroundAuto)
+            .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                    .stroke(isOn ? color.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .scaleEffect(isHovering ? 1.02 : 1.0)
+            .animation(DroppyAnimation.hover, value: isHovering)
+        }
+        .buttonStyle(DroppySelectableButtonStyle(isSelected: isOn))
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
 // MARK: - Link Button
 
 /// Reusable button for external links, styled to match DisplayModeButton
@@ -477,5 +800,76 @@ struct AnimatedSubSettingToggle: View {
         .onHover { hovering in
             isHovering = hovering
         }
+    }
+}
+
+// MARK: - Haptic Slider
+
+/// A slider that provides tactile feedback via Force Touch trackpad on each value change
+/// Gives a premium feel like native macOS controls
+struct HapticSlider<V: BinaryFloatingPoint>: View where V.Stride: BinaryFloatingPoint {
+    @Binding var value: V
+    let range: ClosedRange<V>
+    let step: V.Stride
+    var tint: Color = .blue
+    
+    var body: some View {
+        Slider(value: $value, in: range, step: step)
+            .tint(tint)
+            .onChange(of: value) { oldValue, newValue in
+                // Provide feedback on each step change
+                let isEndpoint = newValue == range.lowerBound || newValue == range.upperBound
+                
+                if isEndpoint {
+                    // Stronger feedback for reaching min/max
+                    HapticFeedback.sliderEndpoint()
+                } else {
+                    // Subtle tick for regular steps
+                    HapticFeedback.sliderTick()
+                }
+            }
+    }
+}
+
+/// Convenience initializers for HapticSlider
+extension HapticSlider {
+    /// Full customization initializer
+    init(
+        value: Binding<V>,
+        in range: ClosedRange<V>,
+        step: V.Stride,
+        tint: Color = .blue
+    ) {
+        self._value = value
+        self.range = range
+        self.step = step
+        self.tint = tint
+    }
+}
+
+/// Drop-in view modifier to add haptic feedback to existing Slider views
+/// Use this for sliders that can't easily be replaced with HapticSlider
+struct SliderHapticModifier<V: BinaryFloatingPoint>: ViewModifier {
+    let value: V
+    let range: ClosedRange<V>
+    
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: value) { oldValue, newValue in
+                let isEndpoint = newValue == range.lowerBound || newValue == range.upperBound
+                
+                if isEndpoint {
+                    HapticFeedback.sliderEndpoint()
+                } else {
+                    HapticFeedback.sliderTick()
+                }
+            }
+    }
+}
+
+extension View {
+    /// Adds haptic feedback to a slider when its value changes (via Force Touch trackpad)
+    func sliderHaptics<V: BinaryFloatingPoint>(value: V, range: ClosedRange<V>) -> some View {
+        modifier(SliderHapticModifier(value: value, range: range))
     }
 }

@@ -54,8 +54,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             .preferredColorScheme(.dark) // Force dark mode always
         let hostingView = NSHostingView(rootView: settingsView)
         
-        // SettingsView uses macOS 26 Tahoe glass design
-        let windowWidth: CGFloat = 850
+        // SettingsView base width (15% narrower than previous 737)
+        let windowWidth: CGFloat = 626
         let windowHeight: CGFloat = 650
         
         // Create the window
@@ -158,6 +158,38 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// Clears the pending tab (called after SettingsView consumes it)
     func clearPendingTab() {
         pendingTabToOpen = nil
+    }
+    
+    // MARK: - Window Sizing
+    
+    /// Base width for regular settings tabs
+    static let baseWidth: CGFloat = 626
+    
+    /// Extended width for extensions tab (15% wider than old 737)
+    static let extensionsWidth: CGFloat = 848
+    
+    /// Resize the settings window based on the current tab
+    /// - Parameter isExtensions: Whether the extensions tab is selected
+    func resizeForTab(isExtensions: Bool) {
+        guard let window = window else { return }
+        
+        let targetWidth = isExtensions ? Self.extensionsWidth : Self.baseWidth
+        let currentFrame = window.frame
+        
+        // Only resize if width actually changed
+        guard abs(currentFrame.width - targetWidth) > 1 else { return }
+        
+        // Calculate new frame, keeping window centered horizontally
+        let widthDelta = targetWidth - currentFrame.width
+        let newFrame = NSRect(
+            x: currentFrame.origin.x - widthDelta / 2,
+            y: currentFrame.origin.y,
+            width: targetWidth,
+            height: currentFrame.height
+        )
+        
+        // Fast snappy resize - no fancy animations
+        window.setFrame(newFrame, display: true, animate: true)
     }
     
     // MARK: - NSWindowDelegate

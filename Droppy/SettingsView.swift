@@ -31,6 +31,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
     @AppStorage(AppPreferenceKey.externalDisplayUseDynamicIsland) private var externalDisplayUseDynamicIsland = PreferenceDefault.externalDisplayUseDynamicIsland
     @AppStorage(AppPreferenceKey.showIdleNotchOnExternalDisplays) private var showIdleNotchOnExternalDisplays = PreferenceDefault.showIdleNotchOnExternalDisplays
+    @AppStorage(AppPreferenceKey.dynamicIslandHeightOffset) private var dynamicIslandHeightOffset = PreferenceDefault.dynamicIslandHeightOffset
     
     // HUD and Media Player settings
     @AppStorage(AppPreferenceKey.enableHUDReplacement) private var enableHUDReplacement = PreferenceDefault.enableHUDReplacement
@@ -51,6 +52,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.autoFadeMediaHUD) private var autoFadeMediaHUD = PreferenceDefault.autoFadeMediaHUD
     @AppStorage(AppPreferenceKey.debounceMediaChanges) private var debounceMediaChanges = PreferenceDefault.debounceMediaChanges
     @AppStorage(AppPreferenceKey.enableRealAudioVisualizer) private var enableRealAudioVisualizer = PreferenceDefault.enableRealAudioVisualizer
+    @AppStorage(AppPreferenceKey.enableGradientVisualizer) private var enableGradientVisualizer = PreferenceDefault.enableGradientVisualizer
     @AppStorage(AppPreferenceKey.mediaSourceFilterEnabled) private var mediaSourceFilterEnabled = PreferenceDefault.mediaSourceFilterEnabled
     @AppStorage(AppPreferenceKey.mediaSourceAllowedBundles) private var mediaSourceAllowedBundles = PreferenceDefault.mediaSourceAllowedBundles
     @AppStorage(AppPreferenceKey.hideIncognitoBrowserMedia) private var hideIncognitoBrowserMedia = PreferenceDefault.hideIncognitoBrowserMedia
@@ -84,6 +86,11 @@ struct SettingsView: View {
     @State private var showHardResetConfirmation = false
     @State private var hardResetIncludeClipboard = false
     @State private var scrollOffset: CGFloat = 0
+    
+    // Hover states for Shared Features grid toggles
+    @State private var isAutoRemoveHovering = false
+    @State private var isPowerFoldersHovering = false
+    @State private var isProtectionHovering = false
     
     /// Extension to open from deep link (e.g., droppy://extension/ai-bg)
     @State private var deepLinkedExtension: ExtensionType?
@@ -136,6 +143,7 @@ struct SettingsView: View {
                         }
                     }
                     .formStyle(.grouped)
+                    .toggleStyle(CenteredSwitchToggleStyle())  // Center all toggles vertically
                     // In transparent mode, keep some section visibility; in dark mode, hide default background
                     .scrollContentBackground(useTransparentBackground ? .visible : .hidden)
                     .background(Color.clear)
@@ -196,11 +204,15 @@ struct SettingsView: View {
             if let pendingTab = SettingsWindowController.shared.pendingTabToOpen {
                 selectedTab = pendingTab
                 SettingsWindowController.shared.clearPendingTab()
+                // Resize window for this tab
+                SettingsWindowController.shared.resizeForTab(isExtensions: pendingTab == .extensions)
             }
             // Check if there's a pending extension from a deep link
             else if let pending = SettingsWindowController.shared.pendingExtensionToOpen {
                 selectedTab = .extensions
                 SettingsWindowController.shared.clearPendingExtension()
+                // Resize window for extensions tab
+                SettingsWindowController.shared.resizeForTab(isExtensions: true)
                 // Delay to allow card views to fully initialize before presenting sheet
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     deepLinkedExtension = pending
@@ -222,6 +234,13 @@ struct SettingsView: View {
             // Navigate to General tab where Smart Export is located
             selectedTab = .general
         }
+        .onChange(of: selectedTab) { _, newTab in
+            // Resize window when switching to/from extensions tab
+            // Defer to next runloop to avoid NSHostingView reentrant layout
+            DispatchQueue.main.async {
+                SettingsWindowController.shared.resizeForTab(isExtensions: newTab == .extensions)
+            }
+        }
     }
     
     // MARK: - Sections
@@ -231,45 +250,47 @@ struct SettingsView: View {
         Group {
             // MARK: Startup
             Section {
-                Toggle(isOn: Binding(
-                    get: { showInMenuBar },
-                    set: { newValue in
-                        if newValue {
-                            showInMenuBar = true
-                        } else {
-                            showMenuBarHiddenWarning = true
+                HStack(alignment: .top, spacing: 8) {
+                    // Menu Bar Icon
+                    SettingsSegmentButtonWithContent(
+                        label: "Menu Bar Icon",
+                        isSelected: showInMenuBar,
+                        action: {
+                            if showInMenuBar {
+                                showMenuBarHiddenWarning = true
+                            } else {
+                                showInMenuBar = true
+                            }
                         }
+                    ) {
+                        Image(systemName: "menubar.rectangle")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(showInMenuBar ? Color.blue : Color.white.opacity(0.5))
                     }
-                )) {
-                    VStack(alignment: .leading) {
-                        Text("Menu Bar Icon")
-                        Text("Display Droppy icon in the menu bar")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .sheet(isPresented: $showMenuBarHiddenWarning) {
+                        MenuBarHiddenSheet(
+                            isPresented: $showMenuBarHiddenWarning,
+                            onConfirm: {
+                                showInMenuBar = false
+                            }
+                        )
                     }
-                }
-                .sheet(isPresented: $showMenuBarHiddenWarning) {
-                    MenuBarHiddenSheet(
-                        isPresented: $showMenuBarHiddenWarning,
-                        onConfirm: {
-                            showInMenuBar = false
+                    
+                    // Launch at Login
+                    SettingsSegmentButtonWithContent(
+                        label: "Launch at Login",
+                        isSelected: startAtLogin,
+                        action: {
+                            startAtLogin.toggle()
+                            LaunchAtLoginManager.setLaunchAtLogin(enabled: startAtLogin)
                         }
-                    )
-                }
-                
-                Toggle(isOn: Binding(
-                    get: { startAtLogin },
-                    set: { newValue in
-                        startAtLogin = newValue
-                        LaunchAtLoginManager.setLaunchAtLogin(enabled: newValue)
+                    ) {
+                        Image(systemName: "power")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(startAtLogin ? Color.blue : Color.white.opacity(0.5))
                     }
-                )) {
-                    VStack(alignment: .leading) {
-                        Text("Launch at Login")
-                        Text("Start Droppy automatically when you log in")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    .frame(maxWidth: .infinity)
                 }
             } header: {
                 Text("Startup")
@@ -292,7 +313,7 @@ struct SettingsView: View {
             // MARK: Display Mode (Non-notch displays only)
             if !hasPhysicalNotch {
                 Section {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Display Mode")
                             .font(.headline)
                         
@@ -300,33 +321,79 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        HStack(spacing: 12) {
-                            DisplayModeButton(
-                                title: "Notch",
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
                                 isSelected: !useDynamicIslandStyle,
-                                icon: {
-                                    UShape()
-                                        .fill(!useDynamicIslandStyle ? Color.droppyAccent : Color.white.opacity(0.5))
-                                        .frame(width: 60, height: 18)
-                                }
+                                action: { useDynamicIslandStyle = false }
                             ) {
-                                useDynamicIslandStyle = false
+                                UShape()
+                                    .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 50, height: 16)
                             }
                             
-                            DisplayModeButton(
-                                title: "Dynamic Island",
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
                                 isSelected: useDynamicIslandStyle,
-                                icon: {
-                                    Capsule()
-                                        .fill(useDynamicIslandStyle ? Color.droppyAccent : Color.white.opacity(0.5))
-                                        .frame(width: 50, height: 16)
-                                }
+                                action: { useDynamicIslandStyle = true }
                             ) {
-                                useDynamicIslandStyle = true
+                                Capsule()
+                                    .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 40, height: 14)
                             }
                         }
+                        
+                        // Island Height Slider (only visible in Island mode)
+                        if useDynamicIslandStyle || externalDisplayUseDynamicIsland {
+                            Divider()
+                                .padding(.vertical, 4)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Island Height")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(dynamicIslandHeightOffset == 0 ? "Standard" : (dynamicIslandHeightOffset < 0 ? "Compact" : "Tall"))
+                                        .font(.caption)
+                                        .foregroundStyle(.blue)
+                                }
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "minus")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 12)
+                                    
+                                    Slider(
+                                        value: $dynamicIslandHeightOffset,
+                                        in: -10...10,
+                                        step: 2
+                                    )
+                                    .tint(.blue)
+                                    .onChange(of: dynamicIslandHeightOffset) { oldValue, newValue in
+                                        // Haptic feedback + sound for premium slider feel
+                                        let isEndpoint = newValue == -10 || newValue == 10
+                                        if isEndpoint {
+                                            HapticFeedback.sliderEndpoint()
+                                        } else {
+                                            HapticFeedback.sliderTick()
+                                        }
+                                        // Post notification to trigger immediate window update
+                                        NotificationCenter.default.post(name: NSNotification.Name("DynamicIslandHeightChanged"), object: nil)
+                                    }
+                                    
+                                    Image(systemName: "plus")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 12)
+                                }
+                            }
+                        }
+
                     }
                     .padding(.vertical, 8)
+                    .animation(DroppyAnimation.smoothContent, value: useDynamicIslandStyle)
                     
                     Toggle(isOn: $showIdleNotchOnExternalDisplays) {
                         VStack(alignment: .leading) {
@@ -356,38 +423,82 @@ struct SettingsView: View {
                 }
                 
                 if !hideNotchOnExternalDisplays {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("External Display Style")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        HStack(spacing: 12) {
-                            DisplayModeButton(
-                                title: "Notch",
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
                                 isSelected: !externalDisplayUseDynamicIsland,
-                                icon: {
-                                    UShape()
-                                        .fill(!externalDisplayUseDynamicIsland ? Color.droppyAccent : Color.white.opacity(0.5))
-                                        .frame(width: 60, height: 18)
-                                }
+                                action: { externalDisplayUseDynamicIsland = false }
                             ) {
-                                externalDisplayUseDynamicIsland = false
+                                UShape()
+                                    .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                             
-                            DisplayModeButton(
-                                title: "Dynamic Island",
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
                                 isSelected: externalDisplayUseDynamicIsland,
-                                icon: {
-                                    RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous)
-                                        .fill(externalDisplayUseDynamicIsland ? Color.droppyAccent : Color.white.opacity(0.5))
-                                        .frame(width: 50, height: 16)
-                                }
+                                action: { externalDisplayUseDynamicIsland = true }
                             ) {
-                                externalDisplayUseDynamicIsland = true
+                                Capsule()
+                                    .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                         }
+                        
+                        // Island Height Slider (only visible when Island mode is selected)
+                        if externalDisplayUseDynamicIsland {
+                            Divider()
+                                .padding(.vertical, 4)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Island Height")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(dynamicIslandHeightOffset == 0 ? "Standard" : (dynamicIslandHeightOffset < 0 ? "Compact" : "Tall"))
+                                        .font(.caption)
+                                        .foregroundStyle(.blue)
+                                }
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "minus")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 12)
+                                    
+                                    Slider(
+                                        value: $dynamicIslandHeightOffset,
+                                        in: -10...10,
+                                        step: 2
+                                    )
+                                    .tint(.blue)
+                                    .onChange(of: dynamicIslandHeightOffset) { oldValue, newValue in
+                                        // Haptic feedback + sound for premium slider feel
+                                        let isEndpoint = newValue == -10 || newValue == 10
+                                        if isEndpoint {
+                                            HapticFeedback.sliderEndpoint()
+                                        } else {
+                                            HapticFeedback.sliderTick()
+                                        }
+                                        // Post notification to trigger immediate window update
+                                        NotificationCenter.default.post(name: NSNotification.Name("DynamicIslandHeightChanged"), object: nil)
+                                    }
+                                    
+                                    Image(systemName: "plus")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 12)
+                                }
+                            }
+                            .animation(DroppyAnimation.smoothContent, value: externalDisplayUseDynamicIsland)
+                        }
                     }
-                    .padding(.top, 4)
                     
                     Toggle(isOn: $showIdleNotchOnExternalDisplays) {
                         VStack(alignment: .leading) {
@@ -404,63 +515,121 @@ struct SettingsView: View {
             
             // MARK: Shared Features
             Section {
-                HStack(spacing: 8) {
-                    AutoCleanInfoButton()
-                    Toggle(isOn: $enableAutoClean) {
-                        VStack(alignment: .leading) {
-                            Text("Auto-Remove")
-                            Text("Clear items when dragged out of Droppy")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                
-                HStack(spacing: 8) {
-                    PowerFoldersInfoButton()
-                    Toggle(isOn: $enablePowerFolders) {
-                        VStack(alignment: .leading) {
-                            Text("Power Folders")
-                            Text("Pin folders and drop files directly into them")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                
-                
-                SmartExportSettingsRow()
-                
-                TrackedFoldersSettingsRow()
-                
-                HStack(spacing: 8) {
-                    AlwaysCopyInfoButton()
-                    Toggle(isOn: $alwaysCopyOnDrag) {
-                        VStack(alignment: .leading) {
-                            HStack(alignment: .center, spacing: 6) {
-                                Text("Protect Originals")
-                                Text("advanced")
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.7))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.white.opacity(0.08)))
-                                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                // 3-Grid Feature Toggles
+                HStack(alignment: .top, spacing: 8) {
+                    // Auto-Remove
+                    VStack(spacing: 6) {
+                        Button {
+                            withAnimation(DroppyAnimation.bounce) {
+                                enableAutoClean.toggle()
                             }
-                            Text("Always copy, never move files")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                    .fill(Color.black.opacity(0.35))
+                                Image(systemName: "trash")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(enableAutoClean ? Color.blue : Color.white.opacity(0.5))
+                            }
+                            .frame(height: 44)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                    .stroke(enableAutoClean ? Color.blue.opacity(0.6) : Color.white.opacity(0.05), lineWidth: enableAutoClean ? 1.5 : 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .scaleEffect(isAutoRemoveHovering ? 1.02 : 1.0)
+                        .onHover { isAutoRemoveHovering = $0 }
+                        .animation(.easeOut(duration: 0.15), value: isAutoRemoveHovering)
+                        
+                        HStack(spacing: 4) {
+                            AutoCleanInfoButton()
+                            Text("Auto-Remove")
+                                .font(.system(size: 11, weight: enableAutoClean ? .semibold : .regular))
+                                .foregroundStyle(enableAutoClean ? .primary : .secondary)
                         }
                     }
-                    .onChange(of: alwaysCopyOnDrag) { _, newValue in
-                        if !newValue {
-                            showProtectOriginalsWarning = true
+                    .frame(maxWidth: .infinity)
+                    
+                    // Power Folders
+                    VStack(spacing: 6) {
+                        Button {
+                            withAnimation(DroppyAnimation.bounce) {
+                                enablePowerFolders.toggle()
+                            }
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                    .fill(Color.black.opacity(0.35))
+                                Image(systemName: "folder.badge.plus")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(enablePowerFolders ? Color.blue : Color.white.opacity(0.5))
+                            }
+                            .frame(height: 44)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                    .stroke(enablePowerFolders ? Color.blue.opacity(0.6) : Color.white.opacity(0.05), lineWidth: enablePowerFolders ? 1.5 : 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .scaleEffect(isPowerFoldersHovering ? 1.02 : 1.0)
+                        .onHover { isPowerFoldersHovering = $0 }
+                        .animation(.easeOut(duration: 0.15), value: isPowerFoldersHovering)
+                        
+                        HStack(spacing: 4) {
+                            PowerFoldersInfoButton()
+                            Text("Power Folders")
+                                .font(.system(size: 11, weight: enablePowerFolders ? .semibold : .regular))
+                                .foregroundStyle(enablePowerFolders ? .primary : .secondary)
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                    
+                    // Protect Originals
+                    VStack(spacing: 6) {
+                        Button {
+                            withAnimation(DroppyAnimation.bounce) {
+                                if alwaysCopyOnDrag {
+                                    showProtectOriginalsWarning = true
+                                } else {
+                                    alwaysCopyOnDrag = true
+                                }
+                            }
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                    .fill(Color.black.opacity(0.35))
+                                Image(systemName: "lock.shield")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(alwaysCopyOnDrag ? Color.blue : Color.white.opacity(0.5))
+                            }
+                            .frame(height: 44)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                                    .stroke(alwaysCopyOnDrag ? Color.blue.opacity(0.6) : Color.white.opacity(0.05), lineWidth: alwaysCopyOnDrag ? 1.5 : 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .scaleEffect(isProtectionHovering ? 1.02 : 1.0)
+                        .onHover { isProtectionHovering = $0 }
+                        .animation(.easeOut(duration: 0.15), value: isProtectionHovering)
+                        .sheet(isPresented: $showProtectOriginalsWarning) {
+                            ProtectOriginalsWarningSheet(alwaysCopyOnDrag: $alwaysCopyOnDrag)
+                        }
+                        
+                        HStack(spacing: 4) {
+                            AlwaysCopyInfoButton()
+                            Text("Protection")
+                                .font(.system(size: 11, weight: alwaysCopyOnDrag ? .semibold : .regular))
+                                .foregroundStyle(alwaysCopyOnDrag ? .primary : .secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .sheet(isPresented: $showProtectOriginalsWarning) {
-                    ProtectOriginalsWarningSheet(alwaysCopyOnDrag: $alwaysCopyOnDrag)
-                }
+                
+                // Smart Export & Tracked Folders (keep as custom rows)
+                SmartExportSettingsRow()
+                TrackedFoldersSettingsRow()
             } header: {
                 Text("Shared Features")
             } footer: {
@@ -505,17 +674,48 @@ struct SettingsView: View {
             // MARK: Shelf Behavior
             if enableNotchShelf {
                 Section {
-                    Toggle(isOn: $autoCollapseShelf) {
-                        VStack(alignment: .leading) {
-                            Text("Auto-Collapse")
-                            Text("Shrink shelf when mouse leaves")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    // 3-Grid Behavior Options
+                    HStack(alignment: .top, spacing: 8) {
+                        // Auto-Collapse
+                        SettingsSegmentButtonWithContent(
+                            label: "Auto-Collapse",
+                            isSelected: autoCollapseShelf,
+                            action: { autoCollapseShelf.toggle() }
+                        ) {
+                            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(autoCollapseShelf ? Color.blue : Color.white.opacity(0.5))
                         }
+                        .frame(maxWidth: .infinity)
+                        
+                        // Auto-Expand
+                        SettingsSegmentButtonWithContent(
+                            label: "Auto-Expand",
+                            isSelected: autoExpandShelf,
+                            action: { autoExpandShelf.toggle() }
+                        ) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(autoExpandShelf ? Color.blue : Color.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        
+                        // Auto-Open Media
+                        SettingsSegmentButtonWithContent(
+                            label: "Auto-Open Media",
+                            isSelected: autoOpenMediaHUDOnShelfExpand,
+                            action: { autoOpenMediaHUDOnShelfExpand.toggle() }
+                        ) {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(autoOpenMediaHUDOnShelfExpand ? Color.blue : Color.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                     
+                    // Full-width sliders appear when enabled
                     if autoCollapseShelf {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(spacing: 4) {
                             HStack {
                                 Text("Collapse Delay")
                                 Spacer()
@@ -524,20 +724,12 @@ struct SettingsView: View {
                                     .monospacedDigit()
                             }
                             Slider(value: $autoCollapseDelay, in: 0.1...2.0, step: 0.05)
-                        }
-                    }
-                    
-                    Toggle(isOn: $autoExpandShelf) {
-                        VStack(alignment: .leading) {
-                            Text("Auto-Expand")
-                            Text("Expand shelf when hovering over notch")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .sliderHaptics(value: autoCollapseDelay, range: 0.1...2.0)
                         }
                     }
                     
                     if autoExpandShelf {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(spacing: 4) {
                             HStack {
                                 Text("Expand Delay")
                                 Spacer()
@@ -546,15 +738,7 @@ struct SettingsView: View {
                                     .monospacedDigit()
                             }
                             Slider(value: $autoExpandDelay, in: 0.1...2.0, step: 0.05)
-                        }
-                    }
-                    
-                    Toggle(isOn: $autoOpenMediaHUDOnShelfExpand) {
-                        VStack(alignment: .leading) {
-                            Text("Auto-Open Media Controls")
-                            Text("Show media controls even when no music is playing, to quickly resume playback")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .sliderHaptics(value: autoExpandDelay, range: 0.1...2.0)
                         }
                     }
                 } header: {
@@ -619,6 +803,7 @@ struct SettingsView: View {
                                     .monospacedDigit()
                             }
                             Slider(value: $instantBasketDelay, in: 0.15...3.0, step: 0.1)
+                                .sliderHaptics(value: instantBasketDelay, range: 0.15...3.0)
                         }
                         .padding(.leading, 28)
                     }
@@ -641,21 +826,37 @@ struct SettingsView: View {
                     }
                     
                     if enableBasketAutoHide {
-                        Picker(selection: $basketAutoHideEdge) {
-                            Text("Left Edge").tag("left")
-                            Text("Right Edge").tag("right")
-                            Text("Bottom Edge").tag("bottom")
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Text("Hide Edge")
-                                Text("Which edge the basket slides to")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Hide Edge")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                SettingsSegmentButton(
+                                    icon: "arrow.left.to.line",
+                                    label: "Left",
+                                    isSelected: basketAutoHideEdge == "left"
+                                ) {
+                                    basketAutoHideEdge = "left"
+                                }
+                                
+                                SettingsSegmentButton(
+                                    icon: "arrow.right.to.line",
+                                    label: "Right",
+                                    isSelected: basketAutoHideEdge == "right"
+                                ) {
+                                    basketAutoHideEdge = "right"
+                                }
+                                
+                                SettingsSegmentButton(
+                                    icon: "arrow.down.to.line",
+                                    label: "Bottom",
+                                    isSelected: basketAutoHideEdge == "bottom"
+                                ) {
+                                    basketAutoHideEdge = "bottom"
+                                }
                             }
                         }
-                        .pickerStyle(.menu)
-                        
-                        PeekPreview(edge: basketAutoHideEdge)
                     }
                 } header: {
                     Text("Auto-Hide")
@@ -886,38 +1087,33 @@ struct SettingsView: View {
                 
                 // Show external display mode picker when not hidden
                 if !hideNotchOnExternalDisplays {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("External Display Style")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        HStack(spacing: 12) {
-                            DisplayModeButton(
-                                title: "Notch",
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
                                 isSelected: !externalDisplayUseDynamicIsland,
-                                icon: {
-                                    UShape()
-                                        .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 60, height: 18)
-                                }
+                                action: { externalDisplayUseDynamicIsland = false }
                             ) {
-                                externalDisplayUseDynamicIsland = false
+                                UShape()
+                                    .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                             
-                            DisplayModeButton(
-                                title: "Dynamic Island",
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
                                 isSelected: externalDisplayUseDynamicIsland,
-                                icon: {
-                                    RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous)
-                                        .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 50, height: 16)
-                                }
+                                action: { externalDisplayUseDynamicIsland = true }
                             ) {
-                                externalDisplayUseDynamicIsland = true
+                                Capsule()
+                                    .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                         }
                     }
-                    .padding(.top, 4)
                 }
             } header: {
                 Text("Display")
@@ -926,7 +1122,7 @@ struct SettingsView: View {
             // MARK: Display Mode (Non-notch displays only)
             if !hasPhysicalNotch {
                 Section {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Display Mode")
                             .font(.headline)
                         
@@ -934,30 +1130,25 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        // Mode picker with visual icons
-                        HStack(spacing: 12) {
-                            DisplayModeButton(
-                                title: "Notch",
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
                                 isSelected: !useDynamicIslandStyle,
-                                icon: {
-                                    UShape()
-                                        .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 60, height: 18)
-                                }
+                                action: { useDynamicIslandStyle = false }
                             ) {
-                                useDynamicIslandStyle = false
+                                UShape()
+                                    .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 50, height: 16)
                             }
                             
-                            DisplayModeButton(
-                                title: "Dynamic Island",
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
                                 isSelected: useDynamicIslandStyle,
-                                icon: {
-                                    Capsule()
-                                        .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 50, height: 16)
-                                }
+                                action: { useDynamicIslandStyle = true }
                             ) {
-                                useDynamicIslandStyle = true
+                                Capsule()
+                                    .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 40, height: 14)
                             }
                         }
                     }
@@ -989,6 +1180,7 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Slider(value: $autoCollapseDelay, in: 0.1...2.0, step: 0.05)
+                            .sliderHaptics(value: autoCollapseDelay, range: 0.1...2.0)
                     }
                 }
                 
@@ -1012,6 +1204,7 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Slider(value: $autoExpandDelay, in: 0.1...2.0, step: 0.05)
+                            .sliderHaptics(value: autoExpandDelay, range: 0.1...2.0)
                     }
                 }
             } header: {
@@ -1153,6 +1346,7 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Slider(value: $instantBasketDelay, in: 0.15...3.0, step: 0.1)
+                            .sliderHaptics(value: instantBasketDelay, range: 0.15...3.0)
                     }
                     .padding(.leading, 28)
                 }
@@ -1175,21 +1369,37 @@ struct SettingsView: View {
                 }
                 
                 if enableBasketAutoHide {
-                    Picker(selection: $basketAutoHideEdge) {
-                        Text("Left Edge").tag("left")
-                        Text("Right Edge").tag("right")
-                        Text("Bottom Edge").tag("bottom")
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text("Hide Edge")
-                            Text("Which edge the basket slides to")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Hide Edge")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 8) {
+                            SettingsSegmentButton(
+                                icon: "arrow.left.to.line",
+                                label: "Left",
+                                isSelected: basketAutoHideEdge == "left"
+                            ) {
+                                basketAutoHideEdge = "left"
+                            }
+                            
+                            SettingsSegmentButton(
+                                icon: "arrow.right.to.line",
+                                label: "Right",
+                                isSelected: basketAutoHideEdge == "right"
+                            ) {
+                                basketAutoHideEdge = "right"
+                            }
+                            
+                            SettingsSegmentButton(
+                                icon: "arrow.down.to.line",
+                                label: "Bottom",
+                                isSelected: basketAutoHideEdge == "bottom"
+                            ) {
+                                basketAutoHideEdge = "bottom"
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    
-                    PeekPreview(edge: basketAutoHideEdge)
                 }
             } header: {
                 Text("Auto-Hide")
@@ -1289,6 +1499,7 @@ struct SettingsView: View {
                                     .monospacedDigit()
                             }
                             Slider(value: $instantBasketDelay, in: 0.15...3.0, step: 0.1)
+                                .sliderHaptics(value: instantBasketDelay, range: 0.15...3.0)
                         }
                         .padding(.leading, 28)  // Align with toggle content
                     }
@@ -1313,22 +1524,37 @@ struct SettingsView: View {
                     
                     // Edge picker (only when auto-hide is enabled)
                     if enableBasketAutoHide {
-                        Picker(selection: $basketAutoHideEdge) {
-                            Text("Left Edge").tag("left")
-                            Text("Right Edge").tag("right")
-                            Text("Bottom Edge").tag("bottom")
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Text("Hide Edge")
-                                Text("Which edge the basket slides to")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Hide Edge")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                SettingsSegmentButton(
+                                    icon: "arrow.left.to.line",
+                                    label: "Left",
+                                    isSelected: basketAutoHideEdge == "left"
+                                ) {
+                                    basketAutoHideEdge = "left"
+                                }
+                                
+                                SettingsSegmentButton(
+                                    icon: "arrow.right.to.line",
+                                    label: "Right",
+                                    isSelected: basketAutoHideEdge == "right"
+                                ) {
+                                    basketAutoHideEdge = "right"
+                                }
+                                
+                                SettingsSegmentButton(
+                                    icon: "arrow.down.to.line",
+                                    label: "Bottom",
+                                    isSelected: basketAutoHideEdge == "bottom"
+                                ) {
+                                    basketAutoHideEdge = "bottom"
+                                }
                             }
                         }
-                        .pickerStyle(.menu)
-                        
-                        // Animated peek preview
-                        PeekPreview(edge: basketAutoHideEdge)
                     }
                 } header: {
                     Text("Auto-Hide")
@@ -1380,6 +1606,7 @@ struct SettingsView: View {
             Section {
                 // Media Player requires macOS 15.0+ due to MediaRemoteAdapter.framework
                 if #available(macOS 15.0, *) {
+                    // Main toggle - standard form factor
                     HStack(spacing: 12) {
                         MediaPlayerHUDIcon()
                         
@@ -1409,44 +1636,74 @@ struct SettingsView: View {
                         // Advanced Auto-Fade settings (Issue #79)
                         AdvancedAutofadeSettingsRow()
                         
-                        Toggle(isOn: $autoHideOnFullscreen) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Hide in Fullscreen")
-                                Text("Hide when fullscreen apps or videos are active")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        // Sub-option: Hide media only (keep volume/brightness HUDs visible)
-                        if autoHideOnFullscreen {
-                            Toggle(isOn: $hideMediaOnlyOnFullscreen) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Media Only")
-                                    Text("Still show volume, brightness, and other HUDs")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                        // Visualizer Mode - segmented grid with real visualizer previews
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Visualizer")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                SettingsSegmentButtonWithContent(
+                                    label: "Real Audio",
+                                    isSelected: enableRealAudioVisualizer
+                                ) {
+                                    enableRealAudioVisualizer.toggle()
+                                    if enableRealAudioVisualizer {
+                                        Task {
+                                            await SystemAudioAnalyzer.shared.requestPermission()
+                                        }
+                                    }
+                                } content: {
+                                    VisualizerPreviewMono(isSelected: enableRealAudioVisualizer)
                                 }
-                            }
-                            .padding(.leading, 20)
-                        }
-                        
-                        Toggle(isOn: $enableRealAudioVisualizer) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Real Audio Visualizer")
-                                Text("Visualizer reacts to actual audio")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .onChange(of: enableRealAudioVisualizer) { _, newValue in
-                            if newValue {
-                                Task {
-                                    await SystemAudioAnalyzer.shared.requestPermission()
+                                
+                                SettingsSegmentButtonWithContent(
+                                    label: "Gradient",
+                                    isSelected: enableGradientVisualizer
+                                ) {
+                                    enableGradientVisualizer.toggle()
+                                } content: {
+                                    VisualizerPreviewGradient(isSelected: enableGradientVisualizer)
                                 }
                             }
                         }
                         
+                        // Fullscreen Behavior - segmented grid
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("In Fullscreen")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                SettingsSegmentButton(
+                                    icon: "eye",
+                                    label: "Show",
+                                    isSelected: !autoHideOnFullscreen
+                                ) {
+                                    autoHideOnFullscreen = false
+                                }
+                                
+                                SettingsSegmentButton(
+                                    icon: "music.note",
+                                    label: "Hide Media",
+                                    isSelected: autoHideOnFullscreen && hideMediaOnlyOnFullscreen
+                                ) {
+                                    autoHideOnFullscreen = true
+                                    hideMediaOnlyOnFullscreen = true
+                                }
+                                
+                                SettingsSegmentButton(
+                                    icon: "eye.slash",
+                                    label: "Hide All",
+                                    isSelected: autoHideOnFullscreen && !hideMediaOnlyOnFullscreen
+                                ) {
+                                    autoHideOnFullscreen = true
+                                    hideMediaOnlyOnFullscreen = false
+                                }
+                            }
+                        }
+                        
+                        // Advanced options - standard toggles
                         Toggle(isOn: $debounceMediaChanges) {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
@@ -1608,7 +1865,8 @@ struct SettingsView: View {
             Section {
                 // Notify me! (Notification HUD Extension)
                 HStack(spacing: 12) {
-                    NotificationHUDIcon(isEnabled: isNotificationHUDInstalled && enableNotificationHUD)
+                    ExtensionIconView<NotificationHUDExtension>(definition: NotificationHUDExtension.self, size: 40)
+                        .opacity(isNotificationHUDInstalled && enableNotificationHUD ? 1.0 : 0.5)
                     
                     if isNotificationHUDInstalled {
                         // Extension is installed - show on/off toggle
@@ -1636,7 +1894,8 @@ struct SettingsView: View {
                 // Termi-Notch Extension
                 if isTerminalNotchInstalled {
                     HStack(spacing: 12) {
-                        TerminalHUDIcon(isEnabled: enableTerminalNotch)
+                        ExtensionIconView<TermiNotchExtension>(definition: TermiNotchExtension.self, size: 40)
+                            .opacity(enableTerminalNotch ? 1.0 : 0.5)
                         
                         // Extension is installed - show on/off toggle for HUD visibility
                         Toggle(isOn: $enableTerminalNotch) {
@@ -1659,7 +1918,8 @@ struct SettingsView: View {
                         )
                     } label: {
                         HStack(spacing: 12) {
-                            TerminalHUDIcon(isEnabled: false)
+                            ExtensionIconView<TermiNotchExtension>(definition: TermiNotchExtension.self, size: 40)
+                                .opacity(0.5)
                             
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Termi-Notch")
@@ -1677,7 +1937,8 @@ struct SettingsView: View {
                 // Caffeine Extension
                 if isCaffeineInstalled {
                     HStack(spacing: 12) {
-                        HighAlertHUDIcon(isEnabled: enableCaffeine)  // Orange when HUD toggle is enabled, like Termi-Notch
+                        ExtensionIconView<CaffeineExtension>(definition: CaffeineExtension.self, size: 40)
+                            .opacity(enableCaffeine ? 1.0 : 0.5)
                         
                         // Extension is installed - show on/off toggle for HUD visibility
                         Toggle(isOn: $enableCaffeine) {
@@ -1710,7 +1971,8 @@ struct SettingsView: View {
                         )
                     } label: {
                         HStack(spacing: 12) {
-                            HighAlertHUDIcon(isEnabled: false)
+                            ExtensionIconView<CaffeineExtension>(definition: CaffeineExtension.self, size: 40)
+                                .opacity(0.5)
                             
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("High Alert")
@@ -1891,40 +2153,33 @@ struct SettingsView: View {
                 
                 // Show external display mode picker when not hidden
                 if !hideNotchOnExternalDisplays {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("External Display Style")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        HStack(spacing: 12) {
-                            DisplayModeButton(
-                                title: "Notch",
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
                                 isSelected: !externalDisplayUseDynamicIsland,
-                                icon: {
-                                    UShape()
-                                        .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 60, height: 18)
-                                }
+                                action: { externalDisplayUseDynamicIsland = false }
                             ) {
-                                externalDisplayUseDynamicIsland = false
+                                UShape()
+                                    .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                             
-                            DisplayModeButton(
-                                title: "Dynamic Island",
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
                                 isSelected: externalDisplayUseDynamicIsland,
-                                icon: {
-                                    RoundedRectangle(cornerRadius: DroppyRadius.small, style: .continuous)
-                                        .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 50, height: 16)
-                                }
+                                action: { externalDisplayUseDynamicIsland = true }
                             ) {
-                                externalDisplayUseDynamicIsland = true
+                                Capsule()
+                                    .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                         }
-                        
-                        // Note: Transparency for DI is controlled by the main "Transparent Background" toggle
                     }
-                    .padding(.top, 4)
                 }
             } header: {
                 Text("Visual Style")
@@ -1935,7 +2190,7 @@ struct SettingsView: View {
             // Only non-notch Macs (iMacs, Mac minis, older MacBooks) can choose
             if !hasPhysicalNotch {
                 Section {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Display Mode")
                             .font(.headline)
                         
@@ -1943,37 +2198,27 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        // Mode picker with visual icons
-                        HStack(spacing: 12) {
-                            // Notch Mode option
-                            DisplayModeButton(
-                                title: "Notch",
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
                                 isSelected: !useDynamicIslandStyle,
-                                icon: {
-                                    UShape()
-                                        .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 60, height: 18)
-                                }
+                                action: { useDynamicIslandStyle = false }
                             ) {
-                                useDynamicIslandStyle = false
+                                UShape()
+                                    .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 50, height: 16)
                             }
                             
-                            // Dynamic Island Mode option
-                            DisplayModeButton(
-                                title: "Dynamic Island",
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
                                 isSelected: useDynamicIslandStyle,
-                                icon: {
-                                    Capsule()
-                                        .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
-                                        .frame(width: 50, height: 16)
-                                }
+                                action: { useDynamicIslandStyle = true }
                             ) {
-                                useDynamicIslandStyle = true
+                                Capsule()
+                                    .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 40, height: 14)
                             }
                         }
-                        
-                        // Note: Transparency is controlled by the main "Transparent Background" toggle
-                        // No separate toggle needed here - it applies globally to all DI views
                     }
                     .padding(.vertical, 8)
                 } header: {
@@ -2003,6 +2248,7 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Slider(value: $autoCollapseDelay, in: 0.1...2.0, step: 0.05)
+                            .sliderHaptics(value: autoCollapseDelay, range: 0.1...2.0)
                     }
                 }
                 
@@ -2026,6 +2272,7 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Slider(value: $autoExpandDelay, in: 0.1...2.0, step: 0.05)
+                            .sliderHaptics(value: autoExpandDelay, range: 0.1...2.0)
                     }
                 }
             } header: {
@@ -2503,7 +2750,14 @@ struct SettingsView: View {
                     ), in: 10...200, step: 10)
                     .accentColor(.cyan)
                 }
-                .onChange(of: clipboardHistoryLimit) { _, _ in
+                .onChange(of: clipboardHistoryLimit) { oldValue, newValue in
+                    // Haptic feedback for slider
+                    let isEndpoint = newValue == 10 || newValue == 200
+                    if isEndpoint {
+                        HapticFeedback.sliderEndpoint()
+                    } else {
+                        HapticFeedback.sliderTick()
+                    }
                     ClipboardManager.shared.enforceHistoryLimit()
                 }
                 
@@ -2517,33 +2771,61 @@ struct SettingsView: View {
                     }
                 }
                 
-                // Tags feature toggle
-                Toggle(isOn: $tagsEnabled) {
-                    VStack(alignment: .leading) {
-                        Text("Enable Tags")
-                        Text("Organize clipboard entries with custom colored tags")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                // 3-Grid Clipboard Options
+                HStack(alignment: .top, spacing: 8) {
+                    // Enable Tags
+                    SettingsSegmentButtonWithContent(
+                        label: "Tags",
+                        isSelected: tagsEnabled,
+                        action: { tagsEnabled.toggle() }
+                    ) {
+                        Image(systemName: "tag")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(tagsEnabled ? Color.blue : Color.white.opacity(0.5))
                     }
+                    .frame(maxWidth: .infinity)
+                    
+                    // Copy + Favorite
+                    SettingsSegmentButtonWithContent(
+                        label: "Copy + Favorite",
+                        isSelected: copyFavoriteEnabled,
+                        action: {
+                            copyFavoriteEnabled.toggle()
+                            if copyFavoriteEnabled {
+                                ClipboardWindowController.shared.startCopyFavoriteShortcut()
+                            } else {
+                                ClipboardWindowController.shared.stopCopyFavoriteShortcut()
+                            }
+                        }
+                    ) {
+                        Image(systemName: "heart")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(copyFavoriteEnabled ? Color.blue : Color.white.opacity(0.5))
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    // Auto-Focus Search
+                    SettingsSegmentButtonWithContent(
+                        label: "Auto-Focus",
+                        isSelected: autoFocusSearch,
+                        action: {
+                            if !autoFocusSearch {
+                                showAutoFocusSearchWarning = true
+                            }
+                            autoFocusSearch.toggle()
+                        }
+                    ) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(autoFocusSearch ? Color.blue : Color.white.opacity(0.5))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .sheet(isPresented: $showAutoFocusSearchWarning) {
+                    AutoFocusSearchInfoSheet(autoFocusSearch: $autoFocusSearch)
                 }
                 
-                // Copy+Favorite Shortcut (Issue #43)
-                Toggle(isOn: $copyFavoriteEnabled) {
-                    VStack(alignment: .leading) {
-                        Text("Copy + Favorite Shortcut")
-                        Text("Global shortcut to copy and mark as favorite at once")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .onChange(of: copyFavoriteEnabled) { _, newValue in
-                    if newValue {
-                        ClipboardWindowController.shared.startCopyFavoriteShortcut()
-                    } else {
-                        ClipboardWindowController.shared.stopCopyFavoriteShortcut()
-                    }
-                }
-                
+                // Shortcut row appears when Copy+Favorite is enabled
                 if copyFavoriteEnabled {
                     HStack {
                         Text("Shortcut")
@@ -2556,34 +2838,6 @@ struct SettingsView: View {
                             }
                         ))
                     }
-                }
-                
-                // Auto-focus search toggle (advanced - at bottom)
-                Toggle(isOn: $autoFocusSearch) {
-                    VStack(alignment: .leading) {
-                        HStack(alignment: .center, spacing: 6) {
-                            Text("Auto-Focus Search")
-                            Text("advanced")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.white.opacity(0.08)))
-                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
-                        }
-                        Text("Open search bar automatically when clipboard opens")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .onChange(of: autoFocusSearch) { _, newValue in
-                    if newValue {
-                        // User is enabling - show explanation sheet
-                        showAutoFocusSearchWarning = true
-                    }
-                }
-                .sheet(isPresented: $showAutoFocusSearchWarning) {
-                    AutoFocusSearchInfoSheet(autoFocusSearch: $autoFocusSearch)
                 }
                 
                 // MARK: - Excluded Apps Section
@@ -2944,7 +3198,7 @@ struct NotchShelfInfoButton: View {
                             .font(.headline)
                     }
                     
-                    Text("A file shelf that lives in your Mac's notch or as a Dynamic Island.")
+                    Text("A file shelf that lives in your Mac's notch or as an Island.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
@@ -3179,9 +3433,8 @@ struct AutoCleanInfoButton: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
-                .frame(width: 280)
+                .frame(width: 320)
             }
     }
 }
@@ -3223,9 +3476,8 @@ struct AlwaysCopyInfoButton: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
-                .frame(width: 280)
+                .frame(width: 320)
             }
     }
 }
@@ -3313,11 +3565,15 @@ struct ProtectOriginalsWarningSheet: View {
             HStack(spacing: 8) {
                 // Disable Anyway (secondary - left)
                 Button {
+                    alwaysCopyOnDrag = false  // Actually disable protection
                     dismiss()
                 } label: {
                     Text("Disable Anyway")
                 }
                 .buttonStyle(DroppyPillButtonStyle(size: .small))
+                .scaleEffect(isHoveringCancel ? 1.05 : 1.0)
+                .onHover { isHoveringCancel = $0 }
+                .animation(.easeOut(duration: 0.15), value: isHoveringCancel)
                 
                 Spacer()
                 
@@ -3329,6 +3585,9 @@ struct ProtectOriginalsWarningSheet: View {
                     Text("Keep Protection")
                 }
                 .buttonStyle(DroppyAccentButtonStyle(color: .blue, size: .small))
+                .scaleEffect(isHoveringConfirm ? 1.05 : 1.0)
+                .onHover { isHoveringConfirm = $0 }
+                .animation(.easeOut(duration: 0.15), value: isHoveringConfirm)
             }
             .padding(DroppySpacing.lg)
         }
@@ -3742,7 +4001,7 @@ struct MenuBarHiddenSheet: View {
                             .foregroundStyle(.blue)
                             .font(.system(size: 14))
                             .frame(width: 22)
-                        Text("Right-click the Notch or Dynamic Island to access Settings anytime")
+                        Text("Right-click the Notch or Island to access Settings anytime")
                             .font(.system(size: 12))
                             .foregroundStyle(.primary.opacity(0.85))
                     }
@@ -3832,9 +4091,8 @@ struct PowerFoldersInfoButton: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
-                .frame(width: 280)
+                .frame(width: 320)
             }
     }
 }
@@ -3951,7 +4209,7 @@ struct ExternalDisplayInfoButton: View {
                         .foregroundStyle(.secondary)
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("Choose Notch or Dynamic Island style", systemImage: "rectangle.topthird.inset.filled")
+                        Label("Choose Notch or Island style", systemImage: "rectangle.topthird.inset.filled")
                         Label("Or hide Droppy on external displays", systemImage: "eye.slash")
                         Label("Works independently for each display", systemImage: "display.2")
                     }
@@ -4499,29 +4757,30 @@ struct AdvancedAutofadeInfoButton: View {
     @State private var showPopover = false
     
     var body: some View {
-        Button {
-            showPopover.toggle()
-        } label: {
-            Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Advanced Auto-Fade")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Configure when the media HUD auto-fades", systemImage: "clock")
-                    Label("Set different delays per app", systemImage: "app.badge")
-                    Label("Enable/disable per display", systemImage: "display.2")
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        Image(systemName: "info.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .onTapGesture { showPopover.toggle() }
+            .onHover { hovering in
+                showPopover = hovering
             }
-            .padding()
-            .frame(width: 280)
-        }
+            .popover(isPresented: $showPopover, arrowEdge: .trailing) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Advanced Auto-Fade")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Configure when the media HUD auto-fades", systemImage: "clock")
+                        Label("Set different delays per app", systemImage: "app.badge")
+                        Label("Enable/disable per display", systemImage: "display.2")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .frame(width: 280)
+            }
     }
 }
 
@@ -4573,6 +4832,7 @@ struct AdvancedAutofadeSettingsRow: View {
                         }
                         Slider(value: $defaultDelay, in: 1...30, step: 1)
                             .tint(.droppyAccent)
+                            .sliderHaptics(value: defaultDelay, range: 1...30)
                     }
                     
                     Divider()

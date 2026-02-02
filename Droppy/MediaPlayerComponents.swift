@@ -224,6 +224,8 @@ struct InlineHUDView: View {
 struct AudioVisualizerBars: View {
     let isPlaying: Bool
     var color: Color = .white
+    var secondaryColor: Color? = nil  // For gradient mode
+    var gradientMode: Bool = false    // Enable gradient across bars
     
     @StateObject private var audioAnalyzer = AudioVisualizerState()
     
@@ -235,6 +237,8 @@ struct AudioVisualizerBars: View {
             spacing: 2,
             height: 20,
             color: color,
+            secondaryColor: secondaryColor,
+            gradientMode: gradientMode,
             audioLevel: audioAnalyzer.audioLevel
         )
         .frame(width: 5 * 2 + 4 * 2, height: 20) // 5 bars * 2px + 4 gaps * 2px = 18px

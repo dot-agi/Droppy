@@ -96,4 +96,15 @@ enum HapticFeedback {
     static func tap() {
         HapticFeedback.light.perform()
     }
+    
+    /// Subtle tick for slider step changes - tactile feedback via Force Touch trackpad
+    /// Uses the lightest possible feedback to not overwhelm during continuous dragging
+    static func sliderTick() {
+        HapticFeedback.light.perform()
+    }
+    
+    /// Stronger tick for reaching slider endpoints (min/max)
+    static func sliderEndpoint() {
+        HapticFeedback.medium.perform()
+    }
 }

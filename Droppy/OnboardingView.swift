@@ -390,24 +390,52 @@ private struct WelcomeContent: View {
                     
                     if hasBuiltInNotch && isOnExternalDisplay {
                         // External display style picker (for MacBook Pro users on external)
-                        HStack(spacing: 16) {
-                            StyleButton(title: "Notch", isSelected: !externalDisplayUseDynamicIsland, isNotch: true) {
-                                externalDisplayUseDynamicIsland = false
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
+                                isSelected: !externalDisplayUseDynamicIsland,
+                                action: { externalDisplayUseDynamicIsland = false }
+                            ) {
+                                UShape()
+                                    .fill(!externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
-                            StyleButton(title: "Dynamic Island", isSelected: externalDisplayUseDynamicIsland, isNotch: false) {
-                                externalDisplayUseDynamicIsland = true
+                            
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
+                                isSelected: externalDisplayUseDynamicIsland,
+                                action: { externalDisplayUseDynamicIsland = true }
+                            ) {
+                                Capsule()
+                                    .fill(externalDisplayUseDynamicIsland ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                         }
+                        .frame(width: 280)
                     } else {
                         // Standard style picker (for non-notch Macs)
-                        HStack(spacing: 16) {
-                            StyleButton(title: "Notch", isSelected: !useDynamicIslandStyle, isNotch: true) {
-                                useDynamicIslandStyle = false
+                        HStack(spacing: 8) {
+                            SettingsSegmentButtonWithContent(
+                                label: "Notch",
+                                isSelected: !useDynamicIslandStyle,
+                                action: { useDynamicIslandStyle = false }
+                            ) {
+                                UShape()
+                                    .fill(!useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
-                            StyleButton(title: "Dynamic Island", isSelected: useDynamicIslandStyle, isNotch: false) {
-                                useDynamicIslandStyle = true
+                            
+                            SettingsSegmentButtonWithContent(
+                                label: "Island",
+                                isSelected: useDynamicIslandStyle,
+                                action: { useDynamicIslandStyle = true }
+                            ) {
+                                Capsule()
+                                    .fill(useDynamicIslandStyle ? Color.blue : Color.white.opacity(0.5))
+                                    .frame(width: 44, height: 14)
                             }
                         }
+                        .frame(width: 280)
                     }
                 }
             }
@@ -1139,48 +1167,6 @@ private struct FeatureLine: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
-    }
-}
-
-private struct StyleButton: View {
-    let title: String
-    let isSelected: Bool
-    let isNotch: Bool
-    let action: () -> Void
-    @State private var hovering = false
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
-                        .frame(width: 90, height: 55)
-                    
-                    if isNotch {
-                        UShape()
-                            .fill(Color.white)
-                            .frame(width: 48, height: 14)
-                    } else {
-                        RoundedRectangle(cornerRadius: DroppyRadius.sm, style: .continuous)
-                            .fill(Color.white)
-                            .frame(width: 40, height: 12)
-                    }
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous)
-                        .stroke(isSelected ? Color.blue : Color.white.opacity(0.1), lineWidth: isSelected ? 2 : 1)
-                )
-                .scaleEffect(hovering ? 1.03 : 1.0)
-                
-                Text(title)
-                    .font(.system(size: 11))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-            }
-        }
-        .buttonStyle(DroppySelectableButtonStyle(isSelected: isSelected))
-        .onHover { hovering = $0 }
-        .animation(DroppyAnimation.hoverQuick, value: hovering)
     }
 }
 

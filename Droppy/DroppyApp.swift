@@ -262,14 +262,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppPreferenceKey.enableClipboard: PreferenceDefault.enableClipboard,
         ])
         
-        // DEBUG: Force clear permission cache to diagnose stuck cache issue
-        #if DEBUG
-        print("🔐 DEBUG: Force clearing permission cache at launch")
-        UserDefaults.standard.removeObject(forKey: "accessibilityGranted")
-        UserDefaults.standard.removeObject(forKey: "screenRecordingGranted")
-        UserDefaults.standard.removeObject(forKey: "inputMonitoringGranted")
-        UserDefaults.standard.synchronize()
-        #endif
         
         // Crash detection: Check if last session crashed and offer to report
         CrashReporter.shared.checkForCrashAndPrompt()

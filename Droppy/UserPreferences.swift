@@ -35,6 +35,7 @@ enum AppPreferenceKey {
     static let enableRightClickHide = "enableRightClickHide"
     static let hidePhysicalNotch = "hidePhysicalNotch"  // Draw black bar to hide the notch cutout
     static let hidePhysicalNotchOnExternals = "hidePhysicalNotchOnExternals"  // Sub-option: also apply to external displays
+    static let dynamicIslandHeightOffset = "dynamicIslandHeightOffset"  // Height adjustment for Dynamic Island (-10 to +10)
     
     // MARK: - Media Player
     static let showMediaPlayer = "showMediaPlayer"
@@ -44,6 +45,7 @@ enum AppPreferenceKey {
     static let autofadeDisplayRulesEnabled = "autofadeDisplayRulesEnabled"  // Enable display-specific rules
     static let debounceMediaChanges = "debounceMediaChanges"
     static let enableRealAudioVisualizer = "enableRealAudioVisualizer"
+    static let enableGradientVisualizer = "enableGradientVisualizer"  // Gradient colors across visualizer bars
 
     // MARK: - Media Source Filter
     static let mediaSourceFilterEnabled = "mediaSourceFilterEnabled"
@@ -166,6 +168,7 @@ enum PreferenceDefault {
     static let enableHapticFeedback = true   // Haptic feedback for trackpad (on by default)
     static let hidePhysicalNotch = false     // Draw black bar to hide the notch cutout
     static let hidePhysicalNotchOnExternals = false  // Sub-option: also apply to external displays
+    static let dynamicIslandHeightOffset: Double = 0  // No height adjustment by default
     
     // MARK: - Media Player
     static let showMediaPlayer = true
@@ -175,6 +178,7 @@ enum PreferenceDefault {
     static let autofadeDisplayRulesEnabled = false  // Display-specific rules disabled by default
     static let debounceMediaChanges = false
     static let enableRealAudioVisualizer = false  // Opt-in: requires Screen Recording
+    static let enableGradientVisualizer = false   // Opt-in: gradient colors across visualizer bars
 
     // MARK: - Media Source Filter
     static let mediaSourceFilterEnabled = false  // Off by default: show all media sources

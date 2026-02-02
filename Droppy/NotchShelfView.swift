@@ -43,10 +43,12 @@ struct NotchShelfView: View {
     @AppStorage(AppPreferenceKey.showOpenShelfIndicator) private var showOpenShelfIndicator = PreferenceDefault.showOpenShelfIndicator
     @AppStorage(AppPreferenceKey.showDropIndicator) private var showDropIndicator = PreferenceDefault.showDropIndicator  // Legacy, not migrated
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
+    @AppStorage(AppPreferenceKey.dynamicIslandHeightOffset) private var dynamicIslandHeightOffset = PreferenceDefault.dynamicIslandHeightOffset
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
     @AppStorage(AppPreferenceKey.enableAutoClean) private var enableAutoClean = PreferenceDefault.enableAutoClean
     @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
     @AppStorage(AppPreferenceKey.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget = PreferenceDefault.enableLockScreenMediaWidget
+    @AppStorage(AppPreferenceKey.enableGradientVisualizer) private var enableGradientVisualizer = PreferenceDefault.enableGradientVisualizer
 
     
     // HUD State - Use @ObservedObject for singletons (they manage their own lifecycle)
@@ -154,8 +156,9 @@ struct NotchShelfView: View {
     
     /// Notch height - scales with resolution
     private var notchHeight: CGFloat {
-        // Dynamic Island uses SSOT fixed size
-        if isDynamicIslandMode { return NotchLayoutConstants.dynamicIslandHeight }
+        // Dynamic Island uses SSOT fixed size + user height offset
+        // Reference dynamicIslandHeightOffset to trigger SwiftUI update when slider changes
+        if isDynamicIslandMode { _ = dynamicIslandHeightOffset; return NotchLayoutConstants.dynamicIslandHeight }
 
         // Use target screen or fallback to built-in
         // CRITICAL: Return physical notch height when screen is unavailable for stable positioning
@@ -1739,7 +1742,9 @@ struct NotchShelfView: View {
                 barWidth: isExpandedOnThisScreen ? 3 : 2.5,  // Match AudioVisualizerBars (3pt)
                 spacing: 2,
                 height: currentHeight,
-                color: musicManager.visualizerColor  // PERFORMANCE: Cached, not recomputed
+                color: musicManager.visualizerColor,  // PERFORMANCE: Cached, not recomputed
+                secondaryColor: enableGradientVisualizer ? musicManager.visualizerSecondaryColor : nil,
+                gradientMode: enableGradientVisualizer
             )
             .frame(width: currentWidth, height: currentHeight)
             .offset(x: currentXOffset, y: currentYOffset)
@@ -1798,8 +1803,10 @@ struct NotchShelfView: View {
                 let currentXOffset = isExpandedOnThisScreen ? expandedXOffset : hudXOffset
                 
                 // Y position
-                // HUD: Centered vertically inside pill (+2pt to compensate for text baseline)
-                let hudYOffset: CGFloat = ((fixedHUDHeight - 20) / 2) + 2
+                // HUD: Center title frame vertically (same as album art)
+                // Frame height MUST match album art size for perfect alignment
+                let hudFrameHeight: CGFloat = isDynamicIslandMode ? 18 : 20
+                let hudYOffset: CGFloat = (fixedHUDHeight - hudFrameHeight) / 2
                 
                 // SSOT: Must match NotchLayoutConstants.contentEdgeInsets exactly
                 // - DI mode: 20pt (contentPadding)
@@ -1818,11 +1825,14 @@ struct NotchShelfView: View {
                 // Alignment: Centered in HUD, left-aligned in expanded
                 let currentAlignment: Alignment = isExpandedOnThisScreen ? .leading : .center
                 
+                // Frame height: match album art for HUD centering
+                let currentFrameHeight: CGFloat = isExpandedOnThisScreen ? 20 : hudFrameHeight
+                
                 // SMOOTH MORPH: Use shared start time so scroll position is continuous during expand/collapse
                 MarqueeText(text: songTitle, speed: 30, externalStartTime: sharedMarqueeStartTime, alignment: currentAlignment)
                     .font(.system(size: currentFontSize, weight: isExpandedOnThisScreen ? .semibold : .medium))
                     .foregroundStyle(.white.opacity(isExpandedOnThisScreen ? 1.0 : 0.9))
-                    .frame(width: currentTitleWidth, height: 20, alignment: currentAlignment)
+                    .frame(width: currentTitleWidth, height: currentFrameHeight, alignment: currentAlignment)
                     .offset(x: currentXOffset, y: currentYOffset)
                     .geometryGroup()  // Bundle as single element for smooth morphing
                     // PREMIUM: Smooth spring animation for morphing (matches album art)

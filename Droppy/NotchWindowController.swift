@@ -1311,6 +1311,17 @@ final class NotchWindowController: NSObject, ObservableObject {
             }
         }
         systemObservers.append(lockObserver)
+        
+        // Dynamic Island height preference change - update window layout immediately
+        let islandHeightObserver = center.addObserver(
+            forName: NSNotification.Name("DynamicIslandHeightChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("📐 NotchWindowController: Island height changed - updating layout")
+            self?.repositionNotchWindow()
+        }
+        systemObservers.append(islandHeightObserver)
     }
     
     /// Forces re-registration of all event monitors
@@ -1788,6 +1799,22 @@ extension NSScreen {
         // Final fallback to built-in display (localizedName contains "Built-in" or similar)
         return NSScreen.screens.first(where: { $0.localizedName.contains("Built-in") || $0.localizedName.contains("内蔵") })
     }
+    
+    /// Returns ANY built-in display (with or without notch)
+    /// Uses CGDisplayIsBuiltin for reliable hardware-level detection
+    /// CRITICAL: Use this for MacBook Air compatibility (no notch models)
+    static var builtIn: NSScreen? {
+        // Primary: use CGDisplayIsBuiltin - works for ALL MacBooks
+        if let builtInScreen = NSScreen.screens.first(where: { CGDisplayIsBuiltin($0.displayID) != 0 }) {
+            return builtInScreen
+        }
+        // Fallback: try builtInWithNotch for notch models
+        if let notchScreen = builtInWithNotch {
+            return notchScreen
+        }
+        // Last resort: check localized name
+        return NSScreen.screens.first(where: { $0.localizedName.contains("Built-in") || $0.localizedName.contains("内蔵") })
+    }
 
     /// Check if a point (in global screen coordinates) is on this screen
     func contains(point: NSPoint) -> Bool {
@@ -1801,15 +1828,18 @@ extension NSScreen {
     }
     
     /// Returns true if this is the built-in MacBook display
+    /// Uses CGDisplayIsBuiltin for reliable hardware-level detection
     var isBuiltIn: Bool {
-        // Check localized name for built-in indicators (multiple languages)
+        // CRITICAL: Use CGDisplayIsBuiltin - the reliable hardware-level API
+        // This works for ALL MacBooks, including Air models without a notch
+        if CGDisplayIsBuiltin(displayID) != 0 {
+            return true
+        }
+        // Fallback for edge cases: check localized name
         let isNameBuiltIn = localizedName.contains("Built-in") || 
                             localizedName.contains("Internal") ||
                             localizedName.contains("内蔵") // Japanese
-        // Alternative: Check if this screen has a notch (MacBook-specific)
-        // Use auxiliary areas for stable detection (works on lock screen)
-        let hasNotch = auxiliaryTopLeftArea != nil && auxiliaryTopRightArea != nil
-        return isNameBuiltIn || hasNotch
+        return isNameBuiltIn
     }
 }
 
@@ -1870,7 +1900,7 @@ class NotchWindow: NSPanel {
     
     /// Dynamic Island dimensions
     private let dynamicIslandWidth: CGFloat = 210
-    private let dynamicIslandHeight: CGFloat = 37
+    private var dynamicIslandHeight: CGFloat { NotchLayoutConstants.dynamicIslandHeight }
     /// Top margin for Dynamic Island - creates floating effect like iPhone
     private let dynamicIslandTopMargin: CGFloat = 4
     

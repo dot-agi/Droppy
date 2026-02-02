@@ -245,6 +245,14 @@ struct MediaHUDView: View {
         musicManager.visualizerColor
     }
     
+    /// Secondary color from album art for gradient visualizer mode
+    private var visualizerSecondaryColor: Color {
+        musicManager.visualizerSecondaryColor
+    }
+    
+    /// Whether gradient visualizer mode is enabled
+    @AppStorage(AppPreferenceKey.enableGradientVisualizer) private var enableGradientVisualizer = PreferenceDefault.enableGradientVisualizer
+    
     /// Width of each "wing" (area left/right of physical notch) - only used in notch mode
     private var wingWidth: CGFloat {
         (hudWidth - notchWidth) / 2
@@ -309,7 +317,16 @@ struct MediaHUDView: View {
                         // Visualizer - harmonized to match icon size (18px for DI mode)
                         // PREMIUM: visualizer also uses matchedGeometryEffect for morphing
                         if showVisualizer {
-                            AudioSpectrumView(isPlaying: musicManager.isPlaying, barCount: 3, barWidth: 2.5, spacing: 2, height: 18, color: visualizerColor)
+                            AudioSpectrumView(
+                                isPlaying: musicManager.isPlaying,
+                                barCount: 3,
+                                barWidth: 2.5,
+                                spacing: 2,
+                                height: 18,
+                                color: visualizerColor,
+                                secondaryColor: enableGradientVisualizer ? visualizerSecondaryColor : nil,
+                                gradientMode: enableGradientVisualizer
+                            )
                                 .frame(width: 3 * 2.5 + 2 * 2, height: 18)
                                 .modifier(AlbumArtMatchedGeometry(namespace: albumArtNamespace, id: "spectrum"))
                         } else {
@@ -366,7 +383,12 @@ struct MediaHUDView: View {
                     HStack {
                         Spacer(minLength: 0)
                         if showVisualizer {
-                            MiniAudioVisualizerBars(isPlaying: musicManager.isPlaying, color: visualizerColor)
+                            MiniAudioVisualizerBars(
+                                isPlaying: musicManager.isPlaying,
+                                color: visualizerColor,
+                                secondaryColor: enableGradientVisualizer ? visualizerSecondaryColor : nil,
+                                gradientMode: enableGradientVisualizer
+                            )
                                 .modifier(AlbumArtMatchedGeometry(namespace: albumArtNamespace, id: "spectrum"))  // Visualizer morphing
                         } else {
                             Color.clear.frame(width: 5 * 3 + 4 * 2, height: 20)
@@ -403,6 +425,8 @@ struct MediaHUDView: View {
 struct MiniAudioVisualizerBars: View {
     let isPlaying: Bool
     var color: Color = .white
+    var secondaryColor: Color? = nil  // For gradient mode
+    var gradientMode: Bool = false    // Enable gradient across bars
     
     @StateObject private var audioAnalyzer = MiniAudioVisualizerState()
     
@@ -414,6 +438,8 @@ struct MiniAudioVisualizerBars: View {
             spacing: 2,
             height: 20,  // Match 20px icon standard
             color: color,
+            secondaryColor: secondaryColor,
+            gradientMode: gradientMode,
             audioLevel: audioAnalyzer.audioLevel
         )
         .frame(width: 5 * 3 + 4 * 2, height: 20)  // Match 20px icon standard

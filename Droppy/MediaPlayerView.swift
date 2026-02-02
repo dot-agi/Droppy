@@ -205,6 +205,7 @@ struct MediaPlayerView: View {
     
     // MARK: - Preferences
     @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
+    @AppStorage(AppPreferenceKey.enableGradientVisualizer) private var enableGradientVisualizer = PreferenceDefault.enableGradientVisualizer
     
     // MARK: - Universal Inline HUD State
     // Handles all HUD types: volume, brightness, battery, caps lock, etc.
@@ -217,6 +218,11 @@ struct MediaPlayerView: View {
     /// PERFORMANCE: Uses cached value from MusicManager (computed once per track change)
     private var visualizerColor: Color {
         musicManager.visualizerColor
+    }
+    
+    /// Secondary color from album art for gradient visualizer mode
+    private var visualizerSecondaryColor: Color {
+        musicManager.visualizerSecondaryColor
     }
     
     /// Compute estimated position at given date
@@ -566,7 +572,12 @@ struct MediaPlayerView: View {
             
             // Audio Visualizer (colored by album art) - fixedSize to prevent it from being squeezed
             if showVisualizer {
-                AudioVisualizerBars(isPlaying: musicManager.isPlaying, color: visualizerColor)
+                AudioVisualizerBars(
+                    isPlaying: musicManager.isPlaying,
+                    color: visualizerColor,
+                    secondaryColor: enableGradientVisualizer ? visualizerSecondaryColor : nil,
+                    gradientMode: enableGradientVisualizer
+                )
                     .frame(width: 28, height: 18)
                     .fixedSize()
             } else {
