@@ -1,14 +1,31 @@
 ## ✨ New Features
-- **Full Screenshot Editor** for Element Capture: draw arrows, rectangles, ellipses, lines, freehand, and highlighter annotations
-- **Text Annotations** with customizable font sizes
-- **Blur Tool** to redact sensitive content in screenshots
-- **Zoom & Pan** controls in the screenshot editor
-- **Edit Button** on capture preview for quick access to editor
+
+### Screenshot Editor for Element Capture
+- **Full Annotation Suite**: Draw arrows, rectangles, ellipses, lines, freehand, and highlighter annotations
+- **Text Tool**: Add text annotations with customizable font sizes
+- **Blur Tool**: Redact sensitive content with pixelated blur effect
+- **Zoom & Pan**: Navigate large screenshots with zoom controls
+- **Quick Edit**: Access editor directly from capture preview
+
+### Multi-Mode Capture
+- **Element Capture**: Capture specific UI elements
+- **Fullscreen Capture**: Grab the entire screen
+- **Window Capture**: Screenshot individual windows
+- Each mode has its own configurable shortcut
+
+### Configurable Editor Shortcuts
+- **Tool Shortcuts**: A=Arrow, L=Line, R=Rectangle, O=Ellipse, F=Freehand, H=Highlighter, B=Blur, T=Text
+- **Stroke Sizes**: 1/2/3 for small/medium/large
+- **Zoom Controls**: +/- to zoom, 0 to reset
+- **Actions**: ⌘Z undo, ⌘⇧Z redo, Escape cancel, Enter done
+- **Fully customizable**: Click any shortcut in settings to record a new key combination
+- **Load Defaults**: Restore all shortcuts with one click
 
 ## 🐛 Bug Fixes
 - Fixed blur effect rendering to match preview and export exactly
-- Fixed annotation scaling to remain fixed during zoom operations
-- Removed Lock Screen settings section (feature deprecated)
+- Fixed annotation scaling during zoom operations
+- Fixed left alignment of feature icons in Element Capture settings
+- Removed deprecated Lock Screen settings section
 
 ---
 

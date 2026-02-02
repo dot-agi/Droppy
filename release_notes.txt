@@ -1,12 +1,17 @@
 ✨ New Features
-- Added full screenshot editor to Element Capture: draw arrows, rectangles, ellipses, lines, freehand, and highlighter annotations
+- Added full screenshot editor to Element Capture with arrows, rectangles, ellipses, lines, freehand, and highlighter annotations
 - Added text annotations with customizable font sizes
 - Added blur tool to redact sensitive content in screenshots
 - Added zoom and pan controls in the screenshot editor
 - Added "Edit" button to capture preview for quick access to editor
-- Updated Element Capture marketing with new GIF demo
+- Added multi-mode capture: Element, Fullscreen, and Window capture with dedicated shortcuts
+- Added fully configurable keyboard shortcuts for all editor tools (A=Arrow, L=Line, R=Rectangle, O=Ellipse, F=Freehand, H=Highlighter, B=Blur, T=Text)
+- Added configurable shortcuts for editor actions: stroke sizes (1/2/3), zoom controls (+/-/0), undo/redo (⌘Z/⌘⇧Z)
+- Added Window Snap-style shortcut configurator UI with "Load Defaults" button
+- Updated Element Capture marketing with new GIF demo showing full editor workflow
 
 🐛 Bug Fixes
 - Fixed blur effect rendering to match preview and export exactly
 - Fixed annotation scaling to remain fixed during zoom operations
+- Fixed left alignment of feature icons in Element Capture settings
 - Removed Lock Screen settings section (feature deprecated)
