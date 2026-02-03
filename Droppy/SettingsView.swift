@@ -27,6 +27,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.hidePhysicalNotch) private var hidePhysicalNotch = PreferenceDefault.hidePhysicalNotch
     @AppStorage(AppPreferenceKey.hidePhysicalNotchOnExternals) private var hidePhysicalNotchOnExternals = PreferenceDefault.hidePhysicalNotchOnExternals
     @AppStorage(AppPreferenceKey.enableHapticFeedback) private var enableHapticFeedback = PreferenceDefault.enableHapticFeedback
+    @AppStorage(AppPreferenceKey.reorderLongPressDuration) private var reorderLongPressDuration = PreferenceDefault.reorderLongPressDuration
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
     @AppStorage(AppPreferenceKey.useDynamicIslandTransparent) private var useDynamicIslandTransparent = PreferenceDefault.useDynamicIslandTransparent
     @AppStorage(AppPreferenceKey.externalDisplayUseDynamicIsland) private var externalDisplayUseDynamicIsland = PreferenceDefault.externalDisplayUseDynamicIsland
@@ -953,8 +954,24 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("Feedback")
+            }
+            
+            Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Reorder Hold Duration")
+                        Spacer()
+                        Text(String(format: "%.1fs", reorderLongPressDuration))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Slider(value: $reorderLongPressDuration, in: 0.3...2.0, step: 0.1)
+                        .sliderHaptics(value: reorderLongPressDuration, range: 0.3...2.0)
+                }
+            } header: {
+                Text("Interaction")
             } footer: {
-                Text("Haptic feedback requires a Force Touch trackpad.")
+                Text("How long to hold before dragging to rearrange items in the shelf or basket.")
             }
         }
     }

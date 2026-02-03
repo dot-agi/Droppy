@@ -147,94 +147,278 @@ struct ReorderableForEach<Item: Identifiable, Content: View>: View {
     }
 }
 
-// MARK: - LazyVGrid Rearrangement Helper
-
-/// View modifier that adds drag-to-rearrange to individual items in a LazyVGrid
+/// iOS-style persistent reorder mode modifier.
+///
+/// ## Behavior:
+/// 1. Long-press any item → Enter persistent "edit mode" (all items jiggle)
+/// 2. Simple drag (no long-press) to reorder items
+/// 3. Click outside or press Escape to exit edit mode
+///
+/// ## Usage:
+/// Parent view must provide `isEditModeActive` binding and handle exit via
+/// background tap or keyboard commands.
 struct ReorderableItemModifier<Item: Identifiable>: ViewModifier {
     let item: Item
     @Binding var items: [Item]
     @Binding var draggingItem: Item.ID?
+    @Binding var isEditModeActive: Bool
     
     let columns: Int
     let itemSize: CGSize
     let spacing: CGFloat
     
+    // MARK: - State
+    
+    /// Current drag offset
     @State private var dragOffset: CGSize = .zero
+    
+    /// Timestamp of last swap for debouncing
+    @State private var lastSwapTime: Date = .distantPast
+    
+    /// Long-press detection for entering edit mode
+    @GestureState private var isDetectingLongPress = false
+    
+    // MARK: - Constants
+    
+    private let swapDebounceInterval: TimeInterval = 0.15
+    
+    // MARK: - Computed Properties
+    
+    private var isDragging: Bool {
+        draggingItem == item.id
+    }
+    
+    private var cellWidth: CGFloat {
+        itemSize.width + spacing
+    }
+    
+    private var cellHeight: CGFloat {
+        itemSize.height + spacing
+    }
+    
+    private var longPressDuration: TimeInterval {
+        UserDefaults.standard.preference(
+            AppPreferenceKey.reorderLongPressDuration,
+            default: PreferenceDefault.reorderLongPressDuration
+        )
+    }
+    
+    // MARK: - Body
     
     func body(content: Content) -> some View {
         content
-            .zIndex(draggingItem == item.id ? 100 : 0)
-            .scaleEffect(draggingItem == item.id ? 1.05 : 1.0)
+            // Layer ordering
+            .zIndex(isDragging ? 100 : 0)
+            
+            // Visual feedback
+            .scaleEffect(isDragging ? 1.05 : (isDetectingLongPress ? 0.96 : 1.0))
+            
+            // Shadow when dragging
             .shadow(
-                color: draggingItem == item.id ? .black.opacity(0.3) : .clear,
-                radius: draggingItem == item.id ? 8 : 0,
-                y: 4
+                color: isDragging ? .black.opacity(0.25) : .clear,
+                radius: isDragging ? 10 : 0,
+                y: isDragging ? 5 : 0
             )
-            .offset(draggingItem == item.id ? dragOffset : .zero)
-            .gesture(
-                DragGesture(minimumDistance: 8)
-                    .onChanged { value in
-                        if draggingItem == nil {
-                            draggingItem = item.id
-                            HapticFeedback.tap()
-                        }
-                        
-                        if draggingItem == item.id {
-                            dragOffset = value.translation
-                            
-                            // Calculate target position and reorder
-                            let currentIndex = items.firstIndex(where: { $0.id == item.id }) ?? 0
-                            let targetIndex = calculateTargetIndex(
-                                from: currentIndex,
-                                translation: value.translation
-                            )
-                            
-                            if targetIndex != currentIndex {
-                                withAnimation(DroppyAnimation.bouncy) {
-                                    items.move(
-                                        fromOffsets: IndexSet(integer: currentIndex),
-                                        toOffset: targetIndex > currentIndex ? targetIndex + 1 : targetIndex
-                                    )
-                                }
-                                HapticFeedback.select()
+            
+            // Offset for dragged item
+            .offset(isDragging ? dragOffset : .zero)
+            
+            // Jiggle animation when in edit mode (but not the dragged item)
+            .modifier(JiggleModifier(isJiggling: isEditModeActive && !isDragging))
+            
+            // Animations
+            .animation(DroppyAnimation.bouncy, value: isDetectingLongPress)
+            .animation(isDragging ? nil : DroppyAnimation.bouncy, value: isDragging)
+            .animation(isDragging ? nil : DroppyAnimation.bouncy, value: items.map(\.id))
+            
+            // Gesture depends on mode
+            .gesture(isEditModeActive ? dragGesture : nil)
+            .highPriorityGesture(isEditModeActive ? nil : longPressToEnterEditMode)
+            // Tap to exit edit mode (works on items since background is blocked by grid)
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded {
+                        if isEditModeActive {
+                            withAnimation(DroppyAnimation.bouncy) {
+                                isEditModeActive = false
                             }
-                        }
-                    }
-                    .onEnded { _ in
-                        withAnimation(DroppyAnimation.bouncy) {
-                            draggingItem = nil
-                            dragOffset = .zero
+                            DroppyState.shared.isReorderModeActive = false
                         }
                     }
             )
-            .animation(draggingItem == item.id ? nil : DroppyAnimation.bouncy, value: items.map(\.id))
+            
+            // Cleanup on disappear
+            .onDisappear {
+                if isDragging { cleanupDrag() }
+            }
+            .onChange(of: items.count) { _, _ in
+                if isDragging, !items.contains(where: { $0.id == item.id }) {
+                    cleanupDrag()
+                }
+            }
+            .onChange(of: isEditModeActive) { wasActive, isActive in
+                if wasActive && !isActive {
+                    // Mode deactivated - cleanup any drag state
+                    cleanupDrag()
+                    DroppyState.shared.isReorderModeActive = false
+                }
+            }
     }
     
-    private func calculateTargetIndex(from currentIndex: Int, translation: CGSize) -> Int {
-        let cellWidth = itemSize.width + spacing
-        let cellHeight = itemSize.height + spacing
+    // MARK: - Gestures
+    
+    /// Long-press gesture to enter edit mode (used when NOT in edit mode)
+    private var longPressToEnterEditMode: some Gesture {
+        LongPressGesture(minimumDuration: longPressDuration)
+            .updating($isDetectingLongPress) { current, state, _ in
+                state = current
+            }
+            .onEnded { _ in
+                withAnimation(DroppyAnimation.bouncy) {
+                    isEditModeActive = true
+                }
+                DroppyState.shared.isReorderModeActive = true
+                HapticFeedback.expand()
+            }
+    }
+    
+    /// Simple drag gesture for reordering (used when IN edit mode)
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 5)
+            .onChanged { value in
+                if draggingItem == nil {
+                    // Start dragging this item
+                    draggingItem = item.id
+                    HapticFeedback.tap()
+                }
+                
+                if isDragging {
+                    processDrag(translation: value.translation)
+                }
+            }
+            .onEnded { _ in
+                cleanupDrag()
+            }
+    }
+    
+    // MARK: - Drag Processing
+    
+    private func processDrag(translation: CGSize) {
+        dragOffset = translation
         
-        // Calculate how many cells we've moved
-        let colOffset = Int(round(translation.width / cellWidth))
-        let rowOffset = Int(round(translation.height / cellHeight))
+        guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+        
+        let colOffset = translation.width / cellWidth
+        let rowOffset = translation.height / cellHeight
         
         let currentRow = currentIndex / columns
         let currentCol = currentIndex % columns
         
-        let targetCol = max(0, min(columns - 1, currentCol + colOffset))
-        let targetRow = max(0, currentRow + rowOffset)
+        var targetIndex = currentIndex
         
-        let targetIndex = targetRow * columns + targetCol
-        return max(0, min(items.count - 1, targetIndex))
+        // Single-axis swap based on larger offset
+        if abs(colOffset) >= 0.5 && abs(colOffset) >= abs(rowOffset) {
+            if colOffset > 0 && currentCol < columns - 1 {
+                targetIndex = currentIndex + 1
+            } else if colOffset < 0 && currentCol > 0 {
+                targetIndex = currentIndex - 1
+            }
+        } else if abs(rowOffset) >= 0.5 {
+            let maxRow = (items.count - 1) / columns
+            if rowOffset > 0 && currentRow < maxRow && currentIndex + columns < items.count {
+                targetIndex = currentIndex + columns
+            } else if rowOffset < 0 && currentRow > 0 {
+                targetIndex = currentIndex - columns
+            }
+        }
+        
+        guard targetIndex != currentIndex else { return }
+        guard targetIndex >= 0 && targetIndex < items.count else { return }
+        
+        let now = Date()
+        guard now.timeIntervalSince(lastSwapTime) >= swapDebounceInterval else { return }
+        lastSwapTime = now
+        
+        withAnimation(DroppyAnimation.bouncy) {
+            items.move(
+                fromOffsets: IndexSet(integer: currentIndex),
+                toOffset: targetIndex > currentIndex ? targetIndex + 1 : targetIndex
+            )
+        }
+        
+        HapticFeedback.select()
+    }
+    
+    private func cleanupDrag() {
+        lastSwapTime = .distantPast
+        withAnimation(DroppyAnimation.bouncy) {
+            draggingItem = nil
+            dragOffset = .zero
+        }
+    }
+}
+
+// MARK: - Jiggle Animation
+
+/// Subtle jiggle animation for iOS-style edit mode indication
+struct JiggleModifier: ViewModifier {
+    let isJiggling: Bool
+    
+    // Use a timer to toggle the jiggle direction
+    @State private var jiggleDirection: CGFloat = 1
+    @State private var jiggleTimer: Timer?
+    
+    func body(content: Content) -> some View {
+        content
+            .rotationEffect(.degrees(isJiggling ? jiggleDirection : 0))
+            .animation(.easeInOut(duration: 0.1), value: jiggleDirection)
+            .animation(.easeOut(duration: 0.1), value: isJiggling)
+            .onChange(of: isJiggling) { _, newValue in
+                if newValue {
+                    startJiggle()
+                } else {
+                    stopJiggle()
+                }
+            }
+            .onAppear {
+                if isJiggling { startJiggle() }
+            }
+            .onDisappear {
+                stopJiggle()
+            }
+    }
+    
+    private func startJiggle() {
+        stopJiggle() // Clear any existing timer
+        jiggleTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            DispatchQueue.main.async {
+                jiggleDirection = jiggleDirection > 0 ? -1 : 1
+            }
+        }
+    }
+    
+    private func stopJiggle() {
+        jiggleTimer?.invalidate()
+        jiggleTimer = nil
+        jiggleDirection = 0
+    }
+}
+
+// MARK: - Comparable Clamping Extension
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 
 extension View {
-    /// Make this item reorderable within a grid
+    /// Make this item reorderable within an iOS-style persistent edit mode grid
     func reorderable<Item: Identifiable>(
         item: Item,
         in items: Binding<[Item]>,
         draggingItem: Binding<Item.ID?>,
+        isEditModeActive: Binding<Bool>,
         columns: Int,
         itemSize: CGSize,
         spacing: CGFloat = 12
@@ -243,9 +427,11 @@ extension View {
             item: item,
             items: items,
             draggingItem: draggingItem,
+            isEditModeActive: isEditModeActive,
             columns: columns,
             itemSize: itemSize,
             spacing: spacing
         ))
     }
 }
+

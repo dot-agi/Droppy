@@ -281,6 +281,10 @@ final class DroppyState {
     /// Global flag to block hover interactions (e.g. tooltips) when context menus are open
     var isInteractionBlocked: Bool = false
     
+    /// Global flag to block external file drags when reorder mode is active (long-press-to-reorder)
+    /// DraggableArea checks this before initiating external drag sessions
+    var isReorderModeActive: Bool = false
+    
     /// Increment the file operation counter (called at start of operation)
     func beginFileOperation() {
         fileOperationCount += 1

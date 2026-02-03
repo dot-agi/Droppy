@@ -250,6 +250,10 @@ class DraggableAreaView<Content: View>: NSView, NSDraggingSource {
     override func mouseDragged(with event: NSEvent) {
         guard let mouseDown = mouseDownEvent else { return }
         
+        // CRITICAL: Block external drag when reorder mode is active (long-press-to-reorder)
+        // User is rearranging items - don't start an external file drag
+        guard !DroppyState.shared.isReorderModeActive else { return }
+        
         // Simple threshold check
         let dragThreshold: CGFloat = 3.0
         let draggedDistance = hypot(event.locationInWindow.x - mouseDown.locationInWindow.x,

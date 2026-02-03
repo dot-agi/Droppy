@@ -103,6 +103,9 @@ struct NotchShelfView: View {
     // Drag-to-rearrange state
     @State private var draggingShelfItem: UUID?
     
+    // iOS-style persistent reorder mode
+    @State private var isReorderModeActive = false
+    
     // Media HUD hover state - used to grow notch when showing song title
     @State private var mediaHUDIsHovered: Bool = false
     @State private var mediaHUDHoverWorkItem: DispatchWorkItem?  // Debounce for hover state
@@ -2297,6 +2300,15 @@ struct NotchShelfView: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        // Exit reorder mode
+                        if isReorderModeActive {
+                            withAnimation(DroppyAnimation.bouncy) {
+                                isReorderModeActive = false
+                            }
+                            DroppyState.shared.isReorderModeActive = false
+                            return
+                        }
+                        
                         state.deselectAll()
                         if renamingItemId != nil {
                             state.isRenaming = false
@@ -2304,8 +2316,9 @@ struct NotchShelfView: View {
                         renamingItemId = nil
                     }
                     // Moved Marquee Drag Gesture HERE so it doesn't conflict with dragging items
+                    // Use higher minimum distance (10) to allow item-level gestures (reordering at 8) to fire first
                     .gesture(
-                         DragGesture(minimumDistance: 1, coordinateSpace: .named("shelfGrid"))
+                         DragGesture(minimumDistance: 10, coordinateSpace: .named("shelfGrid"))
                              .onChanged { value in
                                  // Start selection
                                  if selectionRect == nil {
@@ -2377,6 +2390,7 @@ struct NotchShelfView: View {
                             item: item,
                             in: $state.shelfItems,
                             draggingItem: $draggingShelfItem,
+                            isEditModeActive: $isReorderModeActive,
                             columns: 5,
                             itemSize: CGSize(width: 72, height: 90),
                             spacing: 12

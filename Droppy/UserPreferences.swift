@@ -99,6 +99,7 @@ enum AppPreferenceKey {
     static let showDropIndicator = "showDropIndicator"  // Legacy
     static let enableIdleFace = "enableIdleFace"
     static let enableHapticFeedback = "enableHapticFeedback"
+    static let reorderLongPressDuration = "reorderLongPressDuration"  // Duration in seconds to hold before reorder mode activates
     
     // MARK: - System
     static let showInMenuBar = "showInMenuBar"
@@ -232,6 +233,7 @@ enum PreferenceDefault {
     static let showOpenShelfIndicator = true
     static let showDropIndicator = true  // Legacy
     static let enableIdleFace = true
+    static let reorderLongPressDuration: Double = 1.0  // 1 second hold to activate reorder mode
     
     // MARK: - System
     static let showInMenuBar = true

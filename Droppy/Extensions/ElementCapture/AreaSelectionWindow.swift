@@ -72,6 +72,7 @@ class AreaSelectionView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        // Subtle dark overlay so user knows capture mode is active
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.15).cgColor
         
         // Add dimension label
@@ -162,23 +163,41 @@ class AreaSelectionView: NSView {
         
         let rect = calculateSelectionRect()
         guard rect.width > 30 && rect.height > 20 else {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
             label.isHidden = true
+            CATransaction.commit()
             return
         }
         
         // Show dimensions
         let text = "\(Int(rect.width)) × \(Int(rect.height))"
+        
+        // Use CATransaction to disable implicit animations for snappy positioning
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        
         label.string = " \(text) "
         label.isHidden = false
         
-        // Position at bottom center of selection
-        let labelSize = CGSize(width: 80, height: 20)
+        // Size to fit content
+        let textWidth = max(70, min(100, CGFloat(text.count) * 8))
+        let labelSize = CGSize(width: textWidth, height: 18)
+        
+        // Position at bottom center of selection (or top if near bottom of screen)
+        var labelY = rect.minY - labelSize.height - 6
+        if labelY < 20 {
+            labelY = rect.maxY + 6
+        }
+        
         label.frame = CGRect(
             x: rect.midX - labelSize.width / 2,
-            y: rect.minY - labelSize.height - 8,
+            y: labelY,
             width: labelSize.width,
             height: labelSize.height
         )
+        
+        CATransaction.commit()
     }
     
     override func draw(_ dirtyRect: NSRect) {

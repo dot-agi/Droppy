@@ -155,28 +155,16 @@ final class CrashReporter {
         
         """
         
-        if let log = crashLog, !log.isEmpty {
-            // Truncate crash log if too long for URL (max ~8000 chars for safety)
-            let truncatedLog = log.count > 6000 ? String(log.prefix(6000)) + "\n\n[Log truncated - full log in ~/Library/Logs/DiagnosticReports/]" : log
-            
-            body += """
-            
-            <details>
-            <summary>Crash Log (click to expand)</summary>
-            
-            ```
-            \(truncatedLog)
-            ```
-            
-            </details>
-            """
-        } else {
-            body += """
-            
-            ---
-            *No crash log found. Check ~/Library/Logs/DiagnosticReports/ for Droppy crash files.*
-            """
-        }
+        // Add instructions for attaching crash log (don't embed in URL - too long)
+        body += """
+        
+        ## Crash Log
+        
+        Please attach your crash log from one of these locations:
+        - `~/Library/Logs/DiagnosticReports/` (look for files named `Droppy*.ips` or `Droppy*.crash`)
+        
+        You can open this folder by pressing Cmd+Shift+G in Finder and pasting the path above.
+        """
         
         // URL encode the components
         let title = "Crash Report: v\(appVersion)"

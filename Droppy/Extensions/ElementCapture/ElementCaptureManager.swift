@@ -568,6 +568,12 @@ final class ElementCaptureManager: ObservableObject {
             return
         }
         
+        // Set display ID for capture (critical!)
+        if let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
+            currentScreenDisplayID = displayID
+            print("[ElementCapture] Area selection on displayID=\(displayID)")
+        }
+        
         areaSelectionWindow = AreaSelectionWindow(
             contentRect: screen.frame,
             styleMask: .borderless,
@@ -599,17 +605,42 @@ final class ElementCaptureManager: ObservableObject {
             return
         }
         
-        // Convert from NSWindow coordinates to screen coordinates for capture
-        let captureRect = NSRect(
-            x: rect.origin.x,
-            y: screen.frame.height - rect.origin.y - rect.height + screen.frame.origin.y,
+        // Hide the selection window before capturing
+        await MainActor.run {
+            self.areaSelectionWindow?.orderOut(nil)
+        }
+        
+        // Small delay to let window hide
+        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        
+        // The rect from AreaSelectionView is in view coordinates (Cocoa, bottom-left origin).
+        // Need to convert to Quartz coordinates (top-left origin) for capture.
+        // The view's origin is at the window's origin which matches the screen frame.
+        
+        // First, convert the rect from view coordinates to screen coordinates
+        // The view frame matches the screen frame, so:
+        let screenRect = CGRect(
+            x: screen.frame.origin.x + rect.origin.x,
+            y: screen.frame.origin.y + rect.origin.y,
             width: rect.width,
             height: rect.height
         )
         
+        // Now convert from Cocoa screen coordinates to Quartz coordinates
+        // Quartz Y=0 is at the TOP of the primary screen
+        let primaryScreenHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+        let quartzRect = CGRect(
+            x: screenRect.origin.x,
+            y: primaryScreenHeight - screenRect.origin.y - screenRect.height,
+            width: screenRect.width,
+            height: screenRect.height
+        )
+        
+        print("[ElementCapture] Area capture rect: view=\(rect), screen=\(screenRect), quartz=\(quartzRect)")
+        
         // Use the same capture path as element capture
         await MainActor.run {
-            self.currentElementFrame = captureRect
+            self.currentElementFrame = quartzRect
             self.hasElement = true
         }
         
@@ -618,7 +649,6 @@ final class ElementCaptureManager: ObservableObject {
         
         // Cleanup
         await MainActor.run {
-            self.areaSelectionWindow?.orderOut(nil)
             self.areaSelectionWindow = nil
             self.stopCaptureMode()
         }

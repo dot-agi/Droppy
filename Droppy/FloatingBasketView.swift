@@ -56,6 +56,9 @@ struct FloatingBasketView: View {
     // Drag-to-rearrange state
     @State private var draggingBasketItem: UUID?
     
+    // iOS-style persistent reorder mode
+    @State private var isReorderModeActive = false
+    
     private let cornerRadius: CGFloat = 28
     
     // Each item is 72pt wide + 12pt spacing (in expanded view)
@@ -287,7 +290,8 @@ struct FloatingBasketView: View {
     }
     
     private var dragSelectionGesture: some Gesture {
-        DragGesture(minimumDistance: 5, coordinateSpace: .local)
+        // Use higher minimum distance (10) to allow item-level gestures (reordering at 8) to fire first
+        DragGesture(minimumDistance: 10, coordinateSpace: .local)
             .onChanged { value in
                 if !isDragSelecting {
                     // Ignore drags starting in the header (window drag area)
@@ -739,6 +743,15 @@ struct FloatingBasketView: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        // Exit reorder mode
+                        if isReorderModeActive {
+                            withAnimation(DroppyAnimation.bouncy) {
+                                isReorderModeActive = false
+                            }
+                            DroppyState.shared.isReorderModeActive = false
+                            return
+                        }
+                        
                         state.deselectAllBasket()
                         // If rename was active, end the file operation lock
                         if renamingItemId != nil {
@@ -773,6 +786,7 @@ struct FloatingBasketView: View {
                             item: item,
                             in: $state.basketItemsList,
                             draggingItem: $draggingBasketItem,
+                            isEditModeActive: $isReorderModeActive,
                             columns: columnsPerRow,
                             itemSize: CGSize(width: itemWidth, height: 90),
                             spacing: itemSpacing
