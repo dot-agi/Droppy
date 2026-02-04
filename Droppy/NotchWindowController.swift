@@ -2002,7 +2002,9 @@ class NotchWindow: NSPanel {
         if let leftArea = screen.auxiliaryTopLeftArea,
            let rightArea = screen.auxiliaryTopRightArea {
             // Correct calculation: the gap between the two auxiliary areas
-            notchWidth = max(rightArea.minX - leftArea.maxX, 180)
+            let calculatedWidth = rightArea.minX - leftArea.maxX
+            notchWidth = max(calculatedWidth, 180)
+            print("📐 NotchWindowController: leftArea.maxX=\(leftArea.maxX), rightArea.minX=\(rightArea.minX), calculatedWidth=\(calculatedWidth), notchWidth=\(notchWidth)")
             // Derive X position directly from auxiliary areas (already in screen-local coordinates)
             // Convert to global coordinates by adding screen origin
             notchX = screen.frame.origin.x + leftArea.maxX
