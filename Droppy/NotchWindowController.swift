@@ -1326,6 +1326,17 @@ final class NotchWindowController: NSObject, ObservableObject {
             self?.repositionNotchWindow()
         }
         systemObservers.append(islandHeightObserver)
+        
+        // Physical notch height preference change - update window layout immediately
+        let notchHeightObserver = center.addObserver(
+            forName: NSNotification.Name("PhysicalNotchHeightChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("📐 NotchWindowController: Notch height changed - updating layout")
+            self?.repositionNotchWindow()
+        }
+        systemObservers.append(notchHeightObserver)
     }
     
     /// Forces re-registration of all event monitors
