@@ -44,9 +44,6 @@
 <img src="docs/assets/images/feature-huds.png" width="300" alt="Beautiful HUDs" />
 </p>
 
-
-
-
 ## <img src="https://getdroppy.app/assets/icons/extensions.png" width="24"> Extensions
 
 Modular extensions add even more power. **Install only what you need.**
