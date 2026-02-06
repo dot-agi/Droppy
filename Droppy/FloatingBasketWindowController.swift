@@ -58,6 +58,10 @@ final class FloatingBasketWindowController: NSObject {
     /// Peek sliver size in pixels - how much of the window stays on screen
     /// With 3D tilt + 0.85 scale, we need less visible area
     private let peekSize: CGFloat = 200
+
+    /// True while user is drag-selecting items inside the basket.
+    /// Prevents accidental auto-hide when the drag temporarily leaves the basket bounds.
+    private var isBasketSelectionDragActive: Bool = false
     
     private override init() {
         super.init()
@@ -483,6 +487,7 @@ final class FloatingBasketWindowController: NSObject {
     /// Starts the delayed hide timer (0.5 second delay)
     func startHideTimer() {
         guard isAutoHideEnabled, !isInPeekMode else { return }
+        guard !isBasketSelectionDragActive else { return }
         
         // Don't start hide timer during file operations (zip, compress, convert, rename)
         guard !DroppyState.shared.isFileOperationInProgress else { return }
@@ -601,6 +606,7 @@ final class FloatingBasketWindowController: NSObject {
     /// Called when cursor exits the basket area (from FloatingBasketView)
     func onBasketHoverExit() {
         guard isAutoHideEnabled, !DroppyState.shared.basketItems.isEmpty else { return }
+        guard !isBasketSelectionDragActive else { return }
 
         // If cursor is still inside the basket window, don't start hide
         if let panel = basketWindow {
@@ -616,6 +622,28 @@ final class FloatingBasketWindowController: NSObject {
         guard !isPeekAnimating else { return }
         
         if !isInPeekMode {
+            startHideTimer()
+        }
+    }
+
+    /// Called when drag-selection starts in the basket grid/list.
+    func beginBasketSelectionDrag() {
+        isBasketSelectionDragActive = true
+        cancelHideTimer()
+    }
+
+    /// Called when drag-selection ends in the basket grid/list.
+    func endBasketSelectionDrag() {
+        isBasketSelectionDragActive = false
+
+        guard isAutoHideEnabled, !DroppyState.shared.basketItems.isEmpty else { return }
+        guard !isInPeekMode, !isPeekAnimating else { return }
+        guard !DroppyState.shared.isFileOperationInProgress else { return }
+        guard let panel = basketWindow else { return }
+
+        // If selection ended with cursor outside the basket, start normal hide delay.
+        let mouseLocation = NSEvent.mouseLocation
+        if !panel.frame.contains(mouseLocation) {
             startHideTimer()
         }
     }

@@ -49,6 +49,8 @@ struct FloatingBasketView: View {
     @State private var isDragSelecting = false
     @State private var dragSelectionStart: CGPoint = .zero
     @State private var dragSelectionCurrent: CGPoint = .zero
+    @State private var basketScrollView: NSScrollView?
+    @State private var scrollViewportFrame: CGRect = .zero
     
     // Global rename state
     @State private var renamingItemId: UUID?
@@ -311,15 +313,20 @@ struct FloatingBasketView: View {
                     
                     // Start selection
                     isDragSelecting = true
+                    FloatingBasketWindowController.shared.beginBasketSelectionDrag()
                     dragSelectionStart = value.startLocation
                     state.deselectAllBasket()
                 }
                 dragSelectionCurrent = value.location
+                autoScrollDuringSelection(at: value.location)
                 
                 // Update selection based on items intersecting the rectangle
                 updateSelectionFromRect()
             }
             .onEnded { _ in
+                if isDragSelecting {
+                    FloatingBasketWindowController.shared.endBasketSelectionDrag()
+                }
                 isDragSelecting = false
             }
     }
@@ -333,6 +340,36 @@ struct FloatingBasketView: View {
                 state.selectedBasketItems.insert(id)
             }
         }
+    }
+
+    private func autoScrollDuringSelection(at location: CGPoint) {
+        guard isExpanded, isDragSelecting else { return }
+        guard scrollViewportFrame != .zero, let scrollView = basketScrollView else { return }
+        guard let documentView = scrollView.documentView else { return }
+
+        let threshold: CGFloat = 28
+        let step: CGFloat = 10
+
+        let topEdge = scrollViewportFrame.minY + threshold
+        let bottomEdge = scrollViewportFrame.maxY - threshold
+        var deltaY: CGFloat = 0
+
+        if location.y < topEdge {
+            deltaY = -step
+        } else if location.y > bottomEdge {
+            deltaY = step
+        } else {
+            return
+        }
+
+        let clipView = scrollView.contentView
+        let currentY = clipView.bounds.origin.y
+        let maxY = max(0, documentView.bounds.height - clipView.bounds.height)
+        let newY = min(max(currentY + deltaY, 0), maxY)
+
+        guard abs(newY - currentY) > 0.5 else { return }
+        clipView.scroll(to: NSPoint(x: clipView.bounds.origin.x, y: newY))
+        scrollView.reflectScrolledClipView(clipView)
     }
     
     /// Basket background - Dropover style: clean dark container with subtle border
@@ -790,6 +827,20 @@ struct FloatingBasketView: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, 18)
         }
+        .background(ScrollViewResolver { scrollView in
+            self.basketScrollView = scrollView
+        })
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        scrollViewportFrame = proxy.frame(in: .named("basketContainer"))
+                    }
+                    .onChange(of: proxy.frame(in: .named("basketContainer"))) { _, newFrame in
+                        scrollViewportFrame = newFrame
+                    }
+            }
+        )
     }
     
     /// List view for basket items - uses same BasketItemView with list layout for full feature parity
@@ -837,6 +888,20 @@ struct FloatingBasketView: View {
             .padding(.top, 24)
             .padding(.bottom, 18)
         }
+        .background(ScrollViewResolver { scrollView in
+            self.basketScrollView = scrollView
+        })
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        scrollViewportFrame = proxy.frame(in: .named("basketContainer"))
+                    }
+                    .onChange(of: proxy.frame(in: .named("basketContainer"))) { _, newFrame in
+                        scrollViewportFrame = newFrame
+                    }
+            }
+        )
         // CRITICAL: Set FIXED width (not max) to force all children to respect bounds
         .frame(width: fullGridWidth)
         // Note: Drop destination handled at container level (mainBasketContainer)
@@ -989,6 +1054,35 @@ struct FloatingBasketView: View {
         // Hide basket if empty
         if state.basketItems.isEmpty {
             FloatingBasketWindowController.shared.hideBasket()
+        }
+    }
+}
+
+private struct ScrollViewResolver: NSViewRepresentable {
+    let onResolve: (NSScrollView) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            resolveScrollView(from: view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            resolveScrollView(from: nsView)
+        }
+    }
+
+    private func resolveScrollView(from view: NSView) {
+        var current: NSView? = view
+        while let candidate = current {
+            if let scroll = candidate.enclosingScrollView {
+                onResolve(scroll)
+                return
+            }
+            current = candidate.superview
         }
     }
 }
