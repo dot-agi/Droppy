@@ -268,6 +268,31 @@ enum DroppyAnimation {
             identity: NotchBlurModifier(scale: 1, blur: 0, opacity: 1)
         ).animation(.smooth(duration: 0.35))
     }
+
+    /// Constraint-safe premium transition for AppKit-hosted views:
+    /// blur + opacity only, without scale transforms.
+    static var notchViewTransitionBlurOnly: AnyTransition {
+        .modifier(
+            active: NotchBlurModifier(scale: 1, blur: 8, opacity: 0),
+            identity: NotchBlurModifier(scale: 1, blur: 0, opacity: 1)
+        ).animation(.smooth(duration: 0.35))
+    }
+    
+    /// Floating button transition: scale(0.5) + blur(4) + opacity for small circular buttons.
+    static var notchButtonTransition: AnyTransition {
+        .modifier(
+            active: NotchBlurModifier(scale: 0.5, blur: 4, opacity: 0),
+            identity: NotchBlurModifier(scale: 1, blur: 0, opacity: 1)
+        ).animation(.smooth(duration: 0.3))
+    }
+    
+    /// Shelf sub-element transition: scale(0.8) + blur(6) + opacity for inline elements.
+    static var notchElementTransition: AnyTransition {
+        .modifier(
+            active: NotchBlurModifier(scale: 0.8, blur: 6, opacity: 0),
+            identity: NotchBlurModifier(scale: 1, blur: 0, opacity: 1)
+        ).animation(.smooth(duration: 0.3))
+    }
 }
 
 // MARK: - Notch Blur Modifier
@@ -312,6 +337,21 @@ extension View {
     /// PERFORMANCE: Lightweight transition (no blur) for complex views like grids with many items.
     func notchTransitionLight() -> some View {
         self.transition(DroppyAnimation.notchViewTransitionLight)
+    }
+
+    /// Constraint-safe premium transition (blur + opacity, no scale).
+    func notchTransitionBlurOnly() -> some View {
+        self.transition(DroppyAnimation.notchViewTransitionBlurOnly)
+    }
+    
+    /// Premium floating button transition (scale 0.5 + blur 4 + opacity).
+    func notchButtonTransition() -> some View {
+        self.transition(DroppyAnimation.notchButtonTransition)
+    }
+    
+    /// Premium shelf sub-element transition (scale 0.8 + blur 6 + opacity).
+    func notchElementTransition() -> some View {
+        self.transition(DroppyAnimation.notchElementTransition)
     }
 }
 

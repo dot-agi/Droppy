@@ -875,7 +875,7 @@ struct NotchShelfView: View {
         
         if shouldShow {
             NotchFace(size: 40)
-                .transition(.scale(scale: 0.5).combined(with: .opacity).animation(DroppyAnimation.hoverBouncy))
+                .transition(DroppyAnimation.notchButtonTransition)
                 .zIndex(1)
         }
     }
@@ -956,7 +956,7 @@ struct NotchShelfView: View {
                                     solidFill: isHighlight ? .orange : (isDynamicIslandMode ? dynamicIslandGray : .black)
                                 ))
                                 .help(CaffeineManager.shared.isActive ? "High Alert: \(CaffeineManager.shared.formattedRemaining)" : "High Alert")
-                                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                .transition(DroppyAnimation.notchElementTransition)
                             }
 
                             if cameraShouldShow {
@@ -979,7 +979,7 @@ struct NotchShelfView: View {
                                     solidFill: isHighlight ? .cyan : (isDynamicIslandMode ? dynamicIslandGray : .black)
                                 ))
                                 .help(showCameraView ? "Hide Notchface" : "Show Notchface")
-                                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                .transition(DroppyAnimation.notchElementTransition)
                             }
 
                             // Terminal button (if extension installed AND enabled)
@@ -993,7 +993,7 @@ struct NotchShelfView: View {
                                     }
                                     .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                                     .help("Open in Terminal.app")
-                                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                    .transition(DroppyAnimation.notchElementTransition)
                                     
                                     if !terminalManager.lastOutput.isEmpty {
                                         Button(action: {
@@ -1003,7 +1003,7 @@ struct NotchShelfView: View {
                                         }
                                         .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
                                         .help("Clear terminal output")
-                                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                        .transition(DroppyAnimation.notchElementTransition)
                                     }
                                 }
                                 // Toggle terminal button (shows terminal icon when hidden, X when visible)
@@ -1020,7 +1020,7 @@ struct NotchShelfView: View {
                                     Image(systemName: terminalManager.isVisible ? "xmark" : "terminal")
                                 }
                                 .buttonStyle(DroppyCircleButtonStyle(size: 32, useTransparent: shouldUseFloatingButtonTransparent, solidFill: isDynamicIslandMode ? dynamicIslandGray : .black))
-                                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                                .transition(DroppyAnimation.notchElementTransition)
                             }
                             
                             // Close button (only in sticky mode AND when terminal is not visible)
@@ -1044,7 +1044,7 @@ struct NotchShelfView: View {
                                 startAutoShrinkTimer()
                             }
                         }
-                        .transition(.scale(scale: 0.5).combined(with: .opacity))
+                        .transition(DroppyAnimation.notchButtonTransition)
                     }
                 }
                 .offset(y: currentExpandedHeight + NotchLayoutConstants.floatingButtonGap + (isDynamicIslandMode ? NotchLayoutConstants.floatingButtonIslandCompensation : 0))

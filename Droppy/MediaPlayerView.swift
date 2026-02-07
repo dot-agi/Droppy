@@ -840,7 +840,7 @@ struct MediaPlayerView: View {
             // MARK: - Universal Inline HUD (morphs in for any HUD type)
             if let hudType = inlineHUDType {
                 InlineHUDView(type: hudType, value: inlineHUDValue, isMuted: inlineHUDMuted)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .transition(DroppyAnimation.notchElementTransition)
             }
         }
         .animation(DroppyAnimation.notchState, value: inlineHUDType != nil)
@@ -941,7 +941,7 @@ struct MediaPlayerView: View {
             // Inline HUD overlay
             if let hudType = inlineHUDType {
                 InlineHUDView(type: hudType, value: inlineHUDValue, isMuted: inlineHUDMuted)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .transition(DroppyAnimation.notchElementTransition)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
