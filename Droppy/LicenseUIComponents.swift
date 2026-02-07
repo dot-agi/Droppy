@@ -9,21 +9,14 @@ private struct LicenseCardChrome<Content: View>: View {
     @State private var sealRotation: Double = 0
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            // Card surface
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(white: 0.105))
-
-            // Outer border
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.09), lineWidth: 1)
-
-            // Inner decorative frame (certificate look)
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.04), lineWidth: 0.5)
-                .padding(5)
-
-            // Watermark seal (subtle, bottom-right) — slowly spins
+        VStack(alignment: .leading, spacing: 0) {
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(white: 0.105))
+        .overlay(alignment: .bottomTrailing) {
+            // Watermark seal — slowly spins
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 80, weight: .thin))
                 .foregroundStyle(Color.white.opacity(0.025))
@@ -34,14 +27,17 @@ private struct LicenseCardChrome<Content: View>: View {
                         sealRotation = 360
                     }
                 }
-
-            // Content
-            VStack(alignment: .leading, spacing: 0) {
-                content()
-            }
-            .padding(18)
         }
-        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.09), lineWidth: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.04), lineWidth: 0.5)
+                .padding(5)
+        )
     }
 }
 
