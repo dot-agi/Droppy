@@ -978,7 +978,7 @@ struct NotchShelfView: View {
                                     useTransparent: shouldUseFloatingButtonTransparent,
                                     solidFill: isHighlight ? .cyan : (isDynamicIslandMode ? dynamicIslandGray : .black)
                                 ))
-                                .help(showCameraView ? "Hide Snap! Camera" : "Show Snap! Camera")
+                                .help(showCameraView ? "Hide Notchface" : "Show Notchface")
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                             }
 

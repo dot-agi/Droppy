@@ -92,6 +92,8 @@ struct DisableExtensionButton: View {
             return "This will disable Video Target Size compression. You can enable it again later."
         case .terminalNotch:
             return "This will disable the terminal extension. You can enable it again later."
+        case .camera:
+            return "This will disable Notchface and stop its live shelf preview. You can enable it again later."
         case .quickshare:
             return "This will disable Quickshare and hide it from menus and quick actions. You can enable it again later."
         case .notificationHUD:
@@ -147,6 +149,9 @@ struct DisableExtensionButton: View {
                 // VoiceTranscribe will need model download, just mark as enabled
                 // User needs to reconfigure
                 break
+            case .aiBackgroundRemoval:
+                // Check if Python packages are still on disk (e.g. after PearCleaner recovery)
+                AIInstallManager.shared.checkInstallationStatus()
             case .spotify:
                 // Spotify will auto-refresh when music plays
                 SpotifyController.shared.refreshState()

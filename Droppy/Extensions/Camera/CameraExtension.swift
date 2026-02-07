@@ -2,14 +2,14 @@
 //  CameraExtension.swift
 //  Droppy
 //
-//  Self-contained definition for Snap! Camera extension.
+//  Self-contained definition for Notchface extension.
 //
 
 import SwiftUI
 
 struct CameraExtension: ExtensionDefinition {
     static let id = "camera"
-    static let title = "Snap! Camera"
+    static let title = "Notchface"
     static let subtitle = "Live notch camera preview"
     static let category: ExtensionGroup = .productivity
     static let categoryColor: Color = .cyan
@@ -17,7 +17,7 @@ struct CameraExtension: ExtensionDefinition {
     static let description = "Adds a floating camera button below the shelf. Open it for a full live front-camera preview with balanced notch padding."
 
     static let features: [(icon: String, text: String)] = [
-        ("camera.fill", "Floating Snap! Camera button below the shelf"),
+        ("camera.fill", "Floating Notchface button below the shelf"),
         ("rectangle.inset.filled", "Full preview mode with aligned notch padding"),
         ("bolt.fill", "Low-latency startup with smooth transitions")
     ]

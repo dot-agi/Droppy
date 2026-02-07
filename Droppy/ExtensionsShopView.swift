@@ -454,7 +454,7 @@ struct ExtensionsShopView: View {
             ExtensionListItem(
                 id: "camera",
                 iconURL: "https://getdroppy.app/assets/icons/snap-camera-v2.png",
-                title: "Snap! Camera",
+                title: "Notchface",
                 subtitle: "Live notch camera preview",
                 category: .productivity,
                 isInstalled: isCameraInstalled,

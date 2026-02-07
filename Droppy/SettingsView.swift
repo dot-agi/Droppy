@@ -51,6 +51,8 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.terminalNotchEnabled) private var enableTerminalNotch = PreferenceDefault.terminalNotchEnabled
     @AppStorage(AppPreferenceKey.caffeineInstalled) private var isCaffeineInstalled = PreferenceDefault.caffeineInstalled
     @AppStorage(AppPreferenceKey.caffeineEnabled) private var enableCaffeine = PreferenceDefault.caffeineEnabled
+    @AppStorage(AppPreferenceKey.cameraInstalled) private var isCameraInstalled = PreferenceDefault.cameraInstalled
+    @AppStorage(AppPreferenceKey.cameraEnabled) private var enableCamera = PreferenceDefault.cameraEnabled
     @AppStorage(AppPreferenceKey.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget = PreferenceDefault.enableLockScreenMediaWidget
     @AppStorage(AppPreferenceKey.showMediaPlayer) private var showMediaPlayer = PreferenceDefault.showMediaPlayer
     @AppStorage(AppPreferenceKey.autoFadeMediaHUD) private var autoFadeMediaHUD = PreferenceDefault.autoFadeMediaHUD
@@ -530,6 +532,8 @@ struct SettingsView: View {
     // MARK: General Tab (Startup, Menu Bar, Core Settings)
     private var generalSettings: some View {
         Group {
+            LicenseSettingsSection()
+
             // MARK: Startup
             Section {
                 nativePickerRow(
@@ -1066,8 +1070,8 @@ struct SettingsView: View {
                         JiggleToShowInfoButton()
                         Toggle(isOn: $enableBasketAutoHide) {
                             VStack(alignment: .leading) {
-                                Text("Auto-Hide (Jiggle to Show)")
-                                Text("Basket hides after delay, jiggle without file to show again")
+                                Text("Auto-Hide")
+                                Text("Basket hides after delay when cursor leaves")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -1597,8 +1601,8 @@ struct SettingsView: View {
                     PeekModeInfoButton()
                     Toggle(isOn: $enableBasketAutoHide) {
                         VStack(alignment: .leading) {
-                            Text("Auto-Hide (Jiggle to Show)")
-                            Text("Basket hides after delay, jiggle without file to show again")
+                            Text("Auto-Hide")
+                            Text("Basket hides after delay when cursor leaves")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1736,8 +1740,8 @@ struct SettingsView: View {
                         PeekModeInfoButton()
                         Toggle(isOn: $enableBasketAutoHide) {
                             VStack(alignment: .leading) {
-                                Text("Auto-Hide (Jiggle to Show)")
-                                Text("Basket hides after delay, jiggle without file to show again")
+                                Text("Auto-Hide")
+                                Text("Basket hides after delay when cursor leaves")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -2098,7 +2102,7 @@ struct SettingsView: View {
                 Text("System")
             }
             
-            // MARK: Extensions (Notify Me, Terminal Notch, Caffeine)
+            // MARK: Extensions (Notify Me, Terminal Notch, Caffeine, Camera)
             Section {
                 // Notify me! (Notification HUD Extension)
                 HStack(spacing: 12) {
@@ -2223,6 +2227,46 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                // Notchface Extension
+                if isCameraInstalled {
+                    HStack(spacing: 12) {
+                        ExtensionIconView<CameraExtension>(definition: CameraExtension.self, size: 40)
+                            .opacity(enableCamera ? 1.0 : 0.5)
+
+                        Toggle(isOn: $enableCamera) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Notchface")
+                                Text("Show the camera button and preview mode")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } else {
+                    Button {
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("OpenExtensionStore"),
+                            object: nil,
+                            userInfo: ["extension": CameraExtension.id]
+                        )
+                    } label: {
+                        HStack(spacing: 12) {
+                            ExtensionIconView<CameraExtension>(definition: CameraExtension.self, size: 40)
+                                .opacity(0.5)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Notchface")
+                                    .foregroundStyle(.secondary)
+                                Text("Enable in Extension Store")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
             } header: {
                 Text("Extensions")
             }
@@ -2332,6 +2376,8 @@ struct SettingsView: View {
                 } else if extensionType == .ffmpegVideoCompression {
                     // FFmpeg Video Compression has its own install view
                     FFmpegInstallView(installCount: nil, rating: nil)
+                } else if extensionType == .camera {
+                    CameraInfoView(installCount: nil, rating: nil)
                 } else if extensionType == .menuBarManager {
                     // Menu Bar Manager has its own configuration view
                     MenuBarManagerInfoView(installCount: nil, rating: nil)
@@ -2350,7 +2396,7 @@ struct SettingsView: View {
                             SpotifyAuthManager.shared.startAuthentication()
                         case .appleMusic:
                             AppleMusicController.shared.refreshState()
-                        case .elementCapture, .aiBackgroundRemoval, .windowSnap, .voiceTranscribe, .ffmpegVideoCompression, .terminalNotch, .quickshare, .notificationHUD, .caffeine, .menuBarManager, .todo:
+                        case .elementCapture, .aiBackgroundRemoval, .windowSnap, .voiceTranscribe, .ffmpegVideoCompression, .terminalNotch, .camera, .quickshare, .notificationHUD, .caffeine, .menuBarManager, .todo:
                             break // No action needed - these have their own configuration UI
                         }
                     }
@@ -2648,36 +2694,11 @@ struct SettingsView: View {
                     LinkButton(
                         title: "Discord",
                         icon: "bubble.left.and.bubble.right.fill",
-                        url: "https://discord.gg/uxqynmJb"
-                    )
-                    
-                    LinkButton(
-                        title: "Support",
-                        icon: "cup.and.heat.waves.fill",
-                        url: "https://buymeacoffee.com/droppy"
+                        url: "https://discord.gg/uvA6PUj4"
                     )
                 }
             } header: {
                 Text("Links")
-            }
-            
-            // MARK: Support
-            Section {
-                Text("I'm Jordy, a solo developer building Droppy because I believe essential tools should be free. If you enjoy using it, a coffee would mean the world ❤️")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                
-                Link(destination: URL(string: "https://buymeacoffee.com/droppy")!) {
-                    HStack {
-                        Label("Buy me a coffee", systemImage: "cup.and.saucer.fill")
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            } header: {
-                Text("Support")
             }
             
             // MARK: Reset
@@ -3570,9 +3591,9 @@ struct BasketGestureInfoButton: View {
     }
 }
 
-// MARK: - Jiggle to Show Info Button
+// MARK: - Auto-Hide Info Button
 
-/// Info button explaining auto-hide with jiggle-to-show behavior
+/// Info button explaining auto-hide behavior
 struct JiggleToShowInfoButton: View {
     @State private var showPopover = false
     
@@ -3591,17 +3612,18 @@ struct JiggleToShowInfoButton: View {
                         Image(systemName: "waveform.path")
                             .font(.system(size: 24))
                             .foregroundStyle(.purple)
-                        Text("Jiggle to Show")
+                        Text("Auto-Hide")
                             .font(.headline)
                     }
                     
-                    Text("Basket hides after a delay when your cursor leaves. Jiggle without dragging files to show all hidden baskets.")
+                    Text("Basket hides after a delay when your cursor leaves. Use your Basket Switcher shortcut to reopen hidden baskets.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
                     VStack(alignment: .leading, spacing: 6) {
                         Label("Hides after configurable delay", systemImage: "timer")
-                        Label("Jiggle (no file) to reveal hidden baskets", systemImage: "cursorarrow.motionlines")
+                        Label("Jiggle while dragging files still works", systemImage: "arrow.left.arrow.right")
+                        Label("Use Basket Switcher shortcut to reveal hidden baskets", systemImage: "keyboard")
                         Label("Baskets with items are preserved", systemImage: "tray.full.fill")
                     }
                     .font(.caption)
@@ -5467,7 +5489,8 @@ struct AutofadeAppPicker: View {
             
             // Search field
             TextField("Search apps...", text: $searchText)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .droppyTextInputChrome()
                 .padding()
             
             // App list
