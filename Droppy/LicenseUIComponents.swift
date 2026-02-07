@@ -211,8 +211,10 @@ struct LicenseLivePreviewCard: View {
 
                 if let email = nonEmpty(email) {
                     LicenseInfoRow(label: "Email", value: email)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
+            .animation(DroppyAnimation.smooth, value: nonEmpty(email) != nil)
         }
     }
 
