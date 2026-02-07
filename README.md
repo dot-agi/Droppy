@@ -32,9 +32,9 @@
 </div>
 
 
-## Core Features
+<h2 align="center">Core Features</h2>
 
-### File Shelf
+<h3 align="center">File Shelf</h3>
 
 <p align="center"><img src="docs/assets/images/feature-shelf.png" width="500" alt="File Shelf" /></p>
 
@@ -47,7 +47,7 @@
 
 ---
 
-### Floating Basket
+<h3 align="center">Floating Basket</h3>
 
 <p align="center"><img src="docs/assets/images/feature-basket.png" width="500" alt="Floating Basket" /></p>
 
@@ -60,7 +60,7 @@
 
 ---
 
-### Clipboard Manager
+<h3 align="center">Clipboard Manager</h3>
 
 <p align="center"><img src="docs/assets/images/feature-clipboard.png" width="500" alt="Clipboard Manager" /></p>
 
@@ -73,7 +73,7 @@
 
 ---
 
-### Beautiful HUDs
+<h3 align="center">Beautiful HUDs</h3>
 
 <p align="center"><img src="docs/assets/images/feature-huds.png" width="500" alt="Beautiful HUDs" /></p>
 
