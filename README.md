@@ -5,7 +5,7 @@
 <h1 align="center">Droppy</h1>
 
 <p align="center">
-  <b>The free native productivity layer macOS is missing.</b><br>
+  <b>The native productivity layer macOS is missing.</b><br>
   <sub>100% Swift • Signed & Notarized • Open Source</sub>
 </p>
 
@@ -69,9 +69,9 @@ Modular extensions add even more power. **Install only what you need.**
 ## FAQ
 
 <details>
-<summary><b>Is Droppy really free?</b></summary>
+<summary><b>How much does Droppy cost?</b></summary>
 <br>
-Yes! Droppy is 100% free and open source. No subscriptions, no paywalls.
+Droppy is a one-time payment of €5.99 — lifetime. All features, all extensions, and all future updates included. No subscriptions, no recurring fees.
 </details>
 
 <details>
