@@ -506,24 +506,8 @@
             border: none;
         }
 
-        .credits-btn {
-            margin-top: 16px;
-            padding: 8px 16px;
-            background: transparent;
-            border: none;
-            color: var(--muted);
-            font-size: 13px;
-            cursor: pointer;
-            opacity: 0.4;
-            transition: opacity 0.2s ease;
-            pointer-events: auto;
-        }
 
-        .credits-btn:hover {
-            opacity: 0.8;
-        }
 
-        .credits-modal-overlay,
         .download-modal-overlay {
             position: fixed;
             inset: 0;
@@ -538,13 +522,11 @@
             transition: opacity 0.3s ease;
         }
 
-        .credits-modal-overlay.active,
         .download-modal-overlay.active {
             opacity: 1;
             pointer-events: auto;
         }
 
-        .credits-modal,
         .download-modal {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -563,52 +545,11 @@
             padding: 32px;
         }
 
-        .credits-modal-overlay.active .credits-modal,
         .download-modal-overlay.active .download-modal {
             transform: scale(1);
         }
 
-        .credits-modal h2 {
-            font-size: 15px;
-            margin-bottom: 12px;
-            text-align: center;
-        }
 
-        .credits-section {
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .credits-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
-
-        .credits-section h3 {
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 4px;
-            color: var(--primary);
-        }
-
-        .credits-section p {
-            font-size: 11px;
-            color: var(--muted);
-            line-height: 1.4;
-            margin-bottom: 4px;
-        }
-
-        .credits-section a {
-            color: #ffd700;
-            text-decoration: none;
-            font-size: 10px;
-        }
-
-        .credits-section a:hover {
-            text-decoration: underline;
-        }
 
         /* Download Modal */
         .download-modal h2 {
@@ -1326,41 +1267,11 @@
                                 type="video/mp4">
                         </video>
                     </div>
-                    <button class="credits-btn" id="credits-btn">Credits & Acknowledgements</button>
+
                 </div>
             </div>
 
-            <!-- Credits Modal -->
-            <div class="credits-modal-overlay" id="credits-modal">
-                <div class="credits-modal">
-                    <h2>Credits & Acknowledgements</h2>
 
-                    <div class="credits-section">
-                        <h3>🧑‍💻 Contributors</h3>
-                        <p>Droppy has had contributions from developers who helped create code, improve features, and
-                            build
-                            community-driven extensions. Thank you to everyone who has contributed!</p>
-                    </div>
-
-                    <div class="credits-section">
-                        <h3>✨ Alcove</h3>
-                        <p>Alcove has been a great inspiration for creating a beautiful notch app with smooth
-                            animations. One of
-                            the founding fathers of good-looking notch apps on macOS. The developer has been supportive
-                            and is
-                            behind this project.</p>
-                        <a href="https://tryalcove.com/" target="_blank">tryalcove.com →</a>
-                    </div>
-
-                    <div class="credits-section">
-                        <h3>🎯 Boringnotch</h3>
-                        <p>Thank you for pioneering notch creativity on macOS and laying the groundwork for the
-                            community.</p>
-                        <a href="https://github.com/TheBoredTeam/boring.notch"
-                            target="_blank">github.com/TheBoredTeam/boring.notch →</a>
-                    </div>
-                </div>
-            </div>
 
             <!-- Download Modal -->
             <div class="download-modal-overlay" id="download-modal">
@@ -1561,19 +1472,7 @@
             }
         }).catch(() => { });
 
-        // Credits modal logic
-        const creditsModal = document.getElementById('credits-modal');
-        const creditsBtn = document.getElementById('credits-btn');
 
-        creditsBtn.addEventListener('click', () => {
-            creditsModal.classList.add('active');
-        });
-
-        creditsModal.addEventListener('click', (e) => {
-            if (e.target === creditsModal) {
-                creditsModal.classList.remove('active');
-            }
-        });
 
         // Download modal logic
         const downloadModal = document.getElementById('download-modal');
