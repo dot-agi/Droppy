@@ -1106,12 +1106,16 @@
                     No subscriptions, no recurring fees
                 </div>
             </div>
-            <a id="pricing-download-btn" href="https://github.com/iordv/Droppy/releases/latest" class="download-btn">
+            <a id="pricing-download-btn" href="https://iordv.gumroad.com/l/Droppy" target="_blank" class="download-btn">
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Download Droppy
+                Buy License
             </a>
+            <p style="margin-top: 12px; font-size: 12px; color: var(--muted);">Then <a
+                    href="https://github.com/iordv/Droppy/releases/latest"
+                    style="color: var(--secondary); text-decoration: underline;">download Droppy</a> and activate with
+                your key.</p>
         </div>
     </section>
 
@@ -1210,7 +1214,6 @@
             const dmg = rel.assets?.find(a => a.name.endsWith('.dmg'));
             if (dmg) {
                 document.getElementById('download-btn').href = dmg.browser_download_url;
-                document.getElementById('pricing-download-btn').href = dmg.browser_download_url;
             }
         }).catch(() => { });
     </script>
