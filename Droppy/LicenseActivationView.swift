@@ -298,13 +298,13 @@ struct LicenseActivationView: View {
     }
 
     private func formattedPreviewKey(from rawValue: String) -> String {
-        guard !rawValue.isEmpty else { return "XXXX-XXXX-XXXX-XXXX" }
+        guard !rawValue.isEmpty else { return "TYPE IN YOUR KEY BELOW" }
 
         let sanitized = rawValue.uppercased().filter { character in
             character.isLetter || character.isNumber
         }
 
-        guard !sanitized.isEmpty else { return "XXXX-XXXX-XXXX-XXXX" }
+        guard !sanitized.isEmpty else { return "TYPE IN YOUR KEY BELOW" }
 
         var groups: [String] = []
         var current = ""

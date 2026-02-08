@@ -199,26 +199,16 @@ enum DroppyQuickshare {
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        // Build request body
-        var body = Data()
         let filename = fileURL.lastPathComponent
-        
-        // File data part
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
-        
-        guard let fileData = try? Data(contentsOf: fileURL) else {
+
+        guard let multipartFileURL = createMultipartBodyFile(fileURL: fileURL, filename: filename, boundary: boundary) else {
             return nil
         }
-        body.append(fileData)
-        body.append("\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        
-        request.httpBody = body
-        
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        defer { try? FileManager.default.removeItem(at: multipartFileURL) }
+
+        request.timeoutInterval = 120
+
+        let task = URLSession.shared.uploadTask(with: request, fromFile: multipartFileURL) { data, response, error in
             defer { semaphore.signal() }
             
             if let error = error {
@@ -241,8 +231,50 @@ enum DroppyQuickshare {
         }
         
         task.resume()
-        semaphore.wait()
+        if semaphore.wait(timeout: .now() + 180) == .timedOut {
+            task.cancel()
+            return nil
+        }
         
         return result
+    }
+
+    /// Build multipart body as a temporary file to avoid loading large uploads fully in memory.
+    private static func createMultipartBodyFile(fileURL: URL, filename: String, boundary: String) -> URL? {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("droppy_upload_\(UUID().uuidString).tmp")
+
+        FileManager.default.createFile(atPath: tempURL.path, contents: nil)
+
+        guard let outputHandle = try? FileHandle(forWritingTo: tempURL),
+              let inputHandle = try? FileHandle(forReadingFrom: fileURL) else {
+            try? FileManager.default.removeItem(at: tempURL)
+            return nil
+        }
+
+        defer {
+            outputHandle.closeFile()
+            inputHandle.closeFile()
+        }
+
+        let header = """
+        --\(boundary)\r
+        Content-Disposition: form-data; name="file"; filename="\(filename)"\r
+        Content-Type: application/octet-stream\r
+        \r
+        """
+        outputHandle.write(Data(header.utf8))
+
+        let chunkSize = 64 * 1024
+        while true {
+            let chunk = inputHandle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { break }
+            outputHandle.write(chunk)
+        }
+
+        let footer = "\r\n--\(boundary)--\r\n"
+        outputHandle.write(Data(footer.utf8))
+
+        return tempURL
     }
 }

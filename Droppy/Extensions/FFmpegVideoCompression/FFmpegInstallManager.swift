@@ -141,13 +141,11 @@ final class FFmpegInstallManager: ObservableObject {
         process.standardError = errorPipe
         
         do {
-            try process.run()
-            
             installProgress = "Downloading and installing FFmpeg..."
-            
-            process.waitUntilExit()
-            
-            if process.terminationStatus == 0 {
+
+            let status = try await runProcessAsync(process)
+
+            if status == 0 {
                 installProgress = "FFmpeg installed successfully!"
                 isInstalled = true
                 
@@ -186,10 +184,9 @@ final class FFmpegInstallManager: ObservableObject {
         process.arguments = ["uninstall", "ffmpeg"]
         
         do {
-            try process.run()
-            process.waitUntilExit()
-            
-            if process.terminationStatus == 0 {
+            let status = try await runProcessAsync(process)
+
+            if status == 0 {
                 installProgress = "FFmpeg removed successfully"
                 isInstalled = false
             } else {
@@ -212,5 +209,20 @@ final class FFmpegInstallManager: ObservableObject {
         installError = nil
         
         print("[FFmpegInstallManager] Cleanup complete")
+    }
+
+    /// Run a subprocess without blocking the main actor.
+    private func runProcessAsync(_ process: Process) async throws -> Int32 {
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { proc in
+                continuation.resume(returning: proc.terminationStatus)
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
     }
 }

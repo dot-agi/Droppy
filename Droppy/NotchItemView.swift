@@ -1113,7 +1113,8 @@ struct NotchItemView: View {
     /// Unzip an archive file, replacing it with the extracted folder
     private func unzipFile() {
         let ext = item.url.pathExtension.lowercased()
-        guard ["zip", "tar", "gz", "bz2", "xz", "7z"].contains(ext) else { return }
+        // Extraction command below uses zip-specific flags.
+        guard ext == "zip" else { return }
         guard !isUnzipping else { return }
         
         isUnzipping = true

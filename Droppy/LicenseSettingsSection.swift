@@ -1,4 +1,5 @@
 import SwiftUI
+import Darwin
 
 struct LicenseSettingsSection: View {
     @ObservedObject private var licenseManager = LicenseManager.shared
@@ -31,7 +32,7 @@ struct LicenseSettingsSection: View {
                                 }
                             }
 
-                        licenseActionRow
+                        activatedDeviceCard
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
                     } header: {
@@ -225,6 +226,79 @@ struct LicenseSettingsSection: View {
         )
     }
 
+    private var activatedDeviceCard: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Activated Device")
+                Text("\(displayDeviceName) • \(localMacFriendlyModel) • \(localMacOSVersion)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(alignment: .top, spacing: 8) {
+                SettingsSegmentButtonWithContent(
+                    label: "This Mac",
+                    isSelected: true,
+                    tileWidth: 106,
+                    tileHeight: 46,
+                    action: {}
+                ) {
+                    Image(systemName: "laptopcomputer")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.blue)
+                }
+                .allowsHitTesting(false)
+                .fixedSize(horizontal: true, vertical: false)
+
+                SettingsSegmentButtonWithContent(
+                    label: "Re-check",
+                    isSelected: false,
+                    tileWidth: 96,
+                    tileHeight: 46,
+                    action: {
+                        Task {
+                            await licenseManager.revalidateStoredLicense()
+                        }
+                    }
+                ) {
+                    if licenseManager.isChecking {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AdaptiveColors.secondaryTextAuto)
+                    }
+                }
+                .disabled(licenseManager.isChecking)
+                .fixedSize(horizontal: true, vertical: false)
+
+                SettingsSegmentButtonWithContent(
+                    label: "Remove",
+                    isSelected: false,
+                    tileWidth: 96,
+                    tileHeight: 46,
+                    action: {
+                        Task {
+                            await licenseManager.deactivateCurrentDevice()
+                            licenseKeyInput = ""
+                        }
+                    }
+                ) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AdaptiveColors.secondaryTextAuto)
+                }
+                .disabled(licenseManager.isChecking)
+                .fixedSize(horizontal: true, vertical: false)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
     private func activateLicense() {
         let key = licenseKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -249,6 +323,88 @@ struct LicenseSettingsSection: View {
     private func normalized(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Not available" : trimmed
+    }
+
+    private var displayDeviceName: String {
+        let trimmed = licenseManager.activatedDeviceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+        if let hostName = Host.current().localizedName, !hostName.isEmpty {
+            return hostName
+        }
+        return "This Mac"
+    }
+
+    private var localMacOSVersion: String {
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        return "macOS \(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)"
+    }
+
+    private var localMacFriendlyModel: String {
+        let identifier = localMacModelIdentifier
+        let chip = localChipName
+        let modelName = mappedMacModelName(for: identifier) ?? fallbackMacFamilyName(from: identifier) ?? identifier
+        return "\(modelName) (\(chip))"
+    }
+
+    private var localChipName: String {
+        var size = 0
+        guard sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0) == 0, size > 0 else {
+            return "Apple Silicon"
+        }
+
+        var cpu = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("machdep.cpu.brand_string", &cpu, &size, nil, 0) == 0 else {
+            return "Apple Silicon"
+        }
+
+        let value = String(cString: cpu).trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? "Apple Silicon" : value
+    }
+
+    private var localMacModelIdentifier: String {
+        var size = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else {
+            return "Mac"
+        }
+
+        var model = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.model", &model, &size, nil, 0) == 0 else {
+            return "Mac"
+        }
+        return String(cString: model)
+    }
+
+    private func mappedMacModelName(for identifier: String) -> String? {
+        let known: [String: String] = [
+            "MacBookPro17,1": "MacBook Pro 13-inch",
+            "MacBookPro18,1": "MacBook Pro 16-inch",
+            "MacBookPro18,2": "MacBook Pro 16-inch",
+            "MacBookPro18,3": "MacBook Pro 14-inch",
+            "MacBookPro18,4": "MacBook Pro 14-inch",
+            "MacBookPro19,1": "MacBook Pro 14-inch",
+            "MacBookPro19,2": "MacBook Pro 16-inch",
+            "MacBookPro20,1": "MacBook Pro 13-inch",
+            "MacBookPro20,2": "MacBook Pro 13-inch",
+            "MacBookPro21,1": "MacBook Pro 14-inch",
+            "MacBookPro21,2": "MacBook Pro 16-inch",
+            "MacBookPro21,3": "MacBook Pro 14-inch",
+            "MacBookPro21,4": "MacBook Pro 16-inch",
+        ]
+        return known[identifier]
+    }
+
+    private func fallbackMacFamilyName(from identifier: String) -> String? {
+        if identifier.hasPrefix("MacBookPro") { return "MacBook Pro" }
+        if identifier.hasPrefix("MacBookAir") { return "MacBook Air" }
+        if identifier.hasPrefix("MacBook") { return "MacBook" }
+        if identifier.hasPrefix("Macmini") { return "Mac mini" }
+        if identifier.hasPrefix("MacStudio") { return "Mac Studio" }
+        if identifier.hasPrefix("MacPro") { return "Mac Pro" }
+        if identifier.hasPrefix("iMacPro") { return "iMac Pro" }
+        if identifier.hasPrefix("iMac") { return "iMac" }
+        return nil
     }
 
     private func inputField<Content: View>(icon: String, isFocused: Bool, @ViewBuilder content: () -> Content) -> some View {

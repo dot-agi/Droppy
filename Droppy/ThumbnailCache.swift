@@ -90,12 +90,12 @@ final class ThumbnailCache {
             NSHomeDirectory()
         ]
         
-        let semaphore = DispatchSemaphore(value: 0)
-        var completed = 0
-        let total = warmupPaths.count
+        let group = DispatchGroup()
         
         for path in warmupPaths {
+            group.enter()
             Task(priority: .userInitiated) {
+                defer { group.leave() }
                 let url = URL(fileURLWithPath: path)
                 let request = QLThumbnailGenerator.Request(
                     fileAt: url,
@@ -109,13 +109,9 @@ final class ThumbnailCache {
                         self.forceGPURender(rep.nsImage)
                     }
                 }
-                completed += 1
-                if completed >= total {
-                    semaphore.signal()
-                }
             }
         }
-        _ = semaphore.wait(timeout: .now() + 5.0)
+        _ = group.wait(timeout: .now() + 5.0)
     }
     
     /// Forces an NSImage to be rendered to GPU, triggering Metal shader compilation

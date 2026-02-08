@@ -911,7 +911,7 @@ private struct ToDoDueDatePopoverContentLocal: View {
 
             HStack(spacing: 8) {
                 stepButton("minus") { shiftMinutes(-15) }
-                TextField("HH:mm", text: $manualTimeText, onEditingChanged: { editing in
+                TextField(timePlaceholder, text: $manualTimeText, onEditingChanged: { editing in
                     isEditingTimeText = editing
                     if editing && manualTimeText.isEmpty {
                         manualTimeText = formatTime(resolvedDate)
@@ -1109,10 +1109,18 @@ private struct ToDoDueDatePopoverContentLocal: View {
 
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.locale = Locale.current
         formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "HH:mm"
+        formatter.setLocalizedDateFormatFromTemplate("jm")
         return formatter.string(from: date)
+    }
+
+    private var timePlaceholder: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.timeZone = TimeZone.current
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter.string(from: Date())
     }
 }
 
@@ -1505,7 +1513,7 @@ private struct TaskRow: View {
         formatter.locale = Locale.current
         formatter.timeZone = TimeZone.current
         if dueDateHasTime(date) {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM HH:mm")
+            formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
         } else if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
             formatter.setLocalizedDateFormatFromTemplate("d MMM")
         } else {

@@ -47,21 +47,28 @@ private struct LicenseInfoRow: View {
     let label: String
     let value: String
     var mono: Bool = false
+    var valueAlignment: Alignment = .leading
+    var enforceVerticalCentering: Bool = false
+    private var centeredRowHeight: CGFloat { 22 }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 0) {
+        HStack(alignment: .center, spacing: 0) {
             Text(label.uppercased())
                 .font(.system(size: 9, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary.opacity(0.7))
                 .frame(width: 64, alignment: .leading)
+                .frame(height: enforceVerticalCentering ? centeredRowHeight : nil, alignment: .center)
 
             Text(value)
                 .font(.system(size: 12, weight: .medium, design: mono ? .monospaced : .default))
                 .foregroundStyle(.primary.opacity(0.85))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: valueAlignment)
+                .frame(height: enforceVerticalCentering ? centeredRowHeight : nil, alignment: .center)
         }
+        .frame(height: enforceVerticalCentering ? centeredRowHeight : nil, alignment: .center)
     }
 }
 
@@ -140,13 +147,9 @@ struct LicenseIdentityCard: View {
             // Info rows
             VStack(alignment: .leading, spacing: 7) {
                 LicenseInfoRow(label: "Email", value: nonEmpty(email) ?? "Not provided")
-                
-                if let deviceName = nonEmpty(deviceName) {
-                    LicenseInfoRow(label: "Device", value: deviceName)
-                }
 
                 if let keyHint = nonEmpty(keyHint) {
-                    LicenseInfoRow(label: "Key", value: keyHint, mono: true)
+                    LicenseInfoRow(label: "Key", value: keyHint, mono: true, enforceVerticalCentering: true)
                 }
 
                 if let verifiedAt {
@@ -214,13 +217,14 @@ struct LicenseLivePreviewCard: View {
 
             // Info rows
             VStack(alignment: .leading, spacing: 7) {
-                LicenseInfoRow(label: "Key", value: keyDisplay, mono: true)
+                LicenseInfoRow(label: "Key", value: keyDisplay, mono: true, enforceVerticalCentering: true)
 
                 if let email = nonEmpty(email) {
                     LicenseInfoRow(label: "Email", value: email)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
+            .padding(.top, nonEmpty(email) == nil ? 4 : 0)
             .animation(DroppyAnimation.smooth, value: nonEmpty(email) != nil)
         }
     }
