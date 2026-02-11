@@ -159,8 +159,11 @@ final class LicenseManager: ObservableObject {
                 return false
             }
 
-            let preflightUses = preflight.purchase?.uses
-            if preflightUses == nil || (preflightUses ?? 0) >= Self.maxDeviceActivations {
+            let isTestPurchase = preflight.isTestPurchase
+            let preflightUses = preflight.currentUsesCount
+            // Gumroad can omit `uses` on non-increment checks for some licenses.
+            // Treat nil as unknown here and enforce the seat limit after claim.
+            if !isTestPurchase, let preflightUses, preflightUses >= Self.maxDeviceActivations {
                 statusMessage = "This license is already active on another device. Deactivate it there first."
                 return false
             }
@@ -171,39 +174,41 @@ final class LicenseManager: ObservableObject {
                 return false
             }
 
-            // Step 2: Claim one seat only after preflight passes.
-            let response = try await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: true)
-            guard response.isValidPurchase else {
-                statusMessage = response.message?.nonEmpty ?? "That license key is not valid for this product."
-                return false
-            }
+            let response: GumroadVerifyResponse
+            if isTestPurchase {
+                // Avoid consuming/locking seats for Gumroad test purchases used in QA.
+                response = preflight
+            } else {
+                // Step 2: Claim one seat only after preflight passes.
+                response = try await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: true)
+                guard response.isValidPurchase else {
+                    statusMessage = response.message?.nonEmpty ?? "That license key is not valid for this product."
+                    return false
+                }
 
-            // Concurrency guard: if another activation raced us and pushed uses over
-            // the seat limit, roll back our increment.
-            let incrementedUses = response.purchase?.uses ?? (preflightUses ?? 0) + 1
-            if incrementedUses > Self.maxDeviceActivations {
-                _ = try? await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: false, decrementUsesCount: true)
-                statusMessage = "This license is already active on another device. Deactivate it there first."
-                return false
-            }
-
-            if let purchaseEmail = normalizedEmail(response.purchase?.email),
-               normalizedEmail(trimmedEmail) != purchaseEmail {
-                _ = try? await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: false, decrementUsesCount: true)
-                statusMessage = "Email does not match this Gumroad license key."
-                return false
+                // Concurrency guard: if another activation raced us and pushed uses over
+                // the seat limit, roll back our increment.
+                let incrementedUses = response.currentUsesCount ?? (preflightUses ?? 0) + 1
+                if incrementedUses > Self.maxDeviceActivations {
+                    _ = try? await verifyLicense(licenseKey: trimmedKey, incrementUsesCount: false, decrementUsesCount: true)
+                    statusMessage = "This license is already active on another device. Deactivate it there first."
+                    return false
+                }
             }
 
             let resolvedEmail = response.purchase?.email?.nonEmpty ?? preflight.purchase?.email?.nonEmpty ?? trimmedEmail
             let keyHint = Self.keyHint(for: trimmedKey)
 
             guard keychainStore.storeLicenseKey(trimmedKey) else {
-                // We already incremented uses_count above, so roll it back if local persistence fails.
-                _ = try? await verifyLicense(
-                    licenseKey: trimmedKey,
-                    incrementUsesCount: false,
-                    decrementUsesCount: true
-                )
+                // We already incremented uses_count above for real purchases, so roll
+                // it back if local persistence fails.
+                if !isTestPurchase {
+                    _ = try? await verifyLicense(
+                        licenseKey: trimmedKey,
+                        incrementUsesCount: false,
+                        decrementUsesCount: true
+                    )
+                }
                 statusMessage = "License could not be saved to Keychain."
                 return false
             }
@@ -267,8 +272,8 @@ final class LicenseManager: ObservableObject {
                 return
             }
 
-            let currentUses = response.purchase?.uses ?? 1
-            if currentUses > Self.maxDeviceActivations {
+            let currentUses = response.currentUsesCount ?? 1
+            if !response.isTestPurchase, currentUses > Self.maxDeviceActivations {
                 setActivatedState(
                     isActive: false,
                     email: "",
@@ -1067,7 +1072,16 @@ private extension LicenseManager {
     struct GumroadVerifyResponse: Decodable {
         let success: Bool
         let message: String?
+        let uses: Int?
         let purchase: Purchase?
+
+        var currentUsesCount: Int? {
+            uses ?? purchase?.uses
+        }
+
+        var isTestPurchase: Bool {
+            purchase?.test == true
+        }
 
         var isValidPurchase: Bool {
             guard success else { return false }
@@ -1085,6 +1099,7 @@ private extension LicenseManager {
         struct Purchase: Decodable {
             let email: String?
             let uses: Int?
+            let test: Bool?
             let refunded: Bool?
             let disputed: Bool?
             let chargebacked: Bool?
