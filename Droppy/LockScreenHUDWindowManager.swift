@@ -32,6 +32,8 @@ final class LockScreenHUDWindowManager {
     private var hasDelegated = false
     private var hideTask: Task<Void, Never>?
     private var configuredContentSize: NSSize = .zero
+    private var currentTargetDisplayID: CGDirectDisplayID?
+    private var screenChangeObserver: NSObjectProtocol?
     
     // MARK: - Dimensions
     /// Wing width for battery/lock HUD — must match NotchShelfView.batteryWingWidth exactly
@@ -47,7 +49,14 @@ final class LockScreenHUDWindowManager {
     }
 
     private init() {
+        setupObservers()
         print("LockScreenHUDWindowManager: 🔒 Initialized")
+    }
+
+    deinit {
+        if let observer = screenChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     // MARK: - Public API
@@ -56,9 +65,11 @@ final class LockScreenHUDWindowManager {
     /// Called by `LockScreenManager` when the screen locks.
     @discardableResult
     func showOnLockScreen() -> Bool {
-        // Get the built-in display (lock screen only appears here)
-        guard let screen = NSScreen.builtInWithNotch ?? NSScreen.main else {
-            print("LockScreenHUDWindowManager: ⚠️ No built-in screen available")
+        // Prefer the active/primary lock-screen display.
+        // This avoids using stale built-in geometry after dock/undock reconfiguration.
+        guard let screen = lockScreenTargetScreen() else {
+            currentTargetDisplayID = nil
+            print("LockScreenHUDWindowManager: ⚠️ No screen available")
             return false
         }
         
@@ -70,6 +81,8 @@ final class LockScreenHUDWindowManager {
         
         // Calculate width dynamically to match main notch
         let currentHudWidth = hudWidth(for: screen)
+        let displayChanged = currentTargetDisplayID != screen.displayID
+        currentTargetDisplayID = screen.displayID
         
         // Calculate frame with new width
         let targetFrame = calculateWindowFrame(for: screen, width: currentHudWidth)
@@ -99,6 +112,7 @@ final class LockScreenHUDWindowManager {
         // Only rebuild the SwiftUI host when needed to avoid visual resets/flicker.
         let needsContentRebuild =
             window.contentView == nil ||
+            displayChanged ||
             abs(configuredContentSize.width - targetFrame.width) > 0.5 ||
             abs(configuredContentSize.height - targetFrame.height) > 0.5
 
@@ -221,6 +235,7 @@ final class LockScreenHUDWindowManager {
         hudWindow = nil
         hasDelegated = false
         configuredContentSize = .zero
+        currentTargetDisplayID = nil
         
         print("LockScreenHUDWindowManager: ✅ Window destroyed")
     }
@@ -246,6 +261,57 @@ final class LockScreenHUDWindowManager {
         window.animationBehavior = .none
         
         return window
+    }
+
+    private func setupObservers() {
+        screenChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.handleScreenGeometryChange()
+            }
+        }
+    }
+
+    private func handleScreenGeometryChange() {
+        guard hudWindow != nil else { return }
+        guard !LockScreenManager.shared.isUnlocked else { return }
+        _ = showOnLockScreen()
+        print("LockScreenHUDWindowManager: 📐 Realigned lock HUD after screen change")
+    }
+
+    /// Resolve the display that should host lock-screen HUD visuals.
+    /// Primary display wins, then current main, then cursor display, then built-in fallback.
+    private func lockScreenTargetScreen() -> NSScreen? {
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return nil }
+
+        let primaryDisplayID = CGMainDisplayID()
+        if let primary = screens.first(where: { $0.displayID == primaryDisplayID }) {
+            return primary
+        }
+
+        if let main = NSScreen.main,
+           screens.contains(where: { $0.displayID == main.displayID }) {
+            return main
+        }
+
+        let mouseLocation = NSEvent.mouseLocation
+        if let mouseScreen = screens.first(where: { $0.frame.contains(mouseLocation) }) {
+            return mouseScreen
+        }
+
+        if let builtIn = screens.first(where: { $0.isBuiltIn }) {
+            return builtIn
+        }
+
+        return screens.first
+    }
+
+    var preferredDisplayID: CGDirectDisplayID? {
+        currentTargetDisplayID
     }
     
     /// Calculate the window frame to align with the physical notch area on the built-in display.

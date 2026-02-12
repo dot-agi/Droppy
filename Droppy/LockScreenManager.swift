@@ -145,7 +145,7 @@ class LockScreenManager: ObservableObject {
                 }
 
                 // Gate all other HUDs during lock transition to guarantee no overlap.
-                HUDManager.shared.show(.lockScreen, on: NSScreen.builtInWithNotch?.displayID, duration: 3600)
+                HUDManager.shared.show(.lockScreen, on: self.preferredLockHUDDisplayID(), duration: 3600)
 
                 // Keep a single lock HUD animation timeline across lock/unlock events.
                 LockScreenHUDAnimator.shared.transition(to: .locked)
@@ -164,7 +164,7 @@ class LockScreenManager: ObservableObject {
                 withAnimation(DroppyAnimation.notchState) {
                     self.isDedicatedHUDActive = LockScreenHUDWindowManager.shared.showOnLockScreen()
                 }
-                HUDManager.shared.show(.lockScreen, on: NSScreen.builtInWithNotch?.displayID, duration: 3600)
+                HUDManager.shared.show(.lockScreen, on: self.preferredLockHUDDisplayID(), duration: 3600)
             }
         }
     }
@@ -182,7 +182,7 @@ class LockScreenManager: ObservableObject {
 
                 // Continue on the same shared animation timeline (no handoff to main notch HUD).
                 LockScreenHUDAnimator.shared.transition(to: .unlocked)
-                HUDManager.shared.show(.lockScreen, on: NSScreen.builtInWithNotch?.displayID, duration: 2.0)
+                HUDManager.shared.show(.lockScreen, on: self.preferredLockHUDDisplayID(), duration: 2.0)
 
                 // Play subtle unlock sound
                 self.playUnlockSound()
@@ -216,6 +216,12 @@ class LockScreenManager: ObservableObject {
             sound.volume = 0.4
             sound.play()
         }
+    }
+
+    private func preferredLockHUDDisplayID() -> CGDirectDisplayID? {
+        LockScreenHUDWindowManager.shared.preferredDisplayID
+            ?? NSScreen.main?.displayID
+            ?? NSScreen.screens.first?.displayID
     }
     
     deinit {

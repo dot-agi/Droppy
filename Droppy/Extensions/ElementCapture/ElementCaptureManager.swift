@@ -223,6 +223,7 @@ final class ElementCaptureManager: ObservableObject {
     private var captureCursorPushed = false
     private var activeMode: ElementCaptureMode = .element  // Current capture mode
     private var isOCRCapture = false  // Flag for OCR mode capture
+    private var screenParametersObserver: NSObjectProtocol?
     
     // MARK: - Configuration
     
@@ -235,7 +236,21 @@ final class ElementCaptureManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        // Empty - shortcuts loaded via loadAndStartMonitoring after app launch
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.handleScreenParametersChanged()
+            }
+        }
+    }
+
+    deinit {
+        if let observer = screenParametersObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     /// Called from AppDelegate after app finishes launching
@@ -1250,8 +1265,8 @@ final class ElementCaptureManager: ObservableObject {
         }
 
         do {
-            // Capture the exact selected display surface in that screen's local coordinate space.
-            let image = try await captureRect(screen.frame, on: screen)
+            // Capture full display directly to avoid coordinate transform drift on mixed-DPI docked setups.
+            let image = try await captureFullDisplay(on: screen)
             let nsImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
 
             copyToClipboard(image)
@@ -1341,6 +1356,15 @@ final class ElementCaptureManager: ObservableObject {
         let clampedCocoaRect = requestedRect.intersection(screen.frame)
         guard clampedCocoaRect.width >= 1, clampedCocoaRect.height >= 1 else {
             throw CaptureError.noElement
+        }
+
+        // Full-screen requests are captured via a dedicated path to avoid mixed-resolution
+        // conversion edge cases during dock/undock transitions.
+        if abs(clampedCocoaRect.origin.x - screen.frame.origin.x) < 0.5 &&
+            abs(clampedCocoaRect.origin.y - screen.frame.origin.y) < 0.5 &&
+            abs(clampedCocoaRect.width - screen.frame.width) < 0.5 &&
+            abs(clampedCocoaRect.height - screen.frame.height) < 0.5 {
+            return try await captureFullDisplay(on: screen)
         }
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -1436,6 +1460,83 @@ final class ElementCaptureManager: ObservableObject {
         
         print("[ElementCapture] Capture(local): displayID=\(targetDisplayID), screen=\(screen.frame), displayBounds=\(displayBounds), requested=\(requestedRect), clamped=\(clampedCocoaRect), source=\(sourceRect), outputScale=\(String(format: "%.2f", outputScaleX))x\(String(format: "%.2f", outputScaleY)), output=\(config.width)x\(config.height)")
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+    }
+
+    /// Capture the full selected display directly in ScreenCaptureKit display space.
+    /// This avoids Cocoa<->display coordinate conversion errors on mixed-DPI setups.
+    private func captureFullDisplay(on screen: NSScreen) async throws -> CGImage {
+        guard CGPreflightScreenCaptureAccess() else {
+            print("[ElementCapture] Screen recording permission not granted - aborting capture")
+            CGRequestScreenCaptureAccess()
+            throw CaptureError.permissionDenied
+        }
+
+        guard let targetDisplayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+            throw CaptureError.noDisplay
+        }
+
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let display = content.displays.first(where: { $0.displayID == targetDisplayID }) else {
+            print("[ElementCapture] No display found for ID: \(targetDisplayID)")
+            throw CaptureError.noDisplay
+        }
+
+        let displayBounds = CGRect(
+            x: 0,
+            y: 0,
+            width: max(CGFloat(display.width), 1),
+            height: max(CGFloat(display.height), 1)
+        )
+        guard displayBounds.width >= 1, displayBounds.height >= 1 else {
+            throw CaptureError.noElement
+        }
+
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let windowsToExclude = content.windows.filter { window in
+            window.owningApplication?.processID == ownPID
+        }
+        let filter = SCContentFilter(display: display, excludingWindows: windowsToExclude)
+        let config = SCStreamConfiguration()
+        config.sourceRect = displayBounds
+        config.width = max(max(Int(CGDisplayPixelsWide(targetDisplayID)), Int(displayBounds.width.rounded(.up))), 1)
+        config.height = max(max(Int(CGDisplayPixelsHigh(targetDisplayID)), Int(displayBounds.height.rounded(.up))), 1)
+        config.scalesToFit = false
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.showsCursor = false
+        if #available(macOS 14.0, *) {
+            config.captureResolution = .best
+        }
+
+        print("[ElementCapture] Capture(full display): displayID=\(targetDisplayID), displayBounds=\(displayBounds), output=\(config.width)x\(config.height)")
+        return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+    }
+
+    private func handleScreenParametersChanged() {
+        guard isActive else { return }
+
+        let mouseLocation = NSEvent.mouseLocation
+        guard let activeScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main else {
+            return
+        }
+
+        if let displayID = activeScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
+            currentScreenDisplayID = displayID
+        }
+
+        // Refresh overlays to the currently active display geometry after dock/undock.
+        if activeMode == .element {
+            lastDetectedFrame = .zero
+            currentElementFrame = .zero
+            hasElement = false
+            highlightWindow?.resetHighlight()
+            highlightWindow?.setFrame(activeScreen.frame, display: true, animate: false)
+            highlightWindow?.orderFrontRegardless()
+        } else if activeMode == .area || activeMode == .ocr {
+            areaSelectionWindow?.setFrame(activeScreen.frame, display: true, animate: false)
+            areaSelectionWindow?.orderFrontRegardless()
+        }
+
+        print("[ElementCapture] Screen parameters changed; resynced capture surfaces")
     }
     
     private func copyToClipboard(_ image: CGImage) {
