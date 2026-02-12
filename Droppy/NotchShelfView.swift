@@ -569,7 +569,11 @@ struct NotchShelfView: View {
     }
 
     private var expandedSurfaceToggleTopPadding: CGFloat {
-        contentLayoutNotchHeight > 0 ? 6 : 8
+        let menuBarHeight: CGFloat = {
+            guard let screen = targetScreen ?? NSScreen.main else { return 24 }
+            return max(24, screen.frame.maxY - screen.visibleFrame.maxY)
+        }()
+        return max(expandedSurfaceToggleInsets.top + 6, menuBarHeight + 8)
     }
 
     private func switchExpandedSurface(to mode: ExpandedSurfaceToggleMode) {
@@ -590,31 +594,32 @@ struct NotchShelfView: View {
     }
 
     @ViewBuilder
-    private func expandedSurfaceToggleButton(for mode: ExpandedSurfaceToggleMode) -> some View {
-        let title = mode == .showMedia ? "Media" : "Shelf"
-        let helpText = mode == .showMedia ? "Show media player" : "Show shelf"
-
-        Button {
-            switchExpandedSurface(to: mode)
-        } label: {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(
-                shouldUseExternalNotchTransparent
-                    ? AdaptiveColors.secondaryTextAuto.opacity(0.9)
-                    : .white.opacity(0.74)
-            )
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(
-                        shouldUseExternalNotchTransparent
-                            ? AdaptiveColors.overlayAuto(0.08)
-                            : Color.white.opacity(0.08)
-                    )
-            )
-            .contentShape(Capsule())
+    private func expandedSurfaceToggleButton(
+        icon: String,
+        isSelected: Bool,
+        helpText: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(
+                    shouldUseExternalNotchTransparent
+                        ? AdaptiveColors.primaryTextAuto.opacity(isSelected ? 0.96 : 0.72)
+                        : .white.opacity(isSelected ? 0.95 : 0.72)
+                )
+                .frame(width: isSelected ? 76 : 36, height: 38)
+                .background {
+                    if isSelected {
+                        Capsule()
+                            .fill(
+                                shouldUseExternalNotchTransparent
+                                    ? AdaptiveColors.overlayAuto(0.12)
+                                    : Color.white.opacity(0.08)
+                            )
+                    }
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help(helpText)
@@ -623,9 +628,30 @@ struct NotchShelfView: View {
 
     @ViewBuilder
     private func expandedSurfaceToggleOverlay(for mode: ExpandedSurfaceToggleMode) -> some View {
+        let isMediaSelected = mode == .showShelf
+
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                expandedSurfaceToggleButton(for: mode)
+            HStack(spacing: 14) {
+                expandedSurfaceToggleButton(
+                    icon: "music.note",
+                    isSelected: isMediaSelected,
+                    helpText: "Show media player",
+                    action: {
+                        guard !isMediaSelected else { return }
+                        switchExpandedSurface(to: .showMedia)
+                    }
+                )
+
+                expandedSurfaceToggleButton(
+                    icon: "tray.fill",
+                    isSelected: !isMediaSelected,
+                    helpText: "Show shelf",
+                    action: {
+                        guard isMediaSelected else { return }
+                        switchExpandedSurface(to: .showShelf)
+                    }
+                )
+
                 Spacer(minLength: 0)
             }
             Spacer(minLength: 0)
@@ -635,6 +661,14 @@ struct NotchShelfView: View {
         .padding(.leading, expandedSurfaceToggleInsets.leading)
         .padding(.trailing, expandedSurfaceToggleInsets.trailing)
         .padding(.bottom, expandedSurfaceToggleInsets.bottom)
+        .onHover { isHovering in
+            isHoveringExpandedContent = isHovering
+            if isHovering {
+                cancelAutoShrinkTimer()
+            } else {
+                startAutoShrinkTimer()
+            }
+        }
         .zIndex(40)
         .transition(displayButtonTransition)
     }
