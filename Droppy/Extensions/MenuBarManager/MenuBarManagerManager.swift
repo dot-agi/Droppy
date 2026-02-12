@@ -202,6 +202,33 @@ final class ControlItem {
     
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
+
+    /// Reused context menu to avoid recreating menu/window objects on every right click.
+    private lazy var contextMenu: NSMenu = {
+        let menu = NSMenu(title: "Menu Bar Manager")
+
+        let settingsItem = NSMenuItem(
+            title: "Menu Bar Manager Settings…",
+            action: #selector(openSettings),
+            keyEquivalent: ""
+        )
+        settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
+
+        let disableItem = NSMenuItem(
+            title: "Disable Menu Bar Manager",
+            action: #selector(disableExtension),
+            keyEquivalent: ""
+        )
+        disableItem.target = self
+        disableItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Disable")
+        menu.addItem(disableItem)
+
+        return menu
+    }()
     
     /// The menu bar section associated with the control item.
     private var section: MenuBarSection? {
@@ -341,7 +368,8 @@ final class ControlItem {
         }
         button.target = self
         button.action = #selector(performAction)
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // Show context menu on right-down to avoid accidental activation of the first menu item.
+        button.sendAction(on: [.leftMouseUp, .rightMouseDown])
     }
     
     /// Updates the appearance of the status item using the given hiding state.
@@ -472,7 +500,7 @@ final class ControlItem {
                 // Normal toggle behavior when hover is disabled
                 section?.toggle()
             }
-        case .rightMouseUp:
+        case .rightMouseDown:
             showContextMenu()
         default:
             break
@@ -481,31 +509,13 @@ final class ControlItem {
     
     /// Shows a context menu for the control item.
     private func showContextMenu() {
-        let menu = NSMenu(title: "Menu Bar Manager")
-        
-        let settingsItem = NSMenuItem(
-            title: "Menu Bar Manager Settings…",
-            action: #selector(openSettings),
-            keyEquivalent: ""
-        )
-        settingsItem.target = self
-        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
-        menu.addItem(settingsItem)
-        
-        menu.addItem(.separator())
-        
-        let disableItem = NSMenuItem(
-            title: "Disable Menu Bar Manager",
-            action: #selector(disableExtension),
-            keyEquivalent: ""
-        )
-        disableItem.target = self
-        disableItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Disable")
-        menu.addItem(disableItem)
-        
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+        guard let button = statusItem.button else { return }
+
+        if let event = NSApp.currentEvent {
+            NSMenu.popUpContextMenu(contextMenu, with: event, for: button)
+        } else {
+            contextMenu.popUp(positioning: nil, at: NSPoint(x: button.bounds.midX, y: button.bounds.maxY), in: button)
+        }
     }
     
     @objc private func openSettings() {
