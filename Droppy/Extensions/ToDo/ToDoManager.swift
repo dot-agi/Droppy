@@ -899,13 +899,8 @@ final class ToDoManager {
                 saveSelectedReminderListIDs()
             } else {
                 let prunedSelection = selectedReminderListIDs.intersection(availableIDs)
-                // If stored selection becomes empty, recover to "all lists" to avoid
-                // a confusing blank reminders timeline.
-                let recoveredSelection = prunedSelection.isEmpty && !availableIDs.isEmpty
-                    ? availableIDs
-                    : prunedSelection
-                if recoveredSelection != selectedReminderListIDs {
-                    selectedReminderListIDs = recoveredSelection
+                if prunedSelection != selectedReminderListIDs {
+                    selectedReminderListIDs = prunedSelection
                     saveSelectedReminderListIDs()
                 }
             }
@@ -918,19 +913,7 @@ final class ToDoManager {
         guard !allCalendars.isEmpty else { return [] }
 
         let selectedIDs = selectedReminderListIDs
-        let selectedCalendars: [EKCalendar]
-        if selectedIDs.isEmpty {
-            selectedCalendars = allCalendars
-            await MainActor.run { [allCalendars] in
-                let allIDs = Set(allCalendars.map(\.calendarIdentifier))
-                if selectedReminderListIDs != allIDs {
-                    selectedReminderListIDs = allIDs
-                    saveSelectedReminderListIDs()
-                }
-            }
-        } else {
-            selectedCalendars = allCalendars.filter { selectedIDs.contains($0.calendarIdentifier) }
-        }
+        let selectedCalendars = allCalendars.filter { selectedIDs.contains($0.calendarIdentifier) }
         guard !selectedCalendars.isEmpty else { return [] }
 
         let predicate = readStore.predicateForReminders(in: selectedCalendars)
