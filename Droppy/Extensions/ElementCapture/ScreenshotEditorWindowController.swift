@@ -122,6 +122,23 @@ final class ScreenshotEditorWindowController {
     private func copyImageToPasteboard(_ image: NSImage) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
+
+        // Prefer the image's existing representation to avoid rep re-resolution drift.
+        if let tiffData = image.tiffRepresentation,
+           let bitmapRep = NSBitmapImageRep(data: tiffData) {
+            pasteboard.declareTypes([.png, .tiff], owner: nil)
+            var wroteData = false
+            
+            if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+                wroteData = pasteboard.setData(pngData, forType: .png) || wroteData
+            }
+            
+            wroteData = pasteboard.setData(tiffData, forType: .tiff) || wroteData
+            
+            if wroteData {
+                return
+            }
+        }
         
         if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
