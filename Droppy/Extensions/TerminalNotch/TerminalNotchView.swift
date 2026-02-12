@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 /// Quick command terminal view that appears in the notch area
 struct TerminalNotchView: View {
@@ -90,10 +91,23 @@ struct TerminalNotchView: View {
         // which already has its own black background
         .onAppear {
             isInputFocused = true
+            DispatchQueue.main.async {
+                isInputFocused = true
+            }
         }
         .onChange(of: manager.isVisible) { _, isVisible in
             if isVisible {
                 // Focus the text field when terminal becomes visible
+                isInputFocused = true
+                DispatchQueue.main.async {
+                    isInputFocused = true
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard manager.isVisible else { return }
+            isInputFocused = true
+            DispatchQueue.main.async {
                 isInputFocused = true
             }
         }

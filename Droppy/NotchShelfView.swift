@@ -48,7 +48,6 @@ struct NotchShelfView: View {
     @AppStorage(AppPreferenceKey.autoCollapseShelf) private var autoCollapseShelf = PreferenceDefault.autoCollapseShelf
     @AppStorage(AppPreferenceKey.autoExpandDelay) private var autoExpandDelay = PreferenceDefault.autoExpandDelay
     @AppStorage(AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) private var autoOpenMediaHUDOnShelfExpand = PreferenceDefault.autoOpenMediaHUDOnShelfExpand
-    @AppStorage(AppPreferenceKey.showMediaShelfSwitchBadge) private var showMediaShelfSwitchBadge = PreferenceDefault.showMediaShelfSwitchBadge
     @AppStorage(AppPreferenceKey.showClipboardButton) private var showClipboardButton = PreferenceDefault.showClipboardButton
     @AppStorage(AppPreferenceKey.showDropIndicator) private var showDropIndicator = PreferenceDefault.showDropIndicator  // Legacy, not migrated
     @AppStorage(AppPreferenceKey.useDynamicIslandStyle) private var useDynamicIslandStyle = PreferenceDefault.useDynamicIslandStyle
@@ -542,138 +541,6 @@ struct NotchShelfView: View {
         !isMediaPlayerVisibleInShelf
     }
 
-    private enum ExpandedSurfaceToggleMode {
-        case showShelf
-        case showMedia
-    }
-
-    private var expandedSurfaceToggleMode: ExpandedSurfaceToggleMode? {
-        guard showMediaShelfSwitchBadge else { return nil }
-        guard showMediaPlayer else { return nil }
-        guard musicManager.isMediaAvailable, !musicManager.isPlayerIdle else { return nil }
-        guard !dragMonitor.isDragging, !state.isDropTargeted else { return nil }
-        guard !isTerminalViewVisible, !isCaffeineViewVisible, !isCameraViewVisible else { return nil }
-
-        if isMediaPlayerVisibleInShelf {
-            return .showShelf
-        }
-
-        guard !shouldLockMediaForTodo else { return nil }
-        return .showMedia
-    }
-
-    private var expandedSurfaceToggleInsets: EdgeInsets {
-        NotchLayoutConstants.contentEdgeInsets(
-            notchHeight: contentLayoutNotchHeight,
-            isExternalWithNotchStyle: isExternalDisplay && !externalDisplayUseDynamicIsland
-        )
-    }
-
-    private var expandedSurfaceToggleTopPadding: CGFloat {
-        let menuBarHeight: CGFloat = {
-            guard let screen = targetScreen ?? NSScreen.main else { return 24 }
-            return max(24, screen.frame.maxY - screen.visibleFrame.maxY)
-        }()
-        return max(expandedSurfaceToggleInsets.top + 6, menuBarHeight + 8)
-    }
-
-    private func switchExpandedSurface(to mode: ExpandedSurfaceToggleMode) {
-        HapticFeedback.tap()
-        withAnimation(displayUnifiedOpenCloseAnimation) {
-            switch mode {
-            case .showShelf:
-                musicManager.isMediaHUDForced = false
-                musicManager.isMediaHUDHidden = true
-            case .showMedia:
-                musicManager.isMediaHUDForced = true
-                musicManager.isMediaHUDHidden = false
-                isTodoListExpanded = false
-                todoManager.isShelfListExpanded = false
-            }
-        }
-        notchController.recalculateAllWindowSizesCoalesced()
-    }
-
-    @ViewBuilder
-    private func expandedSurfaceToggleButton(
-        icon: String,
-        isSelected: Bool,
-        helpText: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(
-                    shouldUseExternalNotchTransparent
-                        ? AdaptiveColors.primaryTextAuto.opacity(isSelected ? 0.96 : 0.72)
-                        : .white.opacity(isSelected ? 0.95 : 0.72)
-                )
-                .frame(width: isSelected ? 76 : 36, height: 38)
-                .background {
-                    if isSelected {
-                        Capsule()
-                            .fill(
-                                shouldUseExternalNotchTransparent
-                                    ? AdaptiveColors.overlayAuto(0.12)
-                                    : Color.white.opacity(0.08)
-                            )
-                    }
-                }
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(helpText)
-        .accessibilityLabel(helpText)
-    }
-
-    @ViewBuilder
-    private func expandedSurfaceToggleOverlay(for mode: ExpandedSurfaceToggleMode) -> some View {
-        let isMediaSelected = mode == .showShelf
-
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                expandedSurfaceToggleButton(
-                    icon: "house.fill",
-                    isSelected: isMediaSelected,
-                    helpText: "Show media player",
-                    action: {
-                        guard !isMediaSelected else { return }
-                        switchExpandedSurface(to: .showMedia)
-                    }
-                )
-
-                expandedSurfaceToggleButton(
-                    icon: "tray.fill",
-                    isSelected: !isMediaSelected,
-                    helpText: "Show shelf",
-                    action: {
-                        guard isMediaSelected else { return }
-                        switchExpandedSurface(to: .showShelf)
-                    }
-                )
-
-                Spacer(minLength: 0)
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.top, expandedSurfaceToggleTopPadding)
-        .padding(.leading, expandedSurfaceToggleInsets.leading)
-        .padding(.trailing, expandedSurfaceToggleInsets.trailing)
-        .padding(.bottom, expandedSurfaceToggleInsets.bottom)
-        .onHover { isHovering in
-            isHoveringExpandedContent = isHovering
-            if isHovering {
-                cancelAutoShrinkTimer()
-            } else {
-                startAutoShrinkTimer()
-            }
-        }
-        .zIndex(40)
-        .transition(displayButtonTransition)
-    }
-    
     /// Current expanded width based on what's shown
     /// Apple Music gets extra width for shuffle, repeat, and love controls
     private var expandedWidth: CGFloat {
@@ -1959,9 +1826,7 @@ struct NotchShelfView: View {
                 .zIndex(12)  // Above visualizer for visibility
                 .allowsHitTesting(isExpandedOnThisScreen)  // FIX #126: Pass through hover when collapsed
 
-            if isExpandedOnThisScreen && enableNotchShelf, let toggleMode = expandedSurfaceToggleMode {
-                expandedSurfaceToggleOverlay(for: toggleMode)
-            }
+            // Toggle buttons removed per UX request.
         }
         .opacity(notchController.isTemporarilyHidden ? 0 : 1)
         .frame(width: currentNotchWidth, height: currentNotchHeight, alignment: .top)

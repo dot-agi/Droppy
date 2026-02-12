@@ -291,6 +291,13 @@ class NotchDragContainer: NSView {
             super.mouseDown(with: event)
             return
         }
+
+        // When expanded, never steal clicks in the notch strip.
+        // Let SwiftUI controls (media/buttons/toggles) handle interaction directly.
+        guard !isExpandedOnTargetDisplay() else {
+            super.mouseDown(with: event)
+            return
+        }
         
         // Only handle clicks when user is already hovering (intentional interaction)
         // This ensures we don't block clicks that should pass through to other apps

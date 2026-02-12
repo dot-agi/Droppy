@@ -3005,8 +3005,6 @@ class NotchWindow: NSPanel {
         let isExpanded = state.isExpanded(for: displayID)
         let isDropTargeted = state.isDropTargeted && (state.dropTargetDisplayID == nil || state.dropTargetDisplayID == displayID)
         let isDraggingFiles = DragMonitor.shared.isDragging
-        let isTodoSplitExpanded = ToDoManager.shared.isShelfListExpanded &&
-            ToDoManager.shared.isShelfSplitViewEnabled
         let mouseLocation = NSEvent.mouseLocation
         let resolvedScreen = notchScreen ?? NSScreen.screens.first(where: { $0.displayID == displayID })
 
@@ -3014,20 +3012,6 @@ class NotchWindow: NSPanel {
         if isExpanded, let screen = resolvedScreen {
             let expandedZone = NotchWindowController.shared.expandedShelfInteractionZone(for: screen)
             isMouseInExpandedShelfZone = expandedZone.contains(mouseLocation)
-
-            // Keep menu bar items clickable while shelf is expanded.
-            // But in ToDo split mode we intentionally lift/click top controls near the menu-bar strip,
-            // so do NOT apply notch-only gating there or those controls become unclickable.
-            if isMouseInExpandedShelfZone && !isTodoSplitExpanded {
-                let menuBarHeight = max(24, screen.frame.maxY - screen.visibleFrame.maxY)
-                let isInMenuBarStrip = mouseLocation.y >= (screen.frame.maxY - menuBarHeight)
-                if isInMenuBarStrip {
-                    let notchHitZone = getNotchRect().insetBy(dx: -8, dy: -2)
-                    if !notchHitZone.contains(mouseLocation) {
-                        isMouseInExpandedShelfZone = false
-                    }
-                }
-            }
         }
         
         // CRITICAL FIX (v7.0.2): When dragging, only accept events if drag is OVER the valid drop zone!
