@@ -1302,6 +1302,13 @@ final class MusicManager: ObservableObject {
             if nextBundle == AppleMusicController.appleMusicBundleId {
                 AppleMusicController.shared.onTrackChange()
             }
+            if nextBundle == TidalController.tidalBundleId {
+                let title = incomingTitle ?? ""
+                let artist = incomingArtist ?? ""
+                if !title.isEmpty {
+                    TidalController.shared.onTrackChange(title: title, artist: artist)
+                }
+            }
             let timingIncomplete = (payload.elapsedTimeNow == nil && payload.elapsedTime == nil) || ((payload.duration ?? 0) <= 0)
             if timingIncomplete || staleEndSnapshot {
                 requestTimingResyncIfNeeded(reason: "track_change_seed", force: true)

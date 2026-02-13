@@ -32,8 +32,39 @@ final class TidalController {
     /// Whether user has authenticated with Tidal API
     private(set) var isAuthenticated: Bool = false
 
-    /// Current track identifier from Tidal (used for like/unlike)
+    /// Current track identifier from Tidal (used for like/unlike and premium features)
     private(set) var currentTrackId: String?
+
+    // MARK: - Premium Feature State
+
+    /// Audio quality label for the current track (e.g. "HiFi", "HiRes", "Atmos")
+    private(set) var currentTrackQuality: String?
+
+    /// Credits for the current track (producers, songwriters, engineers)
+    private(set) var currentTrackCredits: [(name: String, role: String)]?
+
+    /// Whether the credits overlay is showing
+    var showingCredits: Bool = false
+
+    /// Parsed synced lyrics for the current track
+    private(set) var lyricsLines: [(time: TimeInterval, text: String)]?
+
+    /// The current lyric line matching playback position
+    private(set) var currentLyricLine: String?
+
+    /// Whether lyrics display is enabled
+    var showingLyrics: Bool = false
+
+    /// User's playlists (fetched on auth)
+    private(set) var userPlaylists: [(id: String, name: String, count: Int)]?
+
+    // MARK: - Track ID Resolution Cache
+
+    /// Cache search results to avoid repeated API calls for the same track
+    private var trackIdCache: [String: String] = [:]
+
+    /// The title+artist key for the currently resolved track
+    private var lastResolvedKey: String?
 
     /// Tidal bundle identifier
     static let tidalBundleId = "com.tidal.desktop"
@@ -100,18 +131,139 @@ final class TidalController {
         fetchShuffleState()
         fetchRepeatState()
 
-        // If authenticated, check liked status
-        if isAuthenticated, let trackId = currentTrackId {
-            checkIfTrackIsLiked(trackId: trackId)
+        // Resolve current track ID if not yet resolved
+        let manager = MusicManager.shared
+        if currentTrackId == nil, !manager.songTitle.isEmpty {
+            onTrackChange(title: manager.songTitle, artist: manager.artistName)
+        }
+
+        // If authenticated, check liked status and fetch playlists
+        if isAuthenticated {
+            if let trackId = currentTrackId {
+                checkIfTrackIsLiked(trackId: trackId)
+            }
+            if userPlaylists == nil {
+                fetchPlaylists()
+            }
         }
     }
 
-    /// Called when track changes - update liked status
-    func onTrackChange() {
-        if isAuthenticated, let trackId = currentTrackId {
+    /// Called when track changes - resolve track ID and update all metadata
+    func onTrackChange(title: String, artist: String) {
+        let key = "\(title)|\(artist)".lowercased()
+
+        // Skip if same track
+        guard key != lastResolvedKey else { return }
+
+        // Clear previous track's premium data
+        currentTrackQuality = nil
+        currentTrackCredits = nil
+        currentLyricLine = nil
+        lyricsLines = nil
+        showingCredits = false
+
+        // Check cache first
+        if let cachedId = trackIdCache[key] {
+            lastResolvedKey = key
+            currentTrackId = cachedId
+            onTrackIdResolved(trackId: cachedId)
+            return
+        }
+
+        // Resolve via search API
+        TidalAuthManager.shared.searchTrack(title: title, artist: artist) { [weak self] trackId in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.lastResolvedKey = key
+                if let trackId = trackId {
+                    self.trackIdCache[key] = trackId
+                    self.currentTrackId = trackId
+                    self.onTrackIdResolved(trackId: trackId)
+                } else {
+                    self.currentTrackId = nil
+                    self.isCurrentTrackLiked = false
+                }
+            }
+        }
+    }
+
+    /// Once we have a track ID, fetch all premium metadata
+    private func onTrackIdResolved(trackId: String) {
+        // Check liked status
+        if isAuthenticated {
             checkIfTrackIsLiked(trackId: trackId)
-        } else {
-            isCurrentTrackLiked = false
+        }
+
+        // Fetch quality badge
+        TidalAuthManager.shared.fetchTrackQuality(trackId: trackId) { [weak self] quality in
+            DispatchQueue.main.async {
+                self?.currentTrackQuality = quality
+            }
+        }
+
+        // Fetch credits
+        TidalAuthManager.shared.fetchTrackCredits(trackId: trackId) { [weak self] credits in
+            DispatchQueue.main.async {
+                self?.currentTrackCredits = credits
+            }
+        }
+
+        // Fetch lyrics
+        TidalAuthManager.shared.fetchLyrics(trackId: trackId) { [weak self] lrcText, _ in
+            DispatchQueue.main.async {
+                if let lrcText = lrcText {
+                    self?.lyricsLines = TidalLyricsParser.parse(lrcText)
+                } else {
+                    self?.lyricsLines = nil
+                }
+            }
+        }
+    }
+
+    /// Update the current lyric line based on playback position
+    func updateCurrentLyric(at elapsed: TimeInterval) {
+        guard showingLyrics, let lines = lyricsLines, !lines.isEmpty else {
+            if currentLyricLine != nil { currentLyricLine = nil }
+            return
+        }
+
+        // Find the last line whose timestamp <= elapsed
+        var matchedLine: String?
+        for line in lines {
+            if line.time <= elapsed {
+                matchedLine = line.text
+            } else {
+                break
+            }
+        }
+
+        if matchedLine != currentLyricLine {
+            currentLyricLine = matchedLine
+        }
+    }
+
+    // MARK: - Playlists
+
+    /// Fetch user's playlists
+    func fetchPlaylists() {
+        TidalAuthManager.shared.fetchUserPlaylists { [weak self] playlists in
+            DispatchQueue.main.async {
+                self?.userPlaylists = playlists
+            }
+        }
+    }
+
+    /// Add current track to a playlist
+    func addToPlaylist(playlistId: String, completion: @escaping (Bool) -> Void) {
+        guard let trackId = currentTrackId else {
+            completion(false)
+            return
+        }
+
+        TidalAuthManager.shared.addTrackToPlaylist(trackId: trackId, playlistId: playlistId) { success in
+            DispatchQueue.main.async {
+                completion(success)
+            }
         }
     }
 
@@ -318,14 +470,34 @@ final class TidalController {
         TidalAuthManager.shared.signOut()
         isAuthenticated = false
         isCurrentTrackLiked = false
+        currentTrackId = nil
+        currentTrackQuality = nil
+        currentTrackCredits = nil
+        lyricsLines = nil
+        currentLyricLine = nil
+        userPlaylists = nil
+        trackIdCache.removeAll()
+        lastResolvedKey = nil
     }
 
     /// Update authentication state (called from TidalAuthManager after token changes)
     func updateAuthState() {
         isAuthenticated = TidalAuthManager.shared.isAuthenticated
 
-        if isAuthenticated, let trackId = currentTrackId {
-            checkIfTrackIsLiked(trackId: trackId)
+        if isAuthenticated {
+            if let trackId = currentTrackId {
+                checkIfTrackIsLiked(trackId: trackId)
+            }
+            fetchPlaylists()
+
+            // Re-trigger track resolution for the currently playing track
+            // This handles the case where auth completes while a song is already playing
+            let manager = MusicManager.shared
+            if manager.isTidalSource, !manager.songTitle.isEmpty {
+                lastResolvedKey = nil  // Force re-resolution
+                trackIdCache.removeAll()
+                onTrackChange(title: manager.songTitle, artist: manager.artistName)
+            }
         }
     }
 }

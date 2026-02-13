@@ -269,6 +269,7 @@ struct ExtensionsShopView: View {
                         iconURL: ext.iconURL,
                         iconPlaceholder: ext.iconPlaceholder,
                         iconPlaceholderColor: ext.iconPlaceholderColor,
+                        localIconAsset: ext.localIconAsset,
                         title: ext.title,
                         subtitle: ext.subtitle,
                         isInstalled: ext.isInstalled,
@@ -445,19 +446,26 @@ struct ExtensionsShopView: View {
             },
             ExtensionListItem(
                 id: "tidal",
-                iconURL: "https://getdroppy.app/assets/icons/tidal.png",
+                localIconAsset: "TidalIcon",
                 title: "Tidal",
                 subtitle: "Control playback from your notch",
                 category: .media,
                 isInstalled: isTidalInstalled,
                 analyticsKey: "tidal",
-                extensionType: .tidal
+                extensionType: .tidal,
+                isCommunity: true
             ) {
                 AnyView(ExtensionInfoView(
                     extensionType: .tidal,
                     onAction: {
-                        if let url = URL(string: "tidal://") {
-                            NSWorkspace.shared.open(url)
+                        if TidalAuthManager.shared.isAuthenticated {
+                            // Already authenticated — just open Tidal
+                            if let url = URL(string: "tidal://") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } else {
+                            // Start OAuth flow
+                            TidalAuthManager.shared.startAuthentication()
                         }
                         TidalController.shared.refreshState()
                     },
@@ -612,6 +620,7 @@ private struct ExtensionListItem: Identifiable {
     let iconURL: String?
     let iconPlaceholder: String?
     let iconPlaceholderColor: Color?
+    let localIconAsset: String?
     let title: String
     let subtitle: String
     let category: ExtensionCategory
@@ -626,6 +635,7 @@ private struct ExtensionListItem: Identifiable {
         iconURL: String? = nil,
         iconPlaceholder: String? = nil,
         iconPlaceholderColor: Color? = nil,
+        localIconAsset: String? = nil,
         title: String,
         subtitle: String,
         category: ExtensionCategory,
@@ -639,6 +649,7 @@ private struct ExtensionListItem: Identifiable {
         self.iconURL = iconURL
         self.iconPlaceholder = iconPlaceholder
         self.iconPlaceholderColor = iconPlaceholderColor
+        self.localIconAsset = localIconAsset
         self.title = title
         self.subtitle = subtitle
         self.category = category
@@ -1166,6 +1177,7 @@ struct CompactExtensionRow<DetailView: View>: View {
     let iconURL: String?
     var iconPlaceholder: String? = nil
     var iconPlaceholderColor: Color? = nil
+    var localIconAsset: String? = nil
     let title: String
     let subtitle: String
     let isInstalled: Bool
@@ -1182,7 +1194,14 @@ struct CompactExtensionRow<DetailView: View>: View {
         } label: {
             HStack(spacing: 12) {
                 // Icon
-                if let urlString = iconURL, let url = URL(string: urlString) {
+                if let assetName = localIconAsset {
+                    Image(assetName)
+                        .resizable()
+                        .renderingMode(.original)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous))
+                } else if let urlString = iconURL, let url = URL(string: urlString) {
                     CachedAsyncImage(url: url) { image in
                         image.droppyExtensionIcon(contentMode: .fit)
                     } placeholder: {

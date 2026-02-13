@@ -114,19 +114,43 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     var previewView: AnyView? {
         definition?.previewView
     }
-    
+
+    /// Whether this is a community-contributed extension
+    var isCommunity: Bool {
+        definition?.isCommunity ?? false
+    }
+
+    /// Creator name for community extensions
+    var creatorName: String? {
+        definition?.creatorName
+    }
+
+    /// Creator profile URL for community extensions
+    var creatorURL: URL? {
+        definition?.creatorURL
+    }
+
     @ViewBuilder
     var iconView: some View {
         if let def = definition {
-            CachedAsyncImage(url: def.iconURL) { image in
-                image.droppyExtensionIcon(contentMode: .fill)
-            } placeholder: {
-                Image(systemName: def.iconPlaceholder)
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundStyle(def.iconPlaceholderColor)
+            if let assetName = def.localIconAsset {
+                Image(assetName)
+                    .resizable()
+                    .renderingMode(.original)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous))
+            } else {
+                CachedAsyncImage(url: def.iconURL) { image in
+                    image.droppyExtensionIcon(contentMode: .fill)
+                } placeholder: {
+                    Image(systemName: def.iconPlaceholder)
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundStyle(def.iconPlaceholderColor)
+                }
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous))
             }
-            .frame(width: 64, height: 64)
-            .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous))
         } else {
             Image(systemName: "puzzlepiece.extension")
                 .font(.system(size: 32))

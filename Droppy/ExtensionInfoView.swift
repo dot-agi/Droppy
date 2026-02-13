@@ -153,6 +153,31 @@ struct ExtensionInfoView: View {
             Text(extensionType.subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
+            // Community Extension Badge
+            if extensionType.isCommunity {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 11))
+                    Text("Community Extension")
+                        .font(.caption.weight(.medium))
+                    if let name = extensionType.creatorName {
+                        Text("by")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        if let url = extensionType.creatorURL {
+                            Link(name, destination: url)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(extensionType.categoryColor)
+                        } else {
+                            Text(name)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(extensionType.categoryColor)
+                        }
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
         }
         .padding(.top, 24)
         .padding(.bottom, 20)

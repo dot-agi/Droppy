@@ -28,9 +28,8 @@ struct TidalExtension: ExtensionDefinition {
         URL(string: "https://getdroppy.app/assets/images/tidal-screenshot.jpg")
     }
 
-    static var iconURL: URL? {
-        URL(string: "https://getdroppy.app/assets/icons/tidal.png")
-    }
+    static var iconURL: URL? { nil }
+    static let localIconAsset: String? = "TidalIcon"
 
     static let iconPlaceholder = "music.note.list"
     static let iconPlaceholderColor = Color(red: 0.0, green: 0.80, blue: 0.84)
@@ -38,4 +37,10 @@ struct TidalExtension: ExtensionDefinition {
     static func cleanup() {
         TidalAuthManager.shared.cleanup()
     }
+
+    // MARK: - Community Extension
+
+    static let isCommunity = true
+    static let creatorName: String? = "Pratyush Shukla"
+    static let creatorURL: URL? = URL(string: "https://github.com/dot-agi")
 }

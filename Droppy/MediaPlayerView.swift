@@ -382,6 +382,22 @@ struct MediaPlayerView: View {
                         artistRowView
                     }
 
+                    // Tidal synced lyrics line
+                    if musicManager.isTidalSource && musicManager.tidalController.showingLyrics,
+                       let lyric = musicManager.tidalController.currentLyricLine {
+                        Text(lyric)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(secondaryText(0.6))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .animation(DroppyAnimation.state, value: lyric)
+                            .onChange(of: estimatedPosition(at: currentDate)) { _, newValue in
+                                musicManager.tidalController.updateCurrentLyric(at: newValue)
+                            }
+                    }
+
                     Spacer(minLength: 4)
 
                     HStack(spacing: 8) {
@@ -801,6 +817,20 @@ struct MediaPlayerView: View {
                     .animation(DroppyAnimation.state, value: musicManager.isSpotifySource)
                     .animation(DroppyAnimation.state, value: musicManager.isAppleMusicSource)
                     .animation(DroppyAnimation.state, value: musicManager.isTidalSource)
+
+                    // Tidal quality badge (top-left corner)
+                    if musicManager.isTidalSource, let quality = musicManager.tidalController.currentTrackQuality {
+                        VStack {
+                            HStack {
+                                TidalQualityBadge(quality: quality)
+                                Spacer()
+                            }
+                            Spacer()
+                        }
+                        .padding(4)
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        .animation(DroppyAnimation.state, value: quality)
+                    }
                 }
                 // Subtle border highlight
                 .overlay(
@@ -1172,6 +1202,7 @@ struct MediaPlayerView: View {
                         appleMusic.toggleLove()
                     }
                 } else if isTidal && tidal.isAuthenticated {
+                    // Like button with playlist context menu
                     SpotifyControlButton(
                         icon: tidal.isCurrentTrackLiked ? "heart.fill" : "heart",
                         isActive: tidal.isCurrentTrackLiked,
@@ -1180,11 +1211,66 @@ struct MediaPlayerView: View {
                     ) {
                         tidal.toggleLike()
                     }
+                    .contextMenu {
+                        if let playlists = tidal.userPlaylists {
+                            Section("Add to Playlist") {
+                                ForEach(Array(playlists.enumerated()), id: \.offset) { _, playlist in
+                                    Button {
+                                        tidal.addToPlaylist(playlistId: playlist.id) { _ in }
+                                    } label: {
+                                        Label(
+                                            "\(playlist.name) (\(playlist.count))",
+                                            systemImage: "music.note.list"
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Tidal lyrics toggle
+                if isTidal && tidal.lyricsLines != nil {
+                    SpotifyControlButton(
+                        icon: "text.quote",
+                        isActive: tidal.showingLyrics,
+                        accentColor: tidalTeal,
+                        size: 14
+                    ) {
+                        tidal.showingLyrics.toggle()
+                    }
+                }
+
+                // Tidal credits toggle
+                if isTidal && tidal.currentTrackCredits != nil {
+                    SpotifyControlButton(
+                        icon: "person.2",
+                        isActive: tidal.showingCredits,
+                        accentColor: tidalTeal,
+                        size: 14
+                    ) {
+                        tidal.showingCredits.toggle()
+                        if tidal.showingCredits {
+                            // Auto-dismiss after 5 seconds
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                                tidal.showingCredits = false
+                            }
+                        }
+                    }
                 }
             }
-            .opacity(inlineHUDType != nil ? 0 : 1)
+            .opacity(inlineHUDType != nil || (isTidal && tidal.showingCredits) ? 0 : 1)
             .scaleEffect(inlineHUDType != nil ? 0.9 : 1)
-            
+
+            // Tidal credits overlay (replaces controls when showing)
+            if isTidal && tidal.showingCredits, let credits = tidal.currentTrackCredits {
+                TidalCreditsOverlay(credits: credits)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .onTapGesture {
+                        tidal.showingCredits = false
+                    }
+            }
+
             // Inline HUD overlay
             if let hudType = inlineHUDType {
                 InlineHUDView(
@@ -1200,6 +1286,7 @@ struct MediaPlayerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .animation(DroppyAnimation.notchState, value: inlineHUDType != nil)
+        .animation(DroppyAnimation.notchState, value: musicManager.tidalController.showingCredits)
     }
 }
 

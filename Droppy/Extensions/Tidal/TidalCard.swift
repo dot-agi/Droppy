@@ -19,17 +19,12 @@ struct TidalExtensionCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with icon, stats, and badge
             HStack(alignment: .top) {
-                CachedAsyncImage(url: URL(string: "https://getdroppy.app/assets/icons/tidal.png")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 24))
-                        .foregroundStyle(tidalTeal)
-                }
-                .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous))
+                Image("TidalIcon")
+                    .resizable()
+                    .renderingMode(.original)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous))
 
                 Spacer()
 
@@ -57,15 +52,25 @@ struct TidalExtensionCard: View {
                     }
                     .foregroundStyle(.secondary)
 
-                    Text(isInstalled ? "Installed" : "Media")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(isInstalled ? .green : .secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(isInstalled ? Color.green.opacity(0.15) : AdaptiveColors.subtleBorderAuto)
-                        )
+                    if isInstalled {
+                        Text("Installed")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.green.opacity(0.15)))
+                    } else {
+                        HStack(spacing: 3) {
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 8))
+                            Text("Community")
+                                .font(.system(size: 9, weight: .medium))
+                        }
+                        .foregroundStyle(.purple.opacity(0.9))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.purple.opacity(0.15)))
+                    }
                 }
             }
 
@@ -102,7 +107,21 @@ struct TidalExtensionCard: View {
             showInfoSheet = true
         }
         .sheet(isPresented: $showInfoSheet) {
-            ExtensionInfoView(extensionType: .tidal, installCount: installCount, rating: rating)
+            ExtensionInfoView(
+                extensionType: .tidal,
+                onAction: {
+                    if TidalAuthManager.shared.isAuthenticated {
+                        if let url = URL(string: "tidal://") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } else {
+                        TidalAuthManager.shared.startAuthentication()
+                    }
+                    TidalController.shared.refreshState()
+                },
+                installCount: installCount,
+                rating: rating
+            )
         }
     }
 }

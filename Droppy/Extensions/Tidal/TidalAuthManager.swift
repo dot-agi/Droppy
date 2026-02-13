@@ -19,7 +19,7 @@ final class TidalAuthManager {
 
     private var clientId: String = ""
     private let redirectUri = "droppy://tidal-callback"
-    private let scopes = "user.read collection.read collection.write"
+    private let scopes = "user.read collection.read collection.write playlists.read playlists.write"
 
     // MARK: - Tidal OAuth Endpoints
 
@@ -425,7 +425,10 @@ final class TidalAuthManager {
         completion: @escaping (Bool, Data?) -> Void
     ) {
         let fullURL = apiBaseURL + endpoint
-        guard let url = URL(string: fullURL) else {
+        // Use URLComponents to handle any special characters in query params
+        guard let components = URLComponents(string: fullURL),
+              let url = components.url else {
+            print("TidalAuthManager: Invalid URL: \(fullURL)")
             completion(false, nil)
             return
         }
@@ -457,6 +460,289 @@ final class TidalAuthManager {
                 completion(false, nil)
             }
         }.resume()
+    }
+
+    // MARK: - Track Search
+
+    /// Search for a track by title and artist to resolve its Tidal ID
+    func searchTrack(title: String, artist: String, completion: @escaping (String?) -> Void) {
+        getValidAccessToken { [weak self] token in
+            guard let self = self, let token = token else {
+                completion(nil)
+                return
+            }
+
+            // Build URL with URLComponents to handle encoding properly
+            let query = "\(title) \(artist)"
+            // Use urlPathAllowed minus "/" so artists like "AC/DC" don't break the path
+            var pathAllowed = CharacterSet.urlPathAllowed
+            pathAllowed.remove(charactersIn: "/")
+            let pathEncoded = query.addingPercentEncoding(withAllowedCharacters: pathAllowed) ?? query
+            let urlString = self.apiBaseURL + "/searchresults/\(pathEncoded)/relationships/tracks"
+
+            guard var components = URLComponents(string: urlString) else {
+                print("TidalAuthManager: Failed to build search URL")
+                completion(nil)
+                return
+            }
+
+            components.queryItems = [
+                URLQueryItem(name: "countryCode", value: "US"),
+                URLQueryItem(name: "include", value: "tracks"),
+                URLQueryItem(name: "page[limit]", value: "1")
+            ]
+
+            guard let url = components.url else {
+                print("TidalAuthManager: Failed to create search URL from components")
+                completion(nil)
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/vnd.tidal.v1+json", forHTTPHeaderField: "Accept")
+            request.setValue("application/vnd.tidal.v1+json", forHTTPHeaderField: "Content-Type")
+
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("TidalAuthManager: Search API error: \(error)")
+                    completion(nil)
+                    return
+                }
+
+                if let httpResponse = response as? HTTPURLResponse {
+                    if !(200...299).contains(httpResponse.statusCode) {
+                        print("TidalAuthManager: Search API status \(httpResponse.statusCode)")
+                        completion(nil)
+                        return
+                    }
+                }
+
+                guard let data = data else {
+                    completion(nil)
+                    return
+                }
+
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let items = json["data"] as? [[String: Any]],
+                       let firstItem = items.first,
+                       let trackId = firstItem["id"] as? String {
+                        print("TidalAuthManager: Resolved track ID: \(trackId)")
+                        completion(trackId)
+                    } else {
+                        print("TidalAuthManager: No track found for query: \(query)")
+                        completion(nil)
+                    }
+                } catch {
+                    print("TidalAuthManager: Search parse error: \(error)")
+                    completion(nil)
+                }
+            }.resume()
+        }
+    }
+
+    // MARK: - Track Quality
+
+    /// Fetch audio quality info for a track
+    func fetchTrackQuality(trackId: String, completion: @escaping (String?) -> Void) {
+        getValidAccessToken { [weak self] token in
+            guard let token = token else {
+                completion(nil)
+                return
+            }
+
+            self?.makeTidalAPIRequest(
+                endpoint: "/tracks/\(trackId)?countryCode=US&include=tracks",
+                method: "GET",
+                body: nil,
+                token: token
+            ) { success, data in
+                guard success, let data = data else {
+                    completion(nil)
+                    return
+                }
+
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let dataObj = json["data"] as? [String: Any] ?? (json["data"] as? [[String: Any]])?.first,
+                       let attrs = dataObj["attributes"] as? [String: Any],
+                       let mediaTags = attrs["mediaTags"] as? [String] {
+                        // Prioritize: Atmos > HiRes > HiFi
+                        if mediaTags.contains("DOLBY_ATMOS") {
+                            completion("Atmos")
+                        } else if mediaTags.contains("HIRES_LOSSLESS") {
+                            completion("HiRes")
+                        } else if mediaTags.contains("LOSSLESS") {
+                            completion("HiFi")
+                        } else {
+                            completion(nil)
+                        }
+                    } else {
+                        completion(nil)
+                    }
+                } catch {
+                    print("TidalAuthManager: Quality parse error: \(error)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+
+    // MARK: - Track Credits
+
+    /// Fetch credits (producers, songwriters, etc.) for a track
+    func fetchTrackCredits(trackId: String, completion: @escaping ([(name: String, role: String)]?) -> Void) {
+        getValidAccessToken { [weak self] token in
+            guard let token = token else {
+                completion(nil)
+                return
+            }
+
+            self?.makeTidalAPIRequest(
+                endpoint: "/tracks/\(trackId)/relationships/credits?countryCode=US&include=credits",
+                method: "GET",
+                body: nil,
+                token: token
+            ) { success, data in
+                guard success, let data = data else {
+                    completion(nil)
+                    return
+                }
+
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let items = json["included"] as? [[String: Any]] {
+                        let credits: [(name: String, role: String)] = items.compactMap { item in
+                            guard let attrs = item["attributes"] as? [String: Any],
+                                  let name = attrs["name"] as? String,
+                                  let role = attrs["role"] as? String else { return nil }
+                            return (name: name, role: role)
+                        }
+                        completion(credits.isEmpty ? nil : credits)
+                    } else {
+                        completion(nil)
+                    }
+                } catch {
+                    print("TidalAuthManager: Credits parse error: \(error)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+
+    // MARK: - Lyrics
+
+    /// Fetch lyrics for a track (returns LRC synced text if available, plain text fallback)
+    func fetchLyrics(trackId: String, completion: @escaping (String?, String?) -> Void) {
+        getValidAccessToken { [weak self] token in
+            guard let token = token else {
+                completion(nil, nil)
+                return
+            }
+
+            self?.makeTidalAPIRequest(
+                endpoint: "/tracks/\(trackId)/relationships/lyrics?countryCode=US&include=lyrics",
+                method: "GET",
+                body: nil,
+                token: token
+            ) { success, data in
+                guard success, let data = data else {
+                    completion(nil, nil)
+                    return
+                }
+
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let items = json["included"] as? [[String: Any]],
+                       let lyricsObj = items.first,
+                       let attrs = lyricsObj["attributes"] as? [String: Any] {
+                        let lrcText = attrs["lrcText"] as? String
+                        let plainText = attrs["text"] as? String
+                        completion(lrcText, plainText)
+                    } else {
+                        completion(nil, nil)
+                    }
+                } catch {
+                    print("TidalAuthManager: Lyrics parse error: \(error)")
+                    completion(nil, nil)
+                }
+            }
+        }
+    }
+
+    // MARK: - Playlists
+
+    /// Fetch user's playlists
+    func fetchUserPlaylists(completion: @escaping ([(id: String, name: String, count: Int)]?) -> Void) {
+        guard let userId = cachedUserId else {
+            completion(nil)
+            return
+        }
+
+        getValidAccessToken { [weak self] token in
+            guard let token = token else {
+                completion(nil)
+                return
+            }
+
+            self?.makeTidalAPIRequest(
+                endpoint: "/userCollectionPlaylists/\(userId)/relationships/items?countryCode=US&include=playlists",
+                method: "GET",
+                body: nil,
+                token: token
+            ) { success, data in
+                guard success, let data = data else {
+                    completion(nil)
+                    return
+                }
+
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let included = json["included"] as? [[String: Any]] {
+                        let playlists: [(id: String, name: String, count: Int)] = included.compactMap { item in
+                            guard let id = item["id"] as? String,
+                                  let attrs = item["attributes"] as? [String: Any],
+                                  let name = attrs["name"] as? String else { return nil }
+                            let count = attrs["numberOfItems"] as? Int ?? 0
+                            return (id: id, name: name, count: count)
+                        }
+                        completion(playlists.isEmpty ? nil : playlists)
+                    } else {
+                        completion(nil)
+                    }
+                } catch {
+                    print("TidalAuthManager: Playlists parse error: \(error)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+
+    /// Add a track to a playlist
+    func addTrackToPlaylist(trackId: String, playlistId: String, completion: @escaping (Bool) -> Void) {
+        getValidAccessToken { [weak self] token in
+            guard let token = token else {
+                completion(false)
+                return
+            }
+
+            let body: [String: Any] = [
+                "data": [
+                    ["type": "tracks", "id": trackId]
+                ]
+            ]
+
+            self?.makeTidalAPIRequest(
+                endpoint: "/playlists/\(playlistId)/relationships/items",
+                method: "POST",
+                body: body,
+                token: token
+            ) { success, _ in
+                completion(success)
+            }
+        }
     }
 
     // MARK: - Sign Out
