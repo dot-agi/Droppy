@@ -740,6 +740,19 @@ final class MusicManager: ObservableObject {
     var appleMusicController: AppleMusicController {
         AppleMusicController.shared
     }
+
+    // MARK: - Tidal Integration
+
+    /// Whether the current media source is Tidal (and Tidal extension is enabled)
+    var isTidalSource: Bool {
+        guard !ExtensionType.tidal.isRemoved else { return false }
+        return bundleIdentifier == TidalController.tidalBundleId
+    }
+
+    /// Tidal controller for app-specific features (shuffle, repeat, like)
+    var tidalController: TidalController {
+        TidalController.shared
+    }
     
     /// Temporarily suppress timing updates after Spotify commands to avoid stale data
     private var suppressTimingUpdatesUntil: Date = .distantPast
@@ -1134,7 +1147,7 @@ final class MusicManager: ObservableObject {
     private var shouldRunFallbackTimingSync: Bool {
         guard isPlaying else { return false }
         guard bundleIdentifier != nil else { return false }
-        return !isSpotifySource && !isAppleMusicSource
+        return !isSpotifySource && !isAppleMusicSource && !isTidalSource
     }
 
     private func stopFallbackTimingSync() {
@@ -1365,6 +1378,7 @@ final class MusicManager: ObservableObject {
         if let bundle = payload.launchableBundleIdentifier {
             let wasSpotify = isSpotifySource
             let wasAppleMusic = isAppleMusicSource
+            let wasTidal = isTidalSource
             let previousBundle = bundleIdentifier
             bundleIdentifier = bundle
             
@@ -1383,6 +1397,11 @@ final class MusicManager: ObservableObject {
             if isAppleMusicSource && !wasAppleMusic {
                 AppleMusicController.shared.refreshState()
                 startAppleMusicMetadataSyncTimer()
+            }
+
+            // Refresh Tidal state when source changes to Tidal
+            if isTidalSource && !wasTidal {
+                TidalController.shared.refreshState()
             }
             
             // PERFORMANCE FIX: Stop Spotify's position sync timer when switching away

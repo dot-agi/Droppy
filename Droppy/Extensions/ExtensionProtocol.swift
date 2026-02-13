@@ -23,6 +23,7 @@ enum ExtensionType: String, CaseIterable, Identifiable {
     case camera
     case quickshare
     case appleMusic
+    case tidal
     case notificationHUD
     case caffeine
     case menuBarManager
@@ -61,6 +62,8 @@ enum ExtensionType: String, CaseIterable, Identifiable {
             return UserDefaults.standard.bool(forKey: "spotifyTracked")
         case .appleMusic:
             return !isRemoved
+        case .tidal:
+            return UserDefaults.standard.bool(forKey: "tidalTracked")
         case .elementCapture:
             return UserDefaults.standard.data(forKey: "elementCaptureShortcut") != nil
         case .windowSnap:

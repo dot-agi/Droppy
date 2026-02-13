@@ -245,7 +245,7 @@ struct ExtensionInfoView: View {
     private var primaryActionText: String {
         if !isInstalled {
             switch extensionType {
-            case .spotify, .appleMusic:
+            case .spotify, .appleMusic, .tidal:
                 return "Set Up"
             case .finder, .finderServices, .windowSnap, .voiceTranscribe, .elementCapture, .terminalNotch, .camera, .notificationHUD, .caffeine, .menuBarManager, .todo:
                 return "Set Up"
@@ -262,6 +262,7 @@ struct ExtensionInfoView: View {
         case .finder, .finderServices: return "Open Settings"
         case .spotify: return "Open Spotify"
         case .appleMusic: return "Open Music"
+        case .tidal: return "Open Tidal"
         case .elementCapture: return "Configure"
         case .windowSnap: return "Configure"
         case .voiceTranscribe: return "Configure"
@@ -283,6 +284,7 @@ struct ExtensionInfoView: View {
         case .finder, .finderServices: return "Configure"
         case .spotify: return "Connect"
         case .appleMusic: return "Connect"
+        case .tidal: return "Connect"
         case .elementCapture: return "Configure Shortcut"
         case .windowSnap: return "Configure Shortcuts"
         case .voiceTranscribe: return "Configure"
@@ -304,6 +306,7 @@ struct ExtensionInfoView: View {
         case .finder, .finderServices: return "gearshape"
         case .spotify: return "link"
         case .appleMusic: return "link"
+        case .tidal: return "link"
         case .elementCapture: return "keyboard"
         case .windowSnap: return "keyboard"
         case .voiceTranscribe: return "mic.fill"

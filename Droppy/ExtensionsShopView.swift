@@ -17,6 +17,7 @@ struct ExtensionsShopView: View {
     private var isFinderInstalled: Bool { UserDefaults.standard.bool(forKey: "finderTracked") }
     private var isSpotifyInstalled: Bool { UserDefaults.standard.bool(forKey: "spotifyTracked") }
     private var isAppleMusicInstalled: Bool { !ExtensionType.appleMusic.isRemoved }
+    private var isTidalInstalled: Bool { UserDefaults.standard.bool(forKey: "tidalTracked") }
     private var isElementCaptureInstalled: Bool {
         UserDefaults.standard.data(forKey: "elementCaptureShortcut") != nil
     }
@@ -440,6 +441,28 @@ struct ExtensionsShopView: View {
                     },
                     installCount: extensionCounts["appleMusic"],
                     rating: extensionRatings["appleMusic"]
+                ))
+            },
+            ExtensionListItem(
+                id: "tidal",
+                iconURL: "https://getdroppy.app/assets/icons/tidal.png",
+                title: "Tidal",
+                subtitle: "Control playback from your notch",
+                category: .media,
+                isInstalled: isTidalInstalled,
+                analyticsKey: "tidal",
+                extensionType: .tidal
+            ) {
+                AnyView(ExtensionInfoView(
+                    extensionType: .tidal,
+                    onAction: {
+                        if let url = URL(string: "tidal://") {
+                            NSWorkspace.shared.open(url)
+                        }
+                        TidalController.shared.refreshState()
+                    },
+                    installCount: extensionCounts["tidal"],
+                    rating: extensionRatings["tidal"]
                 ))
             },
             ExtensionListItem(

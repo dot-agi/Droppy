@@ -656,9 +656,12 @@ struct MediaPlayerView: View {
                 .modifier(AlbumArtMatchedGeometry(namespace: albumArtNamespace, id: "albumArt"))  // BEFORE clipShape!
                 .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous))
                 
-                // Spotify badge (bottom-right corner)
+                // Source badge (bottom-right corner)
                 if musicManager.isSpotifySource {
                     SpotifyBadge()
+                        .offset(x: 4, y: 4)
+                } else if musicManager.isTidalSource {
+                    TidalBadge()
                         .offset(x: 4, y: 4)
                 }
             }
@@ -791,10 +794,13 @@ struct MediaPlayerView: View {
                             .opacity(musicManager.isSpotifySource ? 1 : 0)
                         AppleMusicBadge()
                             .opacity(musicManager.isAppleMusicSource ? 1 : 0)
+                        TidalBadge()
+                            .opacity(musicManager.isTidalSource ? 1 : 0)
                     }
                     .offset(x: 5, y: 5)
                     .animation(DroppyAnimation.state, value: musicManager.isSpotifySource)
                     .animation(DroppyAnimation.state, value: musicManager.isAppleMusicSource)
+                    .animation(DroppyAnimation.state, value: musicManager.isTidalSource)
                 }
                 // Subtle border highlight
                 .overlay(
@@ -942,16 +948,19 @@ struct MediaPlayerView: View {
     private var controlsRow: some View {
         let isSpotify = musicManager.isSpotifySource
         let spotify = musicManager.spotifyController
-        
+        let isTidal = musicManager.isTidalSource
+        let tidal = musicManager.tidalController
+
         // Spotify's signature green
         let spotifyGreen = Color(red: 0.11, green: 0.73, blue: 0.33)
+        let tidalTeal = Color(red: 0.0, green: 0.80, blue: 0.84)
         let controlForeground = useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : Color.white
         
         // ZStack for morphing between controls and volume indicator
         ZStack {
             // MARK: - Playback Controls (hide when volume shown)
             HStack(spacing: 0) {
-                // Left side: Shuffle (Spotify only) or spacer
+                // Left side: Shuffle (Spotify/Tidal) or spacer
                 if isSpotify {
                     SpotifyControlButton(
                         icon: "shuffle",
@@ -959,6 +968,14 @@ struct MediaPlayerView: View {
                         accentColor: spotifyGreen
                     ) {
                         spotify.toggleShuffle()
+                    }
+                } else if isTidal {
+                    SpotifyControlButton(
+                        icon: "shuffle",
+                        isActive: tidal.shuffleEnabled,
+                        accentColor: tidalTeal
+                    ) {
+                        tidal.toggleShuffle()
                     }
                 } else {
                     Spacer()
@@ -991,7 +1008,7 @@ struct MediaPlayerView: View {
                 
                 Spacer()
                 
-                // Right side: Repeat (Spotify only) or spacer
+                // Right side: Repeat (Spotify/Tidal) or spacer
                 if isSpotify {
                     SpotifyControlButton(
                         icon: spotify.repeatMode.iconName,
@@ -999,6 +1016,14 @@ struct MediaPlayerView: View {
                         accentColor: spotifyGreen
                     ) {
                         spotify.cycleRepeatMode()
+                    }
+                } else if isTidal {
+                    SpotifyControlButton(
+                        icon: tidal.repeatMode.iconName,
+                        isActive: tidal.repeatMode != .off,
+                        accentColor: tidalTeal
+                    ) {
+                        tidal.cycleRepeatMode()
                     }
                 } else {
                     Spacer()
@@ -1031,16 +1056,19 @@ struct MediaPlayerView: View {
     private var controlsRowCompact: some View {
         let isSpotify = musicManager.isSpotifySource
         let isAppleMusic = musicManager.isAppleMusicSource
+        let isTidal = musicManager.isTidalSource
         let spotify = musicManager.spotifyController
         let appleMusic = musicManager.appleMusicController
+        let tidal = musicManager.tidalController
         let spotifyGreen = Color(red: 0.11, green: 0.73, blue: 0.33)
         let appleMusicPink = Color(red: 0.98, green: 0.34, blue: 0.40)  // Apple Music accent
+        let tidalTeal = Color(red: 0.0, green: 0.80, blue: 0.84)
         let controlForeground = useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : Color.white
         
         ZStack {
             // Compact centered controls
             HStack(spacing: 20) {
-                // Shuffle (Spotify or Apple Music)
+                // Shuffle (Spotify, Apple Music, or Tidal)
                 if isSpotify {
                     SpotifyControlButton(
                         icon: "shuffle",
@@ -1058,6 +1086,15 @@ struct MediaPlayerView: View {
                         size: 16
                     ) {
                         appleMusic.toggleShuffle()
+                    }
+                } else if isTidal {
+                    SpotifyControlButton(
+                        icon: "shuffle",
+                        isActive: tidal.shuffleEnabled,
+                        accentColor: tidalTeal,
+                        size: 16
+                    ) {
+                        tidal.toggleShuffle()
                     }
                 }
                 
@@ -1094,7 +1131,7 @@ struct MediaPlayerView: View {
                     musicManager.nextTrack()
                 }
                 
-                // Repeat (Spotify or Apple Music)
+                // Repeat (Spotify, Apple Music, or Tidal)
                 if isSpotify {
                     SpotifyControlButton(
                         icon: spotify.repeatMode.iconName,
@@ -1113,9 +1150,18 @@ struct MediaPlayerView: View {
                     ) {
                         appleMusic.cycleRepeatMode()
                     }
+                } else if isTidal {
+                    SpotifyControlButton(
+                        icon: tidal.repeatMode.iconName,
+                        isActive: tidal.repeatMode != .off,
+                        accentColor: tidalTeal,
+                        size: 16
+                    ) {
+                        tidal.cycleRepeatMode()
+                    }
                 }
                 
-                // Love button (Apple Music only - Spotify requires OAuth)
+                // Love/Like button (Apple Music or authenticated Tidal)
                 if isAppleMusic {
                     SpotifyControlButton(
                         icon: appleMusic.isCurrentTrackLoved ? "heart.fill" : "heart",
@@ -1124,6 +1170,15 @@ struct MediaPlayerView: View {
                         size: 16
                     ) {
                         appleMusic.toggleLove()
+                    }
+                } else if isTidal && tidal.isAuthenticated {
+                    SpotifyControlButton(
+                        icon: tidal.isCurrentTrackLiked ? "heart.fill" : "heart",
+                        isActive: tidal.isCurrentTrackLiked,
+                        accentColor: tidalTeal,
+                        size: 16
+                    ) {
+                        tidal.toggleLike()
                     }
                 }
             }

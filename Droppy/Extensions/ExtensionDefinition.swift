@@ -131,6 +131,7 @@ final class ExtensionRegistry {
         register(CameraExtension.self)
         register(QuickshareExtension.self)
         register(AppleMusicExtension.self)
+        register(TidalExtension.self)
         register(NotificationHUDExtension.self)
         register(CaffeineExtension.self)
         register(MenuBarManagerExtension.self)
