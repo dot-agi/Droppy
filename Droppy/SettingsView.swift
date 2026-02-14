@@ -80,7 +80,6 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKey.autoExpandOnExternalDisplays) private var autoExpandOnExternalDisplays = PreferenceDefault.autoExpandOnExternalDisplays
     @AppStorage(AppPreferenceKey.autoExpandDelay) private var autoExpandDelay = PreferenceDefault.autoExpandDelay
     @AppStorage(AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) private var autoOpenMediaHUDOnShelfExpand = PreferenceDefault.autoOpenMediaHUDOnShelfExpand
-    @AppStorage(AppPreferenceKey.showMediaShelfSwitchBadge) private var showMediaShelfSwitchBadge = PreferenceDefault.showMediaShelfSwitchBadge
     @AppStorage(AppPreferenceKey.autoHideOnFullscreen) private var autoHideOnFullscreen = PreferenceDefault.autoHideOnFullscreen
     @AppStorage(AppPreferenceKey.hideMediaOnlyOnFullscreen) private var hideMediaOnlyOnFullscreen = PreferenceDefault.hideMediaOnlyOnFullscreen
     @AppStorage(AppPreferenceKey.enableFinderServices) private var enableFinderServices = PreferenceDefault.enableFinderServices
@@ -114,20 +113,23 @@ struct SettingsView: View {
     @State private var deepLinkedExtension: ExtensionType?
     @ObservedObject private var cameraManager = CameraManager.shared
     
-    /// Detects if the BUILT-IN display has a physical notch
-    /// Uses builtInWithNotch or isBuiltIn check - NOT main screen (which could be external)
+    /// Detects if the BUILT-IN display has a physical notch.
+    /// Uses auxiliary notch areas first because safeAreaInsets.top can be 0 on some notch Macs.
     private var hasPhysicalNotch: Bool {
-        // Check if there's a built-in display with a notch
-        if let builtIn = NSScreen.builtInWithNotch {
-            return builtIn.safeAreaInsets.top > 0
-        }
-        // Fallback: check all screens for a built-in one with a notch
-        for screen in NSScreen.screens {
-            if screen.isBuiltIn && screen.safeAreaInsets.top > 0 {
+        if let builtIn = NSScreen.builtIn {
+            let hasAuxiliaryNotchAreas = builtIn.auxiliaryTopLeftArea != nil && builtIn.auxiliaryTopRightArea != nil
+            if hasAuxiliaryNotchAreas {
                 return true
             }
+            return builtIn.safeAreaInsets.top > 0
         }
-        return false
+
+        // Fallback: check all screens in case the built-in helper is temporarily unavailable.
+        return NSScreen.screens.contains { screen in
+            guard screen.isBuiltIn else { return false }
+            let hasAuxiliaryNotchAreas = screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
+            return hasAuxiliaryNotchAreas || screen.safeAreaInsets.top > 0
+        }
     }
 
     private var externalScreens: [NSScreen] {
@@ -1141,15 +1143,6 @@ struct SettingsView: View {
                         }
                     }
 
-                    Toggle(isOn: $showMediaShelfSwitchBadge) {
-                        VStack(alignment: .leading) {
-                            Text("Media/Shelf Switch Badge (Legacy)")
-                            Text("Reserved setting. Current builds use swipe/hover switching and do not show this top-left button.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    
                     // Full-width sliders appear when enabled
                     if autoCollapseShelf {
                         VStack(spacing: 4) {
