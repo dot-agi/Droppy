@@ -8,6 +8,13 @@
 import SwiftUI
 
 struct ToDoInfoView: View {
+    private enum Layout {
+        static let controlWidth: CGFloat = 200
+        static let cardsPanelWidth: CGFloat = 360
+        static let doubleCardWidth: CGFloat = 176
+        static let tripleCardWidth: CGFloat = 114
+    }
+
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
 
@@ -15,9 +22,19 @@ struct ToDoInfoView: View {
     @AppStorage(AppPreferenceKey.todoAutoCleanupHours) private var autoCleanupHours = PreferenceDefault.todoAutoCleanupHours
     @AppStorage(AppPreferenceKey.todoSyncCalendarEnabled) private var syncCalendarEnabled = PreferenceDefault.todoSyncCalendarEnabled
     @AppStorage(AppPreferenceKey.todoSyncRemindersEnabled) private var syncRemindersEnabled = PreferenceDefault.todoSyncRemindersEnabled
+    @AppStorage(AppPreferenceKey.todoShelfSplitViewEnabled) private var shelfSplitViewEnabled = PreferenceDefault.todoShelfSplitViewEnabled
+    @AppStorage(AppPreferenceKey.todoDueSoonNotificationsEnabled) private var dueSoonNotificationsEnabled = PreferenceDefault.todoDueSoonNotificationsEnabled
+    @AppStorage(AppPreferenceKey.todoDueSoonNotificationsChimeEnabled) private var dueSoonNotificationsChimeEnabled = PreferenceDefault.todoDueSoonNotificationsChimeEnabled
+    @AppStorage(AppPreferenceKey.todoHideUndatedReminders) private var hideUndatedReminders = PreferenceDefault.todoHideUndatedReminders
+    @AppStorage(AppPreferenceKey.todoShowUpcomingInMenuBar) private var showUpcomingInMenuBar = PreferenceDefault.todoShowUpcomingInMenuBar
+    @AppStorage(AppPreferenceKey.todoDefaultReminderListID) private var defaultReminderListID = PreferenceDefault.todoDefaultReminderListID
+    @AppStorage(AppPreferenceKey.todoShowTaskWeekNumber) private var showTaskWeekNumber = PreferenceDefault.todoShowTaskWeekNumber
+    @AppStorage(AppPreferenceKey.todoShowTaskViewTimezone) private var showTaskViewTimezone = PreferenceDefault.todoShowTaskViewTimezone
     @State private var manager = ToDoManager.shared
     @State private var showReviewsSheet = false
+    @State private var focusedCalendarIndex: Int? = nil
     @State private var focusedListIndex: Int? = nil
+    @State private var quickOpenShortcut: SavedShortcut? = nil
 
     // Stats passed from parent
     var installCount: Int?
@@ -51,7 +68,7 @@ struct ToDoInfoView: View {
             // Footer (fixed)
             footerSection
         }
-        .frame(width: 450)
+        .frame(width: 675)
         .fixedSize(horizontal: true, vertical: true)
         .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
@@ -60,11 +77,16 @@ struct ToDoInfoView: View {
         }
         .onAppear {
             if syncCalendarEnabled {
+                manager.refreshCalendarListsNow()
                 manager.syncExternalSourcesNow()
             }
             if syncRemindersEnabled {
                 manager.refreshReminderListsNow()
             }
+            quickOpenShortcut = manager.quickOpenShortcut
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .todoQuickOpenShortcutChanged)) { _ in
+            quickOpenShortcut = manager.quickOpenShortcut
         }
     }
 
@@ -151,9 +173,15 @@ struct ToDoInfoView: View {
             HStack(spacing: 6) {
                 Image(systemName: "person.2.fill")
                     .font(.system(size: 11))
-                Text("Community Extension")
+                Text("Shared extension")
                     .font(.caption.weight(.medium))
                 Text("by")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Link("Jordy (dev)", destination: URL(string: "https://getdroppy.app")!)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.blue)
+                Text("and")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Link("Valetivivek", destination: URL(string: "https://github.com/valetivivek")!)
@@ -251,31 +279,45 @@ struct ToDoInfoView: View {
                         Text("24 hours").tag(24)
                     }
                     .pickerStyle(.menu)
-                    .frame(width: 120)
+                    .frame(width: Layout.controlWidth, alignment: .trailing)
                 }
                 .padding(DroppySpacing.md)
 
                 Divider()
                     .padding(.horizontal, DroppySpacing.md)
 
-                HStack {
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Apple Calendar sync")
+                        Text("Sync sources")
                             .font(.callout.weight(.medium))
-                        Text("Show upcoming calendar events in the task overview.")
+                        Text("Choose what Reminders syncs into your task overview.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
                     Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { syncCalendarEnabled },
-                        set: { newValue in
-                            syncCalendarEnabled = newValue
-                            manager.setCalendarSyncEnabled(newValue)
+                    HStack(spacing: 8) {
+                        settingsToggleTile(
+                            title: "Calendar",
+                            icon: "calendar.badge.clock",
+                            isOn: syncCalendarEnabled,
+                            tileWidth: Layout.doubleCardWidth
+                        ) {
+                            syncCalendarEnabled.toggle()
+                            manager.setCalendarSyncEnabled(syncCalendarEnabled)
                         }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+
+                        settingsToggleTile(
+                            title: "Reminders",
+                            icon: "checklist",
+                            isOn: syncRemindersEnabled,
+                            tileWidth: Layout.doubleCardWidth
+                        ) {
+                            syncRemindersEnabled.toggle()
+                            manager.setRemindersSyncEnabled(syncRemindersEnabled)
+                        }
+                    }
+                    .frame(width: Layout.cardsPanelWidth, alignment: .center)
                 }
                 .padding(.horizontal, DroppySpacing.md)
                 .padding(.vertical, 12)
@@ -283,24 +325,86 @@ struct ToDoInfoView: View {
                 Divider()
                     .padding(.horizontal, DroppySpacing.md)
 
-                HStack {
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Apple Reminders sync")
+                        Text("View options")
                             .font(.callout.weight(.medium))
-                        Text("Two-way sync with Apple Reminders")
+                        Text("Toggle core Reminders UI behavior.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
                     Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { syncRemindersEnabled },
-                        set: { newValue in
-                            syncRemindersEnabled = newValue
-                            manager.setRemindersSyncEnabled(newValue)
+                    HStack(spacing: 8) {
+                        settingsToggleTile(
+                            title: "Hide undated",
+                            icon: "calendar.badge.exclamationmark",
+                            isOn: hideUndatedReminders,
+                            isEnabled: syncRemindersEnabled,
+                            tileWidth: Layout.tripleCardWidth
+                        ) {
+                            hideUndatedReminders.toggle()
+                            manager.setHideUndatedRemindersEnabled(hideUndatedReminders)
                         }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+
+                        settingsToggleTile(
+                            title: "Menu bar",
+                            icon: "menubar.arrow.up.rectangle",
+                            isOn: showUpcomingInMenuBar,
+                            tileWidth: Layout.tripleCardWidth
+                        ) {
+                            showUpcomingInMenuBar.toggle()
+                        }
+
+                        settingsToggleTile(
+                            title: "Split panel",
+                            icon: "sidebar.trailing",
+                            isOn: shelfSplitViewEnabled,
+                            tileWidth: Layout.tripleCardWidth
+                        ) {
+                            shelfSplitViewEnabled.toggle()
+                            manager.setShelfSplitViewEnabled(shelfSplitViewEnabled)
+                        }
+                    }
+                    .frame(width: Layout.cardsPanelWidth, alignment: .trailing)
+                }
+                .padding(.horizontal, DroppySpacing.md)
+                .padding(.vertical, 12)
+
+                Divider()
+                    .padding(.horizontal, DroppySpacing.md)
+
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Quick open shortcut")
+                            .font(.callout.weight(.medium))
+                        Text("Open your Reminders tasks/calendar instantly with a custom shortcut.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    HStack(spacing: 8) {
+                        KeyShortcutRecorder(shortcut: Binding(
+                            get: { quickOpenShortcut },
+                            set: { newValue in
+                                quickOpenShortcut = newValue
+                                manager.setQuickOpenShortcut(newValue)
+                            }
+                        ), recordButtonTitle: "Record", recordingButtonTitle: "Press...", recordButtonColor: .blue, recordButtonWidth: 70)
+
+                        Button {
+                            quickOpenShortcut = nil
+                            manager.setQuickOpenShortcut(nil)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(quickOpenShortcut != nil ? 1 : 0)
+                    }
+                    .frame(width: Layout.cardsPanelWidth, alignment: .trailing)
                 }
                 .padding(.horizontal, DroppySpacing.md)
                 .padding(.vertical, 12)
@@ -309,14 +413,123 @@ struct ToDoInfoView: View {
                     Divider()
                         .padding(.horizontal, DroppySpacing.md)
 
-                    reminderListsSection
-
-                    Divider()
-                        .padding(.horizontal, DroppySpacing.md)
-                } else {
-                    Divider()
-                        .padding(.horizontal, DroppySpacing.md)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Default list for new tasks")
+                                .font(.callout.weight(.medium))
+                            Text("Automatically add new tasks to this list when no @list is provided.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                        Spacer()
+                        Picker("", selection: defaultReminderListPickerSelection) {
+                            Text("System default").tag("")
+                            ForEach(manager.availableReminderLists) { list in
+                                Text(list.title).tag(list.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: Layout.controlWidth, alignment: .trailing)
+                        .disabled(manager.availableReminderLists.isEmpty)
+                    }
+                    .padding(.horizontal, DroppySpacing.md)
+                    .padding(.vertical, 12)
                 }
+
+                Divider()
+                    .padding(.horizontal, DroppySpacing.md)
+
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Alerts")
+                            .font(.callout.weight(.medium))
+                        Text("Due reminders and optional sound.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    HStack(spacing: 8) {
+                        settingsToggleTile(
+                            title: "Due alerts",
+                            icon: "bell.badge",
+                            isOn: dueSoonNotificationsEnabled,
+                            tileWidth: Layout.doubleCardWidth
+                        ) {
+                            dueSoonNotificationsEnabled.toggle()
+                            manager.setDueSoonNotificationsEnabled(dueSoonNotificationsEnabled)
+                        }
+
+                        settingsToggleTile(
+                            title: "Chime",
+                            icon: "speaker.wave.2",
+                            isOn: dueSoonNotificationsChimeEnabled,
+                            isEnabled: dueSoonNotificationsEnabled,
+                            tileWidth: Layout.doubleCardWidth
+                        ) {
+                            dueSoonNotificationsChimeEnabled.toggle()
+                            manager.setDueSoonNotificationChimeEnabled(dueSoonNotificationsChimeEnabled)
+                        }
+                    }
+                    .frame(width: Layout.cardsPanelWidth, alignment: .trailing)
+                }
+                .padding(.horizontal, DroppySpacing.md)
+                .padding(.vertical, 12)
+
+                Divider()
+                    .padding(.horizontal, DroppySpacing.md)
+
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Timeline labels")
+                            .font(.callout.weight(.medium))
+                        Text("Additional information shown for timed tasks/events.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    HStack(spacing: 8) {
+                        settingsToggleTile(
+                            title: "Week #",
+                            icon: "number.square",
+                            isOn: showTaskWeekNumber,
+                            tileWidth: Layout.doubleCardWidth
+                        ) {
+                            showTaskWeekNumber.toggle()
+                        }
+
+                        settingsToggleTile(
+                            title: "Timezone",
+                            icon: "globe",
+                            isOn: showTaskViewTimezone,
+                            tileWidth: Layout.doubleCardWidth
+                        ) {
+                            showTaskViewTimezone.toggle()
+                        }
+                    }
+                    .frame(width: Layout.cardsPanelWidth, alignment: .trailing)
+                }
+                .padding(.horizontal, DroppySpacing.md)
+                .padding(.vertical, 12)
+
+                if syncCalendarEnabled {
+                    Divider()
+                        .padding(.horizontal, DroppySpacing.md)
+
+                    calendarListsSection
+                }
+
+                if syncRemindersEnabled {
+                    Divider()
+                        .padding(.horizontal, DroppySpacing.md)
+
+                    reminderListsSection
+                }
+
+                Divider()
+                    .padding(.horizontal, DroppySpacing.md)
 
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -340,6 +553,115 @@ struct ToDoInfoView: View {
             )
             .onChange(of: autoCleanupHours) { _, _ in
                 manager.performCleanupNow()
+            }
+        }
+    }
+
+    private var calendarListsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Calendar lists")
+                        .font(.callout.weight(.medium))
+                    Text("Choose which Apple Calendar calendars are shown.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+                HStack(spacing: 6) {
+                    Button {
+                        manager.selectAllCalendarLists()
+                    } label: {
+                        Text("All")
+                            .frame(minWidth: 34)
+                    }
+                    .buttonStyle(DroppyPillButtonStyle(size: .small))
+
+                    Button {
+                        manager.clearCalendarListsSelection()
+                    } label: {
+                        Text("None")
+                            .frame(minWidth: 44)
+                    }
+                    .buttonStyle(DroppyPillButtonStyle(size: .small))
+                }
+            }
+            .padding(.horizontal, DroppySpacing.md)
+            .padding(.top, 12)
+
+            if manager.availableCalendarLists.isEmpty {
+                Text("No calendars found.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, DroppySpacing.md)
+                    .padding(.bottom, 12)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(manager.availableCalendarLists.enumerated()), id: \.element.id) { index, list in
+                        Button {
+                            manager.toggleCalendarListSelection(list.id)
+                        } label: {
+                            HStack(spacing: 10) {
+                                reminderListBadge(colorHex: list.colorHex)
+                                Text(list.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(AdaptiveColors.primaryTextAuto.opacity(0.92))
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: manager.isCalendarListSelected(list.id) ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(manager.isCalendarListSelected(list.id) ? .blue : AdaptiveColors.secondaryTextAuto.opacity(0.4))
+                            }
+                            .padding(.horizontal, DroppySpacing.md)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(focusedCalendarIndex == index ? AdaptiveColors.overlayAuto(0.08) : Color.clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < manager.availableCalendarLists.count - 1 {
+                            Divider()
+                                .padding(.leading, DroppySpacing.md + 28)
+                                .padding(.trailing, DroppySpacing.md)
+                        }
+                    }
+                }
+                .onKeyPress(.downArrow) {
+                    let count = manager.availableCalendarLists.count
+                    guard count > 0 else { return .ignored }
+                    withAnimation(DroppyAnimation.hover) {
+                        if let current = focusedCalendarIndex {
+                            focusedCalendarIndex = min(current + 1, count - 1)
+                        } else {
+                            focusedCalendarIndex = 0
+                        }
+                    }
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    let count = manager.availableCalendarLists.count
+                    guard count > 0 else { return .ignored }
+                    withAnimation(DroppyAnimation.hover) {
+                        if let current = focusedCalendarIndex {
+                            focusedCalendarIndex = max(current - 1, 0)
+                        } else {
+                            focusedCalendarIndex = count - 1
+                        }
+                    }
+                    return .handled
+                }
+                .onKeyPress(.return) {
+                    guard let index = focusedCalendarIndex,
+                          index < manager.availableCalendarLists.count else { return .ignored }
+                    let list = manager.availableCalendarLists[index]
+                    manager.toggleCalendarListSelection(list.id)
+                    return .handled
+                }
+                .focusable()
+                .focusEffectDisabled()
             }
         }
     }
@@ -451,6 +773,68 @@ struct ToDoInfoView: View {
                 .focusEffectDisabled()
             }
         }
+    }
+
+    private var defaultReminderListPickerSelection: Binding<String> {
+        Binding(
+            get: {
+                let trimmed = defaultReminderListID.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty,
+                      manager.availableReminderLists.contains(where: { $0.id == trimmed }) else {
+                    return ""
+                }
+                return trimmed
+            },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                manager.setDefaultReminderListID(trimmed.isEmpty ? nil : trimmed)
+                defaultReminderListID = manager.defaultReminderListID ?? ""
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func settingsToggleTile(
+        title: String,
+        icon: String,
+        isOn: Bool,
+        isEnabled: Bool = true,
+        tileWidth: CGFloat,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 6) {
+            SettingsSegmentButtonWithContent(
+                label: title,
+                isSelected: isOn,
+                showsLabel: false,
+                tileWidth: tileWidth,
+                tileHeight: 46,
+                action: {
+                    guard isEnabled else { return }
+                    action()
+                }
+            ) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(
+                        isEnabled
+                            ? (isOn ? Color.blue : AdaptiveColors.overlayAuto(0.5))
+                            : AdaptiveColors.overlayAuto(0.3)
+                    )
+            }
+
+            Text(title)
+                .font(.system(size: 11, weight: isOn ? .bold : .semibold, design: .rounded))
+                .foregroundStyle(
+                    isEnabled
+                        ? (isOn ? .primary : .secondary)
+                        : .tertiary
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: tileWidth)
+        }
+        .opacity(isEnabled ? 1 : 0.55)
     }
 
     @ViewBuilder

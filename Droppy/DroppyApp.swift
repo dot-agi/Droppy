@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Main application entry point for Droppy
 @main
@@ -27,6 +28,10 @@ struct DroppyApp: App {
 struct DroppyMenuContent: View {
     // Track shortcut changes via notification
     @State private var shortcutRefreshId = UUID()
+    @State private var clipboardMenuItems: [ClipboardItem] = []
+    @State private var clipboardMenuTitles: [UUID: String] = [:]
+    @State private var todoManager = ToDoManager.shared
+    @ObservedObject private var clipboardManager = ClipboardManager.shared
     
     // Observe NotchWindowController for hide state
     @ObservedObject private var notchController = NotchWindowController.shared
@@ -40,7 +45,8 @@ struct DroppyMenuContent: View {
 
     // Check if Clipboard menu bar is enabled
     @AppStorage(AppPreferenceKey.showClipboardInMenuBar) private var showClipboardInMenuBar = PreferenceDefault.showClipboardInMenuBar
-    @ObservedObject private var clipboardManager = ClipboardManager.shared
+    @AppStorage(AppPreferenceKey.todoInstalled) private var todoInstalled = PreferenceDefault.todoInstalled
+    @AppStorage(AppPreferenceKey.todoShowUpcomingInMenuBar) private var showUpcomingInMenuBar = PreferenceDefault.todoShowUpcomingInMenuBar
     @ObservedObject private var licenseManager = LicenseManager.shared
     
     // Check if extensions are disabled
@@ -110,6 +116,7 @@ struct DroppyMenuContent: View {
             }
             .keyboardShortcut("q", modifiers: .command)
         } else {
+            Group {
             if licenseManager.requiresLicenseEnforcement && licenseManager.isTrialActive && !licenseManager.isActivated {
                 Text(licenseManager.trialStatusText)
                     .font(.caption)
@@ -160,26 +167,24 @@ struct DroppyMenuContent: View {
             // Clipboard Menu (New)
             if showClipboardInMenuBar {
                 Menu {
-                    // Recent History
-                    let history = clipboardManager.history.prefix(15)
-                    
-                    if history.isEmpty {
+                    if clipboardMenuItems.isEmpty {
                         Text("Clipboard is empty")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(history) { item in
+                        ForEach(clipboardMenuItems) { item in
                             Button {
-                                clipboardManager.paste(item: item)
+                                ClipboardManager.shared.paste(item: item)
                             } label: {
                                 // Show icon based on type
-                                Label(item.title, systemImage: iconFor(item: item))
+                                Label(clipboardMenuTitle(for: item), systemImage: iconFor(item: item))
                             }
                         }
                         
                         Divider()
                         
                         Button(role: .destructive) {
-                            clipboardManager.history.removeAll()
+                            clipboardManager.clearAllHistory()
+                            refreshClipboardMenuSnapshot(includePasteboardPreview: true)
                         } label: {
                             Label("Clear History", systemImage: "trash")
                         }
@@ -195,6 +200,62 @@ struct DroppyMenuContent: View {
                     
                 } label: {
                     Label("Clipboard", systemImage: "clipboard")
+                }
+            }
+
+            if shouldShowUpcomingMenu {
+                Menu {
+                    if upcomingTaskItems.isEmpty && upcomingEventItems.isEmpty {
+                        Text("No upcoming tasks or events")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if !upcomingTaskItems.isEmpty {
+                            Text("Tasks")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            ForEach(upcomingTaskItems) { item in
+                                Button {
+                                    SettingsWindowController.shared.showSettings(openingExtension: .todo)
+                                } label: {
+                                    Label(upcomingTitle(for: item), systemImage: "checklist")
+                                }
+                            }
+                        }
+
+                        if !upcomingEventItems.isEmpty {
+                            if !upcomingTaskItems.isEmpty {
+                                Divider()
+                            }
+                            Text("Events")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            ForEach(upcomingEventItems) { item in
+                                Button {
+                                    SettingsWindowController.shared.showSettings(openingExtension: .todo)
+                                } label: {
+                                    Label(upcomingTitle(for: item), systemImage: "calendar.badge.clock")
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        todoManager.syncExternalSourcesNow()
+                    } label: {
+                        Label("Refresh Upcoming", systemImage: "arrow.clockwise")
+                    }
+
+                    Button {
+                        SettingsWindowController.shared.showSettings(openingExtension: .todo)
+                    } label: {
+                        Label("Open Reminders", systemImage: "checklist")
+                    }
+                } label: {
+                    Label("Upcoming", systemImage: "calendar.badge.clock")
                 }
             }
             
@@ -265,6 +326,13 @@ struct DroppyMenuContent: View {
                 // Refresh when extension is disabled/enabled
                 shortcutRefreshId = UUID()
             }
+            .onReceive(clipboardManager.$history) { _ in
+                refreshClipboardMenuSnapshot()
+            }
+            }
+            .onAppear {
+                refreshClipboardMenuSnapshot(includePasteboardPreview: true)
+            }
         }
     }
     
@@ -296,15 +364,109 @@ struct DroppyMenuContent: View {
         case .color: return "paintpalette"
         }
     }
+
+    private func refreshClipboardMenuSnapshot(includePasteboardPreview: Bool = false) {
+        var items = Array(clipboardManager.history.prefix(15))
+        if includePasteboardPreview,
+           items.isEmpty,
+           let previewItem = clipboardManager.currentPasteboardPreviewItem() {
+            items = [previewItem]
+        }
+        clipboardMenuItems = items
+
+        var titles: [UUID: String] = [:]
+        titles.reserveCapacity(items.count)
+        for item in items {
+            titles[item.id] = item.title
+        }
+        clipboardMenuTitles = titles
+    }
+
+    private func clipboardMenuTitle(for item: ClipboardItem) -> String {
+        clipboardMenuTitles[item.id] ?? item.title
+    }
+
+    private var shouldShowUpcomingMenu: Bool {
+        showUpcomingInMenuBar && todoInstalled && !ExtensionType.todo.isRemoved
+    }
+
+    private var upcomingTaskItems: [ToDoItem] {
+        let items = todoManager.overviewTaskItems.filter {
+            !$0.isCompleted && $0.externalSource != .calendar
+        }
+        return Array(items.prefix(6))
+    }
+
+    private var upcomingEventItems: [ToDoItem] {
+        Array(todoManager.upcomingCalendarItems.prefix(6))
+    }
+
+    private func upcomingTitle(for item: ToDoItem) -> String {
+        let baseTitle: String
+        if item.title.count > 52 {
+            baseTitle = String(item.title.prefix(49)) + "..."
+        } else {
+            baseTitle = item.title
+        }
+
+        guard let dueDate = item.dueDate else { return baseTitle }
+        return "\(baseTitle) - \(upcomingDueText(for: dueDate))"
+    }
+
+    private func upcomingDueText(for dueDate: Date) -> String {
+        let calendar = Calendar.current
+        let hasTime = dueDateHasTime(dueDate)
+        if calendar.isDateInToday(dueDate) {
+            return hasTime ? "Today \(Self.todoMenuTimeFormatter.string(from: dueDate))" : "Today"
+        }
+        if calendar.isDateInTomorrow(dueDate) {
+            return hasTime ? "Tomorrow \(Self.todoMenuTimeFormatter.string(from: dueDate))" : "Tomorrow"
+        }
+        return hasTime
+            ? Self.todoMenuDateFormatter.string(from: dueDate)
+            : Self.todoMenuDateOnlyFormatter.string(from: dueDate)
+    }
+
+    private func dueDateHasTime(_ dueDate: Date) -> Bool {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: dueDate)
+        return (components.hour ?? 0) != 0 || (components.minute ?? 0) != 0
+    }
+
+    private static let todoMenuTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
+
+    private static let todoMenuDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
+        return formatter
+    }()
+
+    private static let todoMenuDateOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter
+    }()
 }
 
 /// App delegate to manage application lifecycle and notch window
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static var isTerminationRequested = false
+
     /// Must be stored as property to stay alive (services won't work if deallocated)
     private let serviceProvider = ServiceProvider()
     private var didStartLicensedFeatures = false
     private var didStartBackgroundUpdates = false
+    private var isRetryingTerminateAfterClosingSheets = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // FIX #123: Force LaunchServices re-registration on first launch
@@ -317,13 +479,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.register(defaults: [
             AppPreferenceKey.showInMenuBar: PreferenceDefault.showInMenuBar,
             AppPreferenceKey.showQuickshareInMenuBar: PreferenceDefault.showQuickshareInMenuBar,
+            AppPreferenceKey.todoShowUpcomingInMenuBar: PreferenceDefault.todoShowUpcomingInMenuBar,
             AppPreferenceKey.quickshareRequireUploadConfirmation: PreferenceDefault.quickshareRequireUploadConfirmation,
             AppPreferenceKey.enableNotchShelf: PreferenceDefault.enableNotchShelf,
             AppPreferenceKey.enableHUDReplacement: PreferenceDefault.enableHUDReplacement,
             AppPreferenceKey.showMediaPlayer: PreferenceDefault.showMediaPlayer,
+            AppPreferenceKey.enableMediaAlbumArtGlow: PreferenceDefault.enableMediaAlbumArtGlow,
+            AppPreferenceKey.enableRealAudioVisualizer: PreferenceDefault.enableRealAudioVisualizer,
+            AppPreferenceKey.enableGradientVisualizer: PreferenceDefault.enableGradientVisualizer,
             AppPreferenceKey.enableClipboard: PreferenceDefault.enableClipboard,
             AppPreferenceKey.enableMultiBasket: PreferenceDefault.enableMultiBasket,
             AppPreferenceKey.quickActionsMailApp: PreferenceDefault.quickActionsMailApp,
+            AppPreferenceKey.quickActionsCloudProvider: PreferenceDefault.quickActionsCloudProvider,
             AppPreferenceKey.gumroadLicenseActive: PreferenceDefault.gumroadLicenseActive,
             AppPreferenceKey.gumroadLicenseEmail: PreferenceDefault.gumroadLicenseEmail,
             AppPreferenceKey.gumroadLicenseKeyHint: PreferenceDefault.gumroadLicenseKeyHint,
@@ -343,6 +510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppPreferenceKey.windowSnapBringToFrontWhenHandling: PreferenceDefault.windowSnapBringToFrontWhenHandling,
             AppPreferenceKey.windowSnapResizeMode: PreferenceDefault.windowSnapResizeMode,
         ])
+        Self.normalizeVisualizerPreferencesIfNeeded()
         
         
         // Crash detection: Check if last session crashed and offer to report
@@ -576,7 +744,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             if needsAccessibility && !isGranted {
                 print("🔐 Droppy: Accessibility needed for enabled features - prompting...")
-                PermissionManager.shared.requestAccessibility()
+                PermissionManager.shared.requestAccessibility(context: .automatic)
             } else {
                 print("🔐 DEBUG: NOT prompting - needsAccessibility=\(needsAccessibility) isGranted=\(isGranted)")
             }
@@ -643,6 +811,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if isRetryingTerminateAfterClosingSheets {
+            isRetryingTerminateAfterClosingSheets = false
+            Self.isTerminationRequested = true
+            return .terminateNow
+        }
+
+        let visibleAttachedSheets = sender.windows.compactMap { $0.attachedSheet }.filter { $0.isVisible }
+        guard !visibleAttachedSheets.isEmpty else {
+            Self.isTerminationRequested = true
+            return .terminateNow
+        }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Close open dialog and quit Droppy?"
+        alert.informativeText = "Droppy can't quit while this dialog is open."
+        alert.addButton(withTitle: "Close and Quit")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else {
+            Self.isTerminationRequested = false
+            return .terminateCancel
+        }
+
+        for sheet in visibleAttachedSheets {
+            if let parent = sheet.sheetParent {
+                parent.endSheet(sheet, returnCode: .cancel)
+            } else {
+                sheet.close()
+            }
+        }
+
+        isRetryingTerminateAfterClosingSheets = true
+        Self.isTerminationRequested = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            sender.terminate(nil)
+        }
+
+        return .terminateCancel
+    }
     
     // Prevent app from closing when the settings window is closed
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -664,6 +875,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     // MARK: - LaunchServices Registration (Fix #123)
+
+    /// Keep visualizer preferences in a valid single-selection state.
+    /// Issue #210: exactly one mode must stay enabled at all times.
+    private static func normalizeVisualizerPreferencesIfNeeded() {
+        let defaults = UserDefaults.standard
+        let realAudioEnabled = defaults.preference(
+            AppPreferenceKey.enableRealAudioVisualizer,
+            default: PreferenceDefault.enableRealAudioVisualizer
+        )
+        let gradientEnabled = defaults.preference(
+            AppPreferenceKey.enableGradientVisualizer,
+            default: PreferenceDefault.enableGradientVisualizer
+        )
+
+        if realAudioEnabled && gradientEnabled {
+            defaults.set(false, forKey: AppPreferenceKey.enableGradientVisualizer)
+        } else if !realAudioEnabled && !gradientEnabled {
+            defaults.set(true, forKey: AppPreferenceKey.enableGradientVisualizer)
+        }
+    }
     
     /// Key for tracking if LaunchServices registration has been performed
     private static let launchServicesRegisteredKey = "didRegisterWithLaunchServices"

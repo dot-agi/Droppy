@@ -10,6 +10,7 @@
 
 import AppKit
 import Combine
+import UniformTypeIdentifiers
 
 /// Monitors system-wide drag events to detect when files/items are being dragged
 final class DragMonitor: ObservableObject {
@@ -28,6 +29,10 @@ final class DragMonitor: ObservableObject {
     private var isMonitoring = false
     private var dragStartChangeCount: Int = 0
     private var dragActive = false
+    private var dragHasSupportedPayload = false
+    private var isDragStartCandidate = false
+    private var dragStartCandidateLocation: CGPoint = .zero
+    private let dragStartMovementThreshold: CGFloat = 3.5
     
     // Jiggle detection state
     private var lastDragLocation: CGPoint = .zero
@@ -53,6 +58,17 @@ final class DragMonitor: ObservableObject {
     private var isDragRevealShortcutConfigured: Bool {
         dragRevealShortcutSignature != "none"
     }
+
+    private static let mailDragTypes: Set<NSPasteboard.PasteboardType> = [
+        NSPasteboard.PasteboardType("com.apple.mail.PasteboardTypeMessageTransfer"),
+        NSPasteboard.PasteboardType("com.apple.mail.PasteboardTypeAutomator"),
+        NSPasteboard.PasteboardType("com.apple.mail.message"),
+        NSPasteboard.PasteboardType(UTType.emailMessage.identifier)
+    ]
+
+    private static let filePromiseDragTypes: Set<NSPasteboard.PasteboardType> = Set(
+        NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
+    )
     
     private init() {}
     
@@ -148,6 +164,8 @@ final class DragMonitor: ObservableObject {
         
         if isDragging {
             dragActive = true
+            dragHasSupportedPayload = true
+            isDragStartCandidate = false
             self.isDragging = true
             updateDragRevealHotKeyRegistration()
             if let loc = location {
@@ -158,6 +176,8 @@ final class DragMonitor: ObservableObject {
             resetJiggle()
         } else {
             dragActive = false
+            dragHasSupportedPayload = false
+            isDragStartCandidate = false
             suppressBasketRevealForCurrentDrag = false
             updateDragRevealHotKeyRegistration()
             self.isDragging = false
@@ -171,6 +191,8 @@ final class DragMonitor: ObservableObject {
     func forceReset() {
         print("🧹 DragMonitor.forceReset() called - clearing stuck drag state")
         dragActive = false
+        dragHasSupportedPayload = false
+        isDragStartCandidate = false
         isDragging = false
         dragLocation = .zero
         dragStartChangeCount = 0
@@ -211,6 +233,8 @@ final class DragMonitor: ObservableObject {
                     updateDragRevealHotKeyRegistration()
                     resetJiggle()
                 }
+                dragHasSupportedPayload = false
+                isDragStartCandidate = false
                 return
             }
 
@@ -219,61 +243,80 @@ final class DragMonitor: ObservableObject {
             let currentChangeCount = dragPasteboard.changeCount
             
             // Detect drag START
-            if currentChangeCount != dragStartChangeCount && mouseIsDown {
-                let hasContent = (dragPasteboard.types?.count ?? 0) > 0
-                if hasContent && !dragActive {
-                    dragActive = true
-                    stopIdleJiggleMonitoring()
-                    dragStartChangeCount = currentChangeCount
-                    resetJiggle()
-                    dragEndNotified = false
-                    lastDragLocation = currentMouseLocation
-                    isDragging = true
-                    dragLocation = currentMouseLocation
-                    updateDragRevealHotKeyRegistration()
-                    
-                    // Check if instant basket mode is enabled
-                    let instantMode = UserDefaults.standard.preference(
-                        AppPreferenceKey.instantBasketOnDrag,
-                        default: PreferenceDefault.instantBasketOnDrag
-                    )
-                    if instantMode && !isDragRevealShortcutConfigured {
-                        // Get user-configured delay (minimum 0.15s to let drag "settle")
-                        let configuredDelay = UserDefaults.standard.preference(
-                            AppPreferenceKey.instantBasketDelay,
-                            default: PreferenceDefault.instantBasketDelay
+            if mouseIsDown && !dragActive {
+                if !isDragStartCandidate {
+                    isDragStartCandidate = true
+                    dragStartCandidateLocation = currentMouseLocation
+                }
+
+                let hasSupportedContent = hasSupportedDragPayload(dragPasteboard)
+                if hasSupportedContent {
+                    // Some drag sources can reuse pasteboard changeCount across repeated drags.
+                    // Only allow movement fallback for known unreliable sources (Mail/file promises);
+                    // for regular file/url drags it can false-trigger on stale drag pasteboard data.
+                    let movedFromCandidate = hypot(
+                        currentMouseLocation.x - dragStartCandidateLocation.x,
+                        currentMouseLocation.y - dragStartCandidateLocation.y
+                    ) > dragStartMovementThreshold
+                    let changeCountChanged = currentChangeCount != dragStartChangeCount
+                    let canUseMovementFallback = shouldAllowMovementFallback(for: dragPasteboard)
+                    if changeCountChanged || (canUseMovementFallback && movedFromCandidate) {
+                        dragActive = true
+                        dragHasSupportedPayload = true
+                        isDragStartCandidate = false
+                        stopIdleJiggleMonitoring()
+                        dragStartChangeCount = currentChangeCount
+                        resetJiggle()
+                        dragEndNotified = false
+                        lastDragLocation = currentMouseLocation
+                        isDragging = true
+                        dragLocation = currentMouseLocation
+                        updateDragRevealHotKeyRegistration()
+                        
+                        // Check if instant basket mode is enabled
+                        let instantMode = UserDefaults.standard.preference(
+                            AppPreferenceKey.instantBasketOnDrag,
+                            default: PreferenceDefault.instantBasketOnDrag
                         )
-                        let delay = max(0.15, configuredDelay)
-                        
-                        // Check if Option key is held (for multi-basket spawn)
-                        let optionHeld = NSEvent.modifierFlags.contains(.option)
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                            // Only show if drag is still active (user didn't release)
-                            guard self?.dragActive == true else { return }
-                            guard self?.suppressBasketRevealForCurrentDrag != true else { return }
-                            let enabled = UserDefaults.standard.preference(
-                                AppPreferenceKey.enableFloatingBasket,
-                                default: PreferenceDefault.enableFloatingBasket
+                        if instantMode && !isDragRevealShortcutConfigured {
+                            // Get user-configured delay (minimum 0.15s to let drag "settle")
+                            let configuredDelay = UserDefaults.standard.preference(
+                                AppPreferenceKey.instantBasketDelay,
+                                default: PreferenceDefault.instantBasketDelay
                             )
-                            if enabled {
-                                // Option+drag: Spawn new basket only if multi-basket mode enabled
-                                // Normal drag: Use existing basket if one is visible
-                                let multiBasketEnabled = UserDefaults.standard.preference(
-                                    AppPreferenceKey.enableMultiBasket,
-                                    default: PreferenceDefault.enableMultiBasket
+                            let delay = max(0.15, configuredDelay)
+                            
+                            // Check if Option key is held (for multi-basket spawn)
+                            let optionHeld = NSEvent.modifierFlags.contains(.option)
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                                // Only show if drag is still active (user didn't release)
+                                guard self?.dragActive == true else { return }
+                                guard self?.dragHasSupportedPayload == true else { return }
+                                guard self?.suppressBasketRevealForCurrentDrag != true else { return }
+                                let enabled = UserDefaults.standard.preference(
+                                    AppPreferenceKey.enableFloatingBasket,
+                                    default: PreferenceDefault.enableFloatingBasket
                                 )
-                                if optionHeld && multiBasketEnabled && FloatingBasketWindowController.isAnyBasketVisible {
-                                    FloatingBasketWindowController.spawnNewBasket()
-                                } else {
-                                    FloatingBasketWindowController.shared.onJiggleDetected()
+                                if enabled {
+                                    // Option+drag: Spawn new basket only if multi-basket mode enabled
+                                    // Normal drag: Use existing basket if one is visible
+                                    let multiBasketEnabled = UserDefaults.standard.preference(
+                                        AppPreferenceKey.enableMultiBasket,
+                                        default: PreferenceDefault.enableMultiBasket
+                                    )
+                                    if optionHeld && multiBasketEnabled && FloatingBasketWindowController.isAnyBasketVisible {
+                                        FloatingBasketWindowController.spawnNewBasket()
+                                    } else {
+                                        FloatingBasketWindowController.shared.onJiggleDetected()
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            
+
             // Update location while dragging (use cached value)
             if dragActive && mouseIsDown {
                 dragLocation = currentMouseLocation
@@ -286,6 +329,8 @@ final class DragMonitor: ObservableObject {
             // Detect drag END
             if !mouseIsDown && dragActive {
                 dragActive = false
+                dragHasSupportedPayload = false
+                isDragStartCandidate = false
                 suppressBasketRevealForCurrentDrag = false
                 updateDragRevealHotKeyRegistration()
                 isDragging = false
@@ -302,6 +347,7 @@ final class DragMonitor: ObservableObject {
     }
     
     private func detectJiggle(currentLocation: CGPoint) {
+        guard dragHasSupportedPayload else { return }
         guard !suppressBasketRevealForCurrentDrag else { return }
         
         let dx = currentLocation.x - lastDragLocation.x
@@ -352,6 +398,34 @@ final class DragMonitor: ObservableObject {
         
         lastDragDirection = currentDirection
     }
+
+    private func hasSupportedDragPayload(_ pasteboard: NSPasteboard) -> Bool {
+        guard let types = pasteboard.types, !types.isEmpty else { return false }
+
+        for type in types {
+            if Self.mailDragTypes.contains(type) || Self.filePromiseDragTypes.contains(type) {
+                return true
+            }
+
+            if let utType = UTType(type.rawValue),
+               utType.conforms(to: .fileURL) ||
+               utType.conforms(to: .url) ||
+               utType.conforms(to: .image) ||
+               utType.conforms(to: .movie) {
+                return true
+            }
+        }
+
+        // Fallback for drag sources that expose URLs without a canonical UTI type.
+        return pasteboard.canReadObject(forClasses: [NSURL.self], options: nil)
+    }
+
+    private func shouldAllowMovementFallback(for pasteboard: NSPasteboard) -> Bool {
+        guard let types = pasteboard.types, !types.isEmpty else { return false }
+        return types.contains { type in
+            Self.mailDragTypes.contains(type) || Self.filePromiseDragTypes.contains(type)
+        }
+    }
     
     private func loadDragRevealShortcut() -> SavedShortcut? {
         guard let data = UserDefaults.standard.data(forKey: AppPreferenceKey.basketDragRevealShortcut),
@@ -392,6 +466,7 @@ final class DragMonitor: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             guard self.dragActive else { return }
+            guard self.dragHasSupportedPayload else { return }
             
             // Debounce key repeat
             let now = Date()

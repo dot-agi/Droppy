@@ -152,6 +152,12 @@ final class NotchWindowController: NSObject, ObservableObject {
     
     /// Monitor for global right-click events (context menu access in idle state) - Issue #57 fix
     private var globalRightClickMonitor: Any?
+
+    /// Last timestamp when a mouse-move event was processed.
+    private var lastMouseMoveProcessTime: TimeInterval = 0
+
+    /// Cap notch mouse-move processing to reduce main-thread pressure.
+    private let mouseMoveProcessInterval: TimeInterval = 1.0 / 120.0
     
     /// Watchdog timer for self-healing - validates window state periodically
     private var watchdogTimer: Timer?
@@ -188,6 +194,24 @@ final class NotchWindowController: NSObject, ObservableObject {
     
     /// System observers for wake/display changes
     private var systemObservers: [NSObjectProtocol] = []
+
+    /// Menu tracking depth across NSMenu begin/end notifications.
+    /// `> 0` means AppKit is actively tracking at least one menu.
+    private var activeMenuTrackingDepth: Int = 0
+
+    @inline(__always)
+    private func isMenuTrackingRunLoopActive() -> Bool {
+        if activeMenuTrackingDepth > 0 {
+            return true
+        }
+        if RunLoop.current.currentMode == .eventTracking {
+            return true
+        }
+        if RunLoop.main.currentMode == .eventTracking {
+            return true
+        }
+        return false
+    }
     
     /// Shared instance
     static let shared = NotchWindowController()
@@ -213,6 +237,10 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Per-display fullscreen hover-reveal tracking (Bug #133 fix)
     /// When user hovers at top edge in fullscreen, we temporarily reveal the notch
     var fullscreenHoverRevealedDisplays: Set<CGDirectDisplayID> = []
+
+    /// Fullscreen reveal should only trigger at the absolute screen edge.
+    /// Keep a tiny tolerance for coordinate precision drift.
+    private let fullscreenTopEdgeRevealTolerance: CGFloat = 0.5
     
     private override init() {
         super.init()
@@ -227,23 +255,70 @@ final class NotchWindowController: NSObject, ObservableObject {
     
     /// Checks if a context menu is currently open (prevents shelf closure during menu interactions)
     func hasActiveContextMenu() -> Bool {
-        // Restrict detection to menu-class windows only.
-        // Generic high-level panels (basket/OCR/etc.) must NOT block shelf collapse logic.
-        return NSApp.windows.contains { window in
-            guard window.isVisible else { return false }
-            guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
-            let className = NSStringFromClass(type(of: window)).lowercased()
-            return className.contains("menu")
+        if isMenuTrackingRunLoopActive() {
+            cachedHasActiveContextMenu = true
+            return true
         }
+        refreshTransientWindowStateIfNeeded()
+        return cachedHasActiveContextMenu
     }
 
     /// Checks if a transient popover/aux panel is currently open.
     func hasActivePopoverWindow() -> Bool {
-        NSApp.windows.contains { window in
-            guard window.isVisible else { return false }
-            let className = String(describing: type(of: window))
-            return className.contains("Popover")
+        refreshTransientWindowStateIfNeeded()
+        return cachedHasActivePopoverWindow
+    }
+
+    /// Cached context-menu detection state to avoid scanning NSApp.windows on every high-frequency event.
+    private var cachedHasActiveContextMenu = false
+
+    /// Cached popover detection state to avoid repeated window scans in monitor hot paths.
+    private var cachedHasActivePopoverWindow = false
+
+    /// Last time we scanned NSApp.windows for transient menu/popover state.
+    private var lastTransientWindowScanTime: TimeInterval = 0
+
+    /// Upper bound for transient-window scans while monitors are active.
+    private let transientWindowScanInterval: TimeInterval = 1.0 / 30.0
+
+    private func refreshTransientWindowStateIfNeeded(force: Bool = false) {
+        let now = ProcessInfo.processInfo.systemUptime
+        if !force, now - lastTransientWindowScanTime < transientWindowScanInterval {
+            return
         }
+        lastTransientWindowScanTime = now
+
+        var hasMenu = false
+        var hasPopover = false
+
+        for window in NSApp.windows where window.isVisible {
+            if !hasMenu, window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue {
+                let className = NSStringFromClass(type(of: window)).lowercased()
+                if className.contains("menu") {
+                    hasMenu = true
+                }
+            }
+
+            if !hasPopover {
+                let className = String(describing: type(of: window))
+                if className.contains("Popover") {
+                    hasPopover = true
+                }
+            }
+
+            if hasMenu && hasPopover {
+                break
+            }
+        }
+
+        cachedHasActiveContextMenu = hasMenu
+        cachedHasActivePopoverWindow = hasPopover
+    }
+
+    private func resetTransientWindowStateCache() {
+        cachedHasActiveContextMenu = false
+        cachedHasActivePopoverWindow = false
+        lastTransientWindowScanTime = 0
     }
 
     private let shelfBaseWidth: CGFloat = 450
@@ -257,8 +332,7 @@ final class NotchWindowController: NSObject, ObservableObject {
 
     fileprivate func currentExpandedShelfWidth() -> CGFloat {
         if ToDoManager.shared.isShelfListExpanded &&
-            ToDoManager.shared.isRemindersSyncEnabled &&
-            ToDoManager.shared.isCalendarSyncEnabled {
+            ToDoManager.shared.isShelfSplitViewEnabled {
             return max(shelfBaseWidth, todoSplitShelfWidth)
         }
         return shelfBaseWidth
@@ -269,16 +343,117 @@ final class NotchWindowController: NSObject, ObservableObject {
         horizontalPadding: CGFloat = 12,
         verticalPadding: CGFloat = 12
     ) -> NSRect {
+        let usingMediaHeight = shouldUseMediaInteractionHeight(on: screen)
         let expandedWidth = currentExpandedShelfWidth()
         let centerX = effectiveShelfCenterX(for: screen)
-        let expandedHeight = DroppyState.expandedShelfHeight(for: screen)
+        let expandedHeight = expandedShelfInteractionHeight(for: screen)
+        let isTodoSplitExpanded = ToDoManager.shared.isShelfListExpanded &&
+            ToDoManager.shared.isShelfSplitViewEnabled
+        // ToDo split mode lifts top controls upward; extend the interaction zone upward
+        // so those controls never count as "outside click" targets.
+        // Keep this generous to cover notch + menu-bar-adjacent placements reliably.
+        let topPadding = verticalPadding + (isTodoSplitExpanded ? 80 : 0)
+        // Media mode uses a reduced base height for less "sticky" hover behavior.
+        // Add back just the floating-controls lane so buttons below the card remain reachable.
+        let mediaFloatingControlsPadding = usingMediaHeight ? expandedFloatingControlsReachPadding(for: screen) : 0
+        let bottomPadding = verticalPadding + mediaFloatingControlsPadding
 
         return NSRect(
             x: centerX - expandedWidth / 2 - horizontalPadding,
-            y: screen.frame.origin.y + screen.frame.height - expandedHeight - verticalPadding,
+            y: screen.frame.origin.y + screen.frame.height - expandedHeight - bottomPadding,
             width: expandedWidth + (horizontalPadding * 2),
-            height: expandedHeight + (verticalPadding * 2)
+            height: expandedHeight + bottomPadding + topPadding
         )
+    }
+
+    /// Expanded media surface is much shorter than the generic max shelf height.
+    /// Using the true media height prevents sticky hover/collapse behavior.
+    private func expandedMediaInteractionHeight(for screen: NSScreen) -> CGFloat {
+        let hasPhysicalNotch = screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
+        if hasPhysicalNotch {
+            let topInset = screen.safeAreaInsets.top
+            let notchHeight = topInset > 0 ? topInset : NotchLayoutConstants.physicalNotchHeight
+            return notchHeight + 120
+        }
+        return 140
+    }
+
+    private func shouldUseMediaInteractionHeight(on screen: NSScreen) -> Bool {
+        let displayID = screen.displayID
+        guard DroppyState.shared.isExpanded(for: displayID) else { return false }
+        guard !DragMonitor.shared.isDragging, !DroppyState.shared.isDropTargeted else { return false }
+
+        let showMediaPlayer = (UserDefaults.standard.object(forKey: AppPreferenceKey.showMediaPlayer) as? Bool) ?? PreferenceDefault.showMediaPlayer
+        guard showMediaPlayer else { return false }
+        guard DroppyState.shared.shelfDisplaySlotCount == 0 else { return false }
+        guard MusicManager.shared.isMediaAvailable, !MusicManager.shared.isPlayerIdle else { return false }
+
+        // Terminal takes over the expanded surface when active.
+        if TerminalNotchManager.shared.isVisible {
+            return false
+        }
+
+        // To-do editing/list sessions should keep their own interaction zone.
+        let todoManager = ToDoManager.shared
+        if todoManager.isVisible || todoManager.isShelfListExpanded || todoManager.isEditingText || todoManager.isInteractingWithPopover {
+            return false
+        }
+
+        let autoOpenMediaHUD = (UserDefaults.standard.object(forKey: AppPreferenceKey.autoOpenMediaHUDOnShelfExpand) as? Bool) ?? PreferenceDefault.autoOpenMediaHUDOnShelfExpand
+        let mediaHidden = MusicManager.shared.isMediaHUDHidden
+        let forcedMedia = MusicManager.shared.isMediaHUDForced
+        let autoOrSongDriven = (autoOpenMediaHUD && !mediaHidden) ||
+            ((MusicManager.shared.isPlaying || MusicManager.shared.wasRecentlyPlaying) && !mediaHidden)
+
+        return forcedMedia || autoOrSongDriven
+    }
+
+    private func expandedShelfInteractionHeight(for screen: NSScreen) -> CGFloat {
+        let fallbackHeight = DroppyState.expandedShelfHeight(for: screen)
+        guard shouldUseMediaInteractionHeight(on: screen) else { return fallbackHeight }
+        return min(fallbackHeight, expandedMediaInteractionHeight(for: screen))
+    }
+
+    /// Additional downward interaction reach required for floating controls beneath
+    /// the expanded media card (close/terminal/camera/caffeine + quick actions).
+    private func expandedFloatingControlsReachPadding(for screen: NSScreen) -> CGFloat {
+        let displayID = screen.displayID
+        guard DroppyState.shared.isExpanded(for: displayID) else { return 0 }
+
+        let enableNotchShelf = (UserDefaults.standard.object(forKey: AppPreferenceKey.enableNotchShelf) as? Bool) ?? true
+        guard enableNotchShelf else { return 0 }
+
+        let dragging = DragMonitor.shared.isDragging
+        let autoCollapseEnabled = (UserDefaults.standard.object(forKey: AppPreferenceKey.autoCollapseShelf) as? Bool) ?? true
+        let enableQuickActions = UserDefaults.standard.preference(AppPreferenceKey.enableQuickActions, default: PreferenceDefault.enableQuickActions)
+
+        let terminalInstalled = UserDefaults.standard.preference(AppPreferenceKey.terminalNotchInstalled, default: PreferenceDefault.terminalNotchInstalled)
+        let terminalEnabled = UserDefaults.standard.preference(AppPreferenceKey.terminalNotchEnabled, default: PreferenceDefault.terminalNotchEnabled)
+        let caffeineInstalled = UserDefaults.standard.preference(AppPreferenceKey.caffeineInstalled, default: PreferenceDefault.caffeineInstalled)
+        let caffeineEnabled = UserDefaults.standard.preference(AppPreferenceKey.caffeineEnabled, default: PreferenceDefault.caffeineEnabled)
+        let cameraInstalled = UserDefaults.standard.preference(AppPreferenceKey.cameraInstalled, default: PreferenceDefault.cameraInstalled)
+        let cameraEnabled = UserDefaults.standard.preference(AppPreferenceKey.cameraEnabled, default: PreferenceDefault.cameraEnabled)
+
+        let regularButtonsVisible = !dragging && (
+            (terminalInstalled && terminalEnabled) ||
+            (caffeineInstalled && caffeineEnabled) ||
+            (cameraInstalled && cameraEnabled) ||
+            !autoCollapseEnabled
+        )
+        let quickActionsVisible = dragging && enableQuickActions
+
+        guard regularButtonsVisible || quickActionsVisible else { return 0 }
+
+        let isDynamicIsland = NotchLayoutConstants.isDynamicIslandMode(for: screen)
+        let islandCompensation: CGFloat = isDynamicIsland ? NotchLayoutConstants.floatingButtonIslandCompensation : 0
+        let controlHeight: CGFloat = quickActionsVisible ? 44 : 32
+        let hoverHeadroom: CGFloat = 20
+
+        return NotchLayoutConstants.floatingButtonGap + islandCompensation + controlHeight + hoverHeadroom
+    }
+
+    func isMouseInsideExpandedShelfInteractionZone(on screen: NSScreen, at location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        expandedShelfInteractionZone(for: screen).contains(location)
     }
 
     private func currentInteractionWindowWidth() -> CGFloat {
@@ -731,6 +906,9 @@ final class NotchWindowController: NSObject, ObservableObject {
         // Global monitor catches mouse movement when Droppy is not frontmost
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
             guard let self else { return }
+            if self.isMenuTrackingRunLoopActive() || self.hasActiveContextMenu() {
+                return
+            }
             // PERFORMANCE (v10.x): Skip drag events unless already hovering over this display's notch.
             // macOS fires hundreds of leftMouseDragged events per second during drag operations.
             // Processing each one causes 100% CPU. We only care about drags that START on the notch.
@@ -743,11 +921,13 @@ final class NotchWindowController: NSObject, ObservableObject {
                 }
             }
             
-            // DEBUG: Log every 60 events to verify monitor is receiving events after unlock
-            struct DebugCounter { static var count = 0 }
-            DebugCounter.count += 1
-            if DebugCounter.count % 60 == 0 {
-                notchDebugLog("🐭 NotchWindowController: globalMouseMonitor received \(DebugCounter.count) events")
+            if notchMotionDebugLogs {
+                // DEBUG: Log every 60 events to verify monitor is receiving events after unlock
+                struct DebugCounter { static var count = 0 }
+                DebugCounter.count += 1
+                if DebugCounter.count % 60 == 0 {
+                    notchDebugLog("🐭 NotchWindowController: globalMouseMonitor received \(DebugCounter.count) events")
+                }
             }
             self.handleMouseEvent(event)
         }
@@ -767,8 +947,9 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Find the window whose screen contains the mouse
             guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return }
 
-            // Get the notch rect from the window for that screen
-            let notchRect = targetWindow.getNotchRect()
+            // Use media-aware collapsed hit zone so hover/click behavior matches
+            // the visible mini player wings in notch mode (Issue #213).
+            let notchRect = targetWindow.collapsedInteractionRect()
             // Create a click-friendly zone: ±10px horizontal expansion, upward to screen top
             let screenTopY = targetScreen.frame.maxY
             let upwardExpansion = max(0, screenTopY - notchRect.maxY)
@@ -858,8 +1039,8 @@ final class NotchWindowController: NSObject, ObservableObject {
             // Find the window whose screen contains the mouse
             guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return }
             
-            // Get the notch rect and create a click zone
-            let notchRect = targetWindow.getNotchRect()
+            // Use media-aware collapsed hit zone so right-click follows visible surface.
+            let notchRect = targetWindow.collapsedInteractionRect()
             let screenTopY = targetScreen.frame.maxY
             let upwardExpansion = max(0, screenTopY - notchRect.maxY)
             
@@ -892,6 +1073,9 @@ final class NotchWindowController: NSObject, ObservableObject {
 
             // Handle mouse movement
             if event.type == .mouseMoved {
+                if self.isMenuTrackingRunLoopActive() || self.hasActiveContextMenu() {
+                    return event
+                }
                 self.handleMouseEvent(event)
                 return event
             }
@@ -909,7 +1093,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                 // Find window for this click
                 guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return event }
                 
-                let notchRect = targetWindow.getNotchRect()
+                let notchRect = targetWindow.collapsedInteractionRect()
                 let screenTopY = targetScreen.frame.maxY
                 let upwardExpansion = max(0, screenTopY - notchRect.maxY)
                 
@@ -943,7 +1127,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                 // Find the window whose screen contains the mouse
                 guard let (targetWindow, targetScreen) = self.findWindowForMouseLocation(mouseLocation) else { return event }
 
-                let notchRect = targetWindow.getNotchRect()
+                let notchRect = targetWindow.collapsedInteractionRect()
 
                 // Notch click zone
                 let screenTopY = targetScreen.frame.maxY
@@ -1037,12 +1221,20 @@ final class NotchWindowController: NSObject, ObservableObject {
         // Keyboard monitor for spacebar Quick Look preview and Cmd+A select all
         // Local monitor - catches events when shelf is key window
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            // Route To-do timeline up/down navigation through AppKit monitor for
+            // consistent behavior without requiring SwiftUI focus rings.
+            if let self,
+               self.handleToDoTimelineArrowNavigation(event: event, modifiers: modifiers, fromGlobalMonitor: false) {
+                return nil
+            }
+
             // Only handle when shelf is expanded and has items
             guard DroppyState.shared.isExpanded,
                   !DroppyState.shared.items.isEmpty else {
                 return event
             }
-            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             
             // Spacebar triggers Quick Look (skip if rename is active)
             if event.keyCode == 49 {
@@ -1068,13 +1260,18 @@ final class NotchWindowController: NSObject, ObservableObject {
         // Global keyboard monitor - catches spacebar when shelf is visible but not key window
         // This ensures Quick Look works even when clicking on items briefly loses focus
         globalKeyboardMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            if let self {
+                _ = self.handleToDoTimelineArrowNavigation(event: event, modifiers: modifiers, fromGlobalMonitor: true)
+            }
+
             // Only handle when shelf is expanded and has items
             guard DroppyState.shared.isExpanded,
                   !DroppyState.shared.items.isEmpty else {
                 return
             }
             guard let self else { return }
-            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             
             // Spacebar quick look fallback.
             if event.keyCode == 49 {
@@ -1106,6 +1303,7 @@ final class NotchWindowController: NSObject, ObservableObject {
                   !self.notchWindows.isEmpty,
                   // CRITICAL: Use object() ?? true to match @AppStorage defaults
                   (UserDefaults.standard.object(forKey: "enableNotchShelf") as? Bool) ?? true,
+                  !self.hasActiveContextMenu(),
                   !DroppyState.shared.isExpanded,  // Don't need edge detection when expanded
                   !DragMonitor.shared.isDragging   // Drag monitor handles its own detection
             else { return }
@@ -1145,12 +1343,19 @@ final class NotchWindowController: NSObject, ObservableObject {
                 
                 // Check if cursor is at the top of THIS specific screen
                 let screenTop = screen.frame.maxY
-                let isAtScreenTop = nsMouseLocation.y >= screenTop - 10  // Within 10px of screen top
+                let isFullscreenOnThisDisplay = self.fullscreenDisplayIDs.contains(screen.displayID)
+                let isAtScreenTop: Bool
+                if isFullscreenOnThisDisplay {
+                    // Fullscreen mode should only react at the absolute top edge.
+                    isAtScreenTop = nsMouseLocation.y >= (screenTop - self.fullscreenTopEdgeRevealTolerance)
+                } else {
+                    isAtScreenTop = nsMouseLocation.y >= screenTop - 10  // Within 10px of screen top
+                }
                 
                 guard isAtScreenTop else { continue }
                 
                 // Check if cursor is within the notch X range
-                let notchRect = window.getNotchRect()
+                let notchRect = window.collapsedInteractionRect()
                 let isWithinNotchX = window.isWithinTopEdgeHoverBand(
                     x: nsMouseLocation.x,
                     on: screen,
@@ -1173,19 +1378,25 @@ final class NotchWindowController: NSObject, ObservableObject {
                 }
             }
         }
-        RunLoop.current.add(timer, forMode: .common)
+        RunLoop.current.add(timer, forMode: .default)
         edgeDetectionTimer = timer
         
         // SCROLL WHEEL MONITOR - Detect 2-finger horizontal swipe for media HUD toggle
         // Swipe left = show media HUD, Swipe right = hide media HUD
         // Global monitor catches events from other apps
         scrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            self?.handleScrollEvent(event)
+            guard let self else { return }
+            guard !self.isMenuTrackingRunLoopActive() else { return }
+            guard self.isPotentialHorizontalSwipeEvent(event) else { return }
+            self.handleScrollEvent(event)
         }
         
         // Local monitor catches events over Droppy's own window
         localScrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            self?.handleScrollEvent(event)
+            guard let self else { return event }
+            guard !self.isMenuTrackingRunLoopActive() else { return event }
+            guard self.isPotentialHorizontalSwipeEvent(event) else { return event }
+            self.handleScrollEvent(event)
             return event  // Pass event through
         }
     }
@@ -1206,6 +1417,34 @@ final class NotchWindowController: NSObject, ObservableObject {
         (TerminalNotchManager.shared.isInstalled && TerminalNotchManager.shared.isVisible) ||
         DroppyState.shared.isRenaming ||
         isTextInputResponderActive()
+    }
+
+    private func handleToDoTimelineArrowNavigation(
+        event: NSEvent,
+        modifiers: NSEvent.ModifierFlags,
+        fromGlobalMonitor: Bool
+    ) -> Bool {
+        guard event.keyCode == 125 || event.keyCode == 126 else { return false }
+        guard modifiers.isEmpty else { return false }
+        guard DroppyState.shared.isExpanded else { return false }
+        guard ToDoManager.shared.isShelfListExpanded else { return false }
+        guard !ToDoManager.shared.isInteractingWithPopover else { return false }
+        guard !ToDoManager.shared.isEditingText else { return false }
+        guard !isTextInputResponderActive() else { return false }
+
+        if fromGlobalMonitor {
+            guard NSApp.isActive else { return false }
+            guard !isAnyExpandedShelfWindowKey() else { return false }
+            guard isMouseNearExpandedShelfZone() else { return false }
+        }
+
+        let step = event.keyCode == 125 ? 1 : -1
+        NotificationCenter.default.post(
+            name: .todoShelfNavigateTimeline,
+            object: nil,
+            userInfo: ["step": step]
+        )
+        return true
     }
 
     private func selectAllShelfItems() {
@@ -1425,6 +1664,12 @@ final class NotchWindowController: NSObject, ObservableObject {
         }
     }
 
+    /// Requests size recalculation using the controller's built-in throttling/coalescing path.
+    /// Prefer this for high-frequency UI updates to keep interaction smooth.
+    func recalculateAllWindowSizesCoalesced() {
+        updateAllWindowsSize()
+    }
+
     
     /// Updates mouse event handling for all notch windows
     /// CRITICAL: Skips update if windows are temporarily hidden to prevent
@@ -1461,10 +1706,16 @@ final class NotchWindowController: NSObject, ObservableObject {
         }
         return nil
     }    
+
+    fileprivate func isAtAbsoluteTopEdge(_ mouseLocation: NSPoint, on screen: NSScreen) -> Bool {
+        mouseLocation.y >= (screen.frame.maxY - fullscreenTopEdgeRevealTolerance)
+    }
+
     /// Stops and releases all monitors and timers
     private func stopMonitors() {
         stopWatchdog() // Stop self-healing watchdog
         cancellables.removeAll()
+        resetTransientWindowStateCache()
         
         isFullscreenMonitoring = false
         
@@ -1611,6 +1862,30 @@ final class NotchWindowController: NSObject, ObservableObject {
             self?.repositionNotchWindow()
         }
         systemObservers.append(islandHeightObserver)
+
+        // Menu tracking notifications (status-item menus, context menus, submenus).
+        // Used as a cheap/robust signal to pause expensive notch event processing while menus are open.
+        let menuBeginObserver = center.addObserver(
+            forName: NSMenu.didBeginTrackingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.activeMenuTrackingDepth += 1
+            self.refreshTransientWindowStateIfNeeded(force: true)
+        }
+        systemObservers.append(menuBeginObserver)
+
+        let menuEndObserver = center.addObserver(
+            forName: NSMenu.didEndTrackingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.activeMenuTrackingDepth = max(0, self.activeMenuTrackingDepth - 1)
+            self.refreshTransientWindowStateIfNeeded(force: true)
+        }
+        systemObservers.append(menuEndObserver)
     }
     
     /// Forces re-registration of all event monitors
@@ -1699,6 +1974,7 @@ final class NotchWindowController: NSObject, ObservableObject {
             center.removeObserver(observer)
         }
         systemObservers.removeAll()
+        activeMenuTrackingDepth = 0
     }
     
     /// Handles system transitions (wake, display change) by re-validating state
@@ -1885,10 +2161,14 @@ final class NotchWindowController: NSObject, ObservableObject {
         notchDebugLog("🟢 startAutoExpandTimer CALLED for displayID: \(displayID?.description ?? "nil")")
         
         cancelAutoExpandTimer() // Reset if already running
+        let skipHighAlertHoverHUD = UserDefaults.standard.preference(
+            AppPreferenceKey.caffeineInstantlyExpandShelfOnHover,
+            default: PreferenceDefault.caffeineInstantlyExpandShelfOnHover
+        )
 
-        // High Alert override: while active, never auto-expand on hover.
-        // User can still click the notch to expand manually.
-        guard !CaffeineManager.shared.isActive else {
+        // High Alert override: by default, active High Alert blocks hover auto-expand.
+        // Users can opt out via High Alert settings to expand shelf directly on hover.
+        guard !CaffeineManager.shared.isActive || skipHighAlertHoverHUD else {
             HapticFeedback.hover()
             notchDebugLog("⏰ AUTO-EXPAND BLOCKED: High Alert is active")
             return
@@ -1926,7 +2206,11 @@ final class NotchWindowController: NSObject, ObservableObject {
             }
 
             // High Alert can toggle after timer start; re-check before expanding.
-            if CaffeineManager.shared.isActive {
+            let skipHighAlertHoverHUD = UserDefaults.standard.preference(
+                AppPreferenceKey.caffeineInstantlyExpandShelfOnHover,
+                default: PreferenceDefault.caffeineInstantlyExpandShelfOnHover
+            )
+            if CaffeineManager.shared.isActive && !skipHighAlertHoverHUD {
                 notchDebugLog("⏰ AUTO-EXPAND BLOCKED (timer fire): High Alert is active")
                 return
             }
@@ -2003,7 +2287,7 @@ final class NotchWindowController: NSObject, ObservableObject {
 
     /// Hover intent zone for shelf auto-expand.
     private func isMouseInAutoExpandIntentZone(mouseLocation: NSPoint, window: NotchWindow) -> Bool {
-        let notchRect = window.getNotchRect()
+        let notchRect = window.collapsedInteractionRect()
         let screenTopY = window.notchScreen?.frame.maxY ?? notchRect.maxY
         let upwardExpansion = max(0, screenTopY - notchRect.maxY)
         let relaxedZone = NSRect(
@@ -2018,6 +2302,18 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Routed event handler from monitors
     /// Only routes to the window whose screen contains the mouse - prevents race conditions
     private func handleMouseEvent(_ event: NSEvent) {
+        if event.type == .mouseMoved {
+            let now = ProcessInfo.processInfo.systemUptime
+            guard now - lastMouseMoveProcessTime >= mouseMoveProcessInterval else { return }
+            lastMouseMoveProcessTime = now
+        }
+
+        // Menu windows dispatch a very high volume of mouse-move events.
+        // Skip notch hit-testing while a menu is open to keep menu interactions responsive.
+        if hasActiveContextMenu() {
+            return
+        }
+
         let mouseLocation = NSEvent.mouseLocation
         
         // Find which window should handle this event (the one whose screen contains the mouse)
@@ -2031,33 +2327,15 @@ final class NotchWindowController: NSObject, ObservableObject {
                 let alreadyRevealed = fullscreenHoverRevealedDisplays.contains(displayID)
                 
                 if !alreadyRevealed {
-                    // Check if mouse is in the notch area (same logic as normal hover)
-                    let isInNotchArea = window.notchRect.contains(mouseLocation)
-                    
-                    // Check expanded zone - matches normal hover behavior
-                    let screenTopY = screen.frame.maxY
-                    let upwardExpansion = (screenTopY - window.notchRect.maxY) + 5
-                    let expandedRect = NSRect(
-                        x: window.notchRect.origin.x - 20,
-                        y: window.notchRect.origin.y,
-                        width: window.notchRect.width + 40,
-                        height: window.notchRect.height + upwardExpansion
-                    )
-                    var isInExpandedZone = expandedRect.contains(mouseLocation)
-                    
-                    // Fitt's Law special case: at screen top within notch X range = always hover
-                    // (Same as normal hover detection - cursor pushed against edge)
-                    let isAtScreenTop = mouseLocation.y >= screenTopY - 20
+                    let interactionRect = window.collapsedInteractionRect()
+                    let isAtScreenTop = isAtAbsoluteTopEdge(mouseLocation, on: screen)
                     let isWithinNotchX = window.isWithinTopEdgeHoverBand(
                         x: mouseLocation.x,
                         on: screen,
-                        notchRect: window.notchRect
+                        notchRect: interactionRect
                     )
+
                     if isAtScreenTop && isWithinNotchX {
-                        isInExpandedZone = true
-                    }
-                    
-                    if isInNotchArea || isInExpandedZone {
                         // Trigger reveal - window becomes visible again
                         notchDebugLog("🎬 FULLSCREEN REVEAL: Triggering for display \(displayID)")
                         fullscreenHoverRevealedDisplays.insert(displayID)
@@ -2109,49 +2387,33 @@ final class NotchWindowController: NSObject, ObservableObject {
     /// Debounce rapid repeated media/shelf toggles from a single swipe burst.
     private var lastMediaSwipeToggleAt: Date = .distantPast
 
-    private enum MouseSwipeModifier: String {
-        case option
-        case shift
-        case control
+    /// Cheap prefilter for scroll monitors so vertical menu scrolling doesn't trigger expensive swipe logic.
+    @inline(__always)
+    private func isPotentialHorizontalSwipeEvent(_ event: NSEvent) -> Bool {
+        let absX = abs(event.scrollingDeltaX)
+        let absY = abs(event.scrollingDeltaY)
 
-        var flags: NSEvent.ModifierFlags {
-            switch self {
-            case .option: return .option
-            case .shift: return .shift
-            case .control: return .control
-            }
-        }
+        // Ignore tiny horizontal jitter present in many vertical trackpad scroll gestures.
+        let minimumHorizontalDelta: CGFloat = event.hasPreciseScrollingDeltas ? 1.5 : 1.0
+        guard absX >= minimumHorizontalDelta else { return false }
+
+        // Require clearly horizontal intent.
+        return absX > absY * 1.2
     }
 
-    private func mouseSwipeModifier() -> MouseSwipeModifier {
-        let rawValue = UserDefaults.standard.preference(
-            AppPreferenceKey.mouseSwipeMediaSwitchModifier,
-            default: PreferenceDefault.mouseSwipeMediaSwitchModifier
-        )
-        return MouseSwipeModifier(rawValue: rawValue) ?? .option
-    }
-
-    private func mouseGestureDeltaX(for event: NSEvent) -> CGFloat? {
-        let isEnabled = UserDefaults.standard.preference(
-            AppPreferenceKey.enableMouseSwipeMediaSwitch,
-            default: PreferenceDefault.enableMouseSwipeMediaSwitch
-        )
-        guard isEnabled else { return nil }
-
-        let allowedFlags: NSEvent.ModifierFlags = [.option, .shift, .control]
-        let activeModifiers = event.modifierFlags.intersection(allowedFlags)
-        guard activeModifiers.contains(mouseSwipeModifier().flags) else { return nil }
-
-        // For regular mouse wheels, map vertical wheel motion to horizontal swipe intent.
-        guard abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) else { return nil }
-        return -event.scrollingDeltaY
-    }
-    
     /// Handles scroll wheel events for 2-finger horizontal swipe media HUD toggle
     /// Swipe left = show media HUD, Swipe right = hide media HUD
     /// Works both when collapsed (hover state) and when expanded (shelf view)
     /// DISABLED when terminal is visible (terminal takes over the shelf)
     private func handleScrollEvent(_ event: NSEvent) {
+        // First reject non-horizontal gestures. This keeps vertical menu scrolling hot paths cheap.
+        guard isPotentialHorizontalSwipeEvent(event) else { return }
+
+        // Don't spend cycles on shelf/media swipe detection while menus are open.
+        if hasActiveContextMenu() {
+            return
+        }
+
         // Disable swipe when terminal is visible (terminal takes over the shelf)
         if TerminalNotchManager.shared.isInstalled && TerminalNotchManager.shared.isVisible {
             return
@@ -2163,15 +2425,7 @@ final class NotchWindowController: NSObject, ObservableObject {
         }
         lastScrollTime = Date()
         
-        let trackpadHorizontalSwipe = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) * 1.5
-        let mappedMouseGestureDelta = mouseGestureDeltaX(for: event)
-        let usingMappedMouseGesture = mappedMouseGestureDelta != nil
-
-        // Allow either native horizontal swipe input or configured mouse-gesture mapping.
-        guard trackpadHorizontalSwipe || usingMappedMouseGesture else { return }
-
-        // Accumulate horizontal intent from the active input path.
-        accumulatedScrollX += mappedMouseGestureDelta ?? event.scrollingDeltaX
+        accumulatedScrollX += event.scrollingDeltaX
         
         let mouseLocation = NSEvent.mouseLocation
         
@@ -2209,6 +2463,7 @@ final class NotchWindowController: NSObject, ObservableObject {
         
         // Require accumulated intent to exceed threshold before triggering.
         // Mouse wheel gestures are less granular than trackpad swipes, so use a lower threshold.
+        let usingMappedMouseGesture = !event.hasPreciseScrollingDeltas
         let threshold: CGFloat = usingMappedMouseGesture ? 4 : 30
         
         // Determine current effective state for media visibility
@@ -2479,6 +2734,43 @@ class NotchWindow: NSPanel {
         return notchRect
     }
 
+    /// Collapsed interaction surface used for hover/click hit-testing.
+    /// In built-in notch mode, the mini media HUD renders 50pt wings on each side
+    /// of the physical notch. Expand hit-testing to match that visible surface.
+    func collapsedInteractionRect() -> NSRect {
+        var rect = notchRect
+        guard shouldUseMediaWingInteractionRect else { return rect }
+
+        let mediaWingWidth: CGFloat = 50
+        rect.origin.x -= mediaWingWidth
+        rect.size.width += (mediaWingWidth * 2)
+        return rect
+    }
+
+    /// Mirrors collapsed mini-media visibility conditions closely enough for hit-testing.
+    private var shouldUseMediaWingInteractionRect: Bool {
+        guard let screen = notchScreen else { return false }
+        guard !needsDynamicIsland else { return false }
+        guard screen.isBuiltIn else { return false }
+        guard screen.auxiliaryTopLeftArea != nil, screen.auxiliaryTopRightArea != nil else { return false }
+
+        let showMediaPlayer = (UserDefaults.standard.object(forKey: AppPreferenceKey.showMediaPlayer) as? Bool)
+            ?? PreferenceDefault.showMediaPlayer
+        guard showMediaPlayer else { return false }
+
+        let displayID = targetDisplayID != 0 ? targetDisplayID : screen.displayID
+        guard !DroppyState.shared.isExpanded(for: displayID) else { return false }
+        guard !NotchWindowController.shared.fullscreenDisplayIDs.contains(displayID) else { return false }
+
+        let music = MusicManager.shared
+        guard music.isMediaAvailable else { return false }
+        guard !music.isPlayerIdle else { return false }
+
+        // Forced mode stays visible when user swipes it in; otherwise require active playback
+        // and not manually hidden.
+        return music.isMediaHUDForced || (music.isPlaying && !music.isMediaHUDHidden)
+    }
+
     /// Built-in notch displays can report cursor positions that "skip" across the cutout
     /// at the top edge. Use a stable center-aligned band for top-edge hover intent.
     func isWithinTopEdgeHoverBand(
@@ -2492,14 +2784,14 @@ class NotchWindow: NSPanel {
             screen.auxiliaryTopRightArea != nil
 
         if hasPhysicalNotch {
-            let centerX = screen.frame.midX
+            let centerX = screen.notchAlignedCenterX
             // Keep the top-edge helper close to the actual notch. A very wide
             // band can cause accidental hover activation while using menu-bar items.
-            let halfWidth = (notchRect.width / 2) + 28 + extraPadding
+            let halfWidth = (notchRect.width / 2) + 12 + extraPadding
             return abs(x - centerX) <= halfWidth
         }
 
-        return x >= (notchRect.minX - 30 - extraPadding) && x <= (notchRect.maxX + 30 + extraPadding)
+        return x >= (notchRect.minX - 14 - extraPadding) && x <= (notchRect.maxX + 14 + extraPadding)
     }
     
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
@@ -2539,12 +2831,14 @@ class NotchWindow: NSPanel {
     }
     
     func handleGlobalMouseEvent(_ event: NSEvent) {
-        // DEBUG: Log to verify this function is being called after unlock
-        struct DebugCounter { static var count = 0; static var lastLog = Date.distantPast }
-        DebugCounter.count += 1
-        if Date().timeIntervalSince(DebugCounter.lastLog) > 2.0 { // Log every 2 seconds max
-            notchDebugLog("🎯 NotchWindow.handleGlobalMouseEvent called \(DebugCounter.count)x, notchRect: \(notchRect)")
-            DebugCounter.lastLog = Date()
+        if notchMotionDebugLogs {
+            // DEBUG: Log to verify this function is being called after unlock
+            struct DebugCounter { static var count = 0; static var lastLog = Date.distantPast }
+            DebugCounter.count += 1
+            if Date().timeIntervalSince(DebugCounter.lastLog) > 2.0 { // Log every 2 seconds max
+                notchDebugLog("🎯 NotchWindow.handleGlobalMouseEvent called \(DebugCounter.count)x, notchRect: \(notchRect)")
+                DebugCounter.lastLog = Date()
+            }
         }
         
         // CRITICAL: Skip all hover tracking when a context menu is open
@@ -2600,16 +2894,18 @@ class NotchWindow: NSPanel {
             height: targetScreen.frame.height + 5  // +5px to include absolute top edge
         )
         guard extendedScreenFrame.contains(mouseLocation) else {
-            // DEBUG: Log when guard fails - UNCONDITIONAL for 5 seconds after unlock!
-            let timeSinceUnlock = Date().timeIntervalSince(DragMonitor.unlockTime)
-            let isVerbose = timeSinceUnlock < 5.0 && timeSinceUnlock > 0
-            
-            struct GuardDebugCounter { static var count = 0; static var lastLog = Date.distantPast }
-            GuardDebugCounter.count += 1
-            
-            if isVerbose || Date().timeIntervalSince(GuardDebugCounter.lastLog) > 2.0 {
-                notchDebugLog("⚠️ GUARD FAILED (\(GuardDebugCounter.count)x, verbose=\(isVerbose)): notchScreen=\(notchScreen != nil ? "\(notchScreen!.displayID)" : "nil"), mouseLocation=\(mouseLocation), frame=\(notchScreen.map { String(describing: $0.frame) } ?? "nil")")
-                GuardDebugCounter.lastLog = Date()
+            if notchMotionDebugLogs {
+                // DEBUG: Log when guard fails - UNCONDITIONAL for 5 seconds after unlock!
+                let timeSinceUnlock = Date().timeIntervalSince(DragMonitor.unlockTime)
+                let isVerbose = timeSinceUnlock < 5.0 && timeSinceUnlock > 0
+                
+                struct GuardDebugCounter { static var count = 0; static var lastLog = Date.distantPast }
+                GuardDebugCounter.count += 1
+                
+                if isVerbose || Date().timeIntervalSince(GuardDebugCounter.lastLog) > 2.0 {
+                    notchDebugLog("⚠️ GUARD FAILED (\(GuardDebugCounter.count)x, verbose=\(isVerbose)): notchScreen=\(notchScreen != nil ? "\(notchScreen!.displayID)" : "nil"), mouseLocation=\(mouseLocation), frame=\(notchScreen.map { String(describing: $0.frame) } ?? "nil")")
+                    GuardDebugCounter.lastLog = Date()
+                }
             }
             return
         }
@@ -2617,16 +2913,25 @@ class NotchWindow: NSPanel {
         // PRECISE HOVER DETECTION (v5.2)
         // Different logic for NOTCH vs DYNAMIC ISLAND modes
         
-        // DEBUG: Log that we passed the guard (unconditional, throttled)
-        struct PastGuardDebugCounter { static var count = 0; static var lastLog = Date.distantPast }
-        PastGuardDebugCounter.count += 1
-        if Date().timeIntervalSince(PastGuardDebugCounter.lastLog) > 2.0 {
-            notchDebugLog("✅ PAST GUARD: displayID=\(targetScreen.displayID), mouse=\(mouseLocation), screenFrame=\(targetScreen.frame)")
-            PastGuardDebugCounter.lastLog = Date()
+        if notchMotionDebugLogs {
+            // DEBUG: Log that we passed the guard (unconditional, throttled)
+            struct PastGuardDebugCounter { static var count = 0; static var lastLog = Date.distantPast }
+            PastGuardDebugCounter.count += 1
+            if Date().timeIntervalSince(PastGuardDebugCounter.lastLog) > 2.0 {
+                notchDebugLog("✅ PAST GUARD: displayID=\(targetScreen.displayID), mouse=\(mouseLocation), screenFrame=\(targetScreen.frame)")
+                PastGuardDebugCounter.lastLog = Date()
+            }
         }
 
-        let isOverExactNotch = notchRect.contains(mouseLocation)
+        let collapsedRect = collapsedInteractionRect()
+        // Use true notch/island geometry for top-edge intent checks.
+        // Collapsed interaction rect can include media wings and become too wide.
+        let topEdgeReferenceRect = notchRect
+        let isOverExactNotch = collapsedRect.contains(mouseLocation)
         var isOverExpandedZone: Bool
+        let displayID = targetScreen.displayID
+        let isFullscreenOnThisDisplay = NotchWindowController.shared.fullscreenDisplayIDs.contains(displayID)
+        let isAtAbsoluteTopEdge = NotchWindowController.shared.isAtAbsoluteTopEdge(mouseLocation, on: targetScreen)
 
 
         // DEBUG: Temporary logging to diagnose external display island issue
@@ -2639,20 +2944,26 @@ class NotchWindow: NSPanel {
             let screenTopY = targetScreen.frame.maxY
 
             // Extend all the way to screen top (covers the gap above the floating island)
-            let upwardExpansion = max(0, screenTopY - notchRect.maxY)
+            let upwardExpansion = max(0, screenTopY - collapsedRect.maxY)
 
             let expandedNotchRect = NSRect(
-                x: notchRect.origin.x - 20,                     // 20px expansion on left
-                y: notchRect.origin.y,                          // Keep bottom edge EXACT (no downward expansion!)
-                width: notchRect.width + 40,                    // 20px expansion on each side = 40px total
-                height: notchRect.height + upwardExpansion      // Extend upward to screen top (covers the gap)
+                x: collapsedRect.origin.x - 10,                     // 10px expansion on left
+                y: collapsedRect.origin.y,                          // Keep bottom edge EXACT (no downward expansion!)
+                width: collapsedRect.width + 20,                    // 10px expansion on each side = 20px total
+                height: collapsedRect.height + upwardExpansion      // Extend upward to screen top (covers the gap)
             )
             isOverExpandedZone = expandedNotchRect.contains(mouseLocation)
 
             // Special case: If cursor is at the absolute screen top edge within island X range,
             // always treat it as hovering (Fitt's Law - user slamming cursor to top)
-            let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 20  // Within 20px
-            let isWithinIslandX = mouseLocation.x >= notchRect.minX - 30 && mouseLocation.x <= notchRect.maxX + 30
+            let isAtScreenTop = isFullscreenOnThisDisplay
+                ? isAtAbsoluteTopEdge
+                : (mouseLocation.y >= targetScreen.frame.maxY - 10)  // Within 10px
+            let isWithinIslandX = isWithinTopEdgeHoverBand(
+                x: mouseLocation.x,
+                on: targetScreen,
+                notchRect: topEdgeReferenceRect
+            )
             if isAtScreenTop && isWithinIslandX {
                 isOverExpandedZone = true
             }
@@ -2663,13 +2974,13 @@ class NotchWindow: NSPanel {
             // - Upward: Extend to absolute screen top (Fitt's Law - infinite edge target)
             // - Downward: NO expansion (avoid blocking bookmark bars, URL fields)
             let screenTopY = targetScreen.frame.maxY
-            let upwardExpansion = (screenTopY - notchRect.maxY) + 5  // +5px buffer to capture absolute edge
+            let upwardExpansion = (screenTopY - collapsedRect.maxY) + 5  // +5px buffer to capture absolute edge
 
             let expandedNotchRect = NSRect(
-                x: notchRect.origin.x - 20,                     // 20px expansion on left
-                y: notchRect.origin.y,                          // Keep bottom edge exact (no downward expansion)
-                width: notchRect.width + 40,                    // 20px expansion on each side = 40px total
-                height: notchRect.height + upwardExpansion      // Extend to screen top edge + buffer
+                x: collapsedRect.origin.x - 10,                     // 10px expansion on left
+                y: collapsedRect.origin.y,                          // Keep bottom edge exact (no downward expansion)
+                width: collapsedRect.width + 20,                    // 10px expansion on each side = 20px total
+                height: collapsedRect.height + upwardExpansion      // Extend to screen top edge + buffer
             )
             isOverExpandedZone = expandedNotchRect.contains(mouseLocation)
 
@@ -2679,11 +2990,13 @@ class NotchWindow: NSPanel {
             // 2. The last event before hitting the edge might have a Y slightly below maxY
             // 3. macOS may also report Y at or ABOVE maxY when cursor is at physical edge
             // 4. Menu bar is ~24px, notch is within that space, so 20px tolerance is safe
-            let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 20  // Within 20px of absolute top
+            let isAtScreenTop = isFullscreenOnThisDisplay
+                ? isAtAbsoluteTopEdge
+                : (mouseLocation.y >= targetScreen.frame.maxY - 10)  // Within 10px of absolute top
             let isWithinNotchX = isWithinTopEdgeHoverBand(
                 x: mouseLocation.x,
                 on: targetScreen,
-                notchRect: notchRect
+                notchRect: topEdgeReferenceRect
             )
             if isAtScreenTop && isWithinNotchX {
                 isOverExpandedZone = true
@@ -2692,52 +3005,63 @@ class NotchWindow: NSPanel {
 
         // Use expanded zone to START hovering, exact zone to MAINTAIN hover
         // Exception: Also maintain hover at the screen top edge (Fitt's Law - user pushing against edge)
-        let displayID = targetScreen.displayID
         let currentlyHovering = DroppyState.shared.isHovering(for: displayID)
 
         // For maintaining hover: exact notch OR at screen top within horizontal bounds
         var isOverExactOrEdge = isOverExactNotch
-        let isAtScreenTop = mouseLocation.y >= targetScreen.frame.maxY - 15  // Within 15px
+        let isAtScreenTop = isFullscreenOnThisDisplay
+            ? isAtAbsoluteTopEdge
+            : (mouseLocation.y >= targetScreen.frame.maxY - 10)  // Within 10px
         let isWithinNotchX = isWithinTopEdgeHoverBand(
             x: mouseLocation.x,
             on: targetScreen,
-            notchRect: notchRect
+            notchRect: topEdgeReferenceRect
         )
         if isAtScreenTop && isWithinNotchX {
             isOverExactOrEdge = true
         }
 
-        let isOverNotch = currentlyHovering ? isOverExactOrEdge : isOverExpandedZone
+        let isOverNotch: Bool
+        if isFullscreenOnThisDisplay {
+            // Fullscreen behavior: only hover/open at absolute top edge within notch X band.
+            isOverNotch = isAtAbsoluteTopEdge && isWithinNotchX
+        } else {
+            isOverNotch = currentlyHovering ? isOverExactOrEdge : isOverExpandedZone
+        }
 
-        // DEBUG: Unconditional check for isDragging being stuck after unlock
-        struct DragDebugCounter { static var lastLog = Date.distantPast; static var count = 0 }
-        DragDebugCounter.count += 1
-        if DragMonitor.shared.isDragging && Date().timeIntervalSince(DragDebugCounter.lastLog) > 2.0 {
-            notchDebugLog("⚠️ DRAG STUCK: isDragging=true for \(DragDebugCounter.count) samples! mouseY=\(mouseLocation.y), screenMaxY=\(targetScreen.frame.maxY)")
-            DragDebugCounter.lastLog = Date()
+        if notchMotionDebugLogs {
+            // DEBUG: Unconditional check for isDragging being stuck after unlock
+            struct DragDebugCounter { static var lastLog = Date.distantPast; static var count = 0 }
+            DragDebugCounter.count += 1
+            if DragMonitor.shared.isDragging && Date().timeIntervalSince(DragDebugCounter.lastLog) > 2.0 {
+                notchDebugLog("⚠️ DRAG STUCK: isDragging=true for \(DragDebugCounter.count) samples! mouseY=\(mouseLocation.y), screenMaxY=\(targetScreen.frame.maxY)")
+                DragDebugCounter.lastLog = Date()
+            }
         }
         
         // Only update if not dragging (drag monitor handles that)
         if !DragMonitor.shared.isDragging {
-            // DEBUG: Log ALL mouse positions near top 200px to catch edge cases after SkyLight
-            let screenMaxY = targetScreen.frame.maxY
-            let yThreshold = screenMaxY - 100
-            
-            // Log periodically to see if we're even getting events
-            struct AllEventDebugCounter { static var count = 0; static var lastLog = Date.distantPast }
-            AllEventDebugCounter.count += 1
-            if Date().timeIntervalSince(AllEventDebugCounter.lastLog) > 2.0 {
-                let isNearTop = mouseLocation.y > yThreshold
-                notchDebugLog("🔎 MOUSE Y CHECK: mouse.y=\(mouseLocation.y), screenMaxY=\(screenMaxY), threshold=\(yThreshold), nearTop=\(isNearTop), displayID=\(targetScreen.displayID)")
-                AllEventDebugCounter.lastLog = Date()
-            }
-            
-            // DEBUG: Log hover detection conditions when mouse is near top of screen
-            if mouseLocation.y > yThreshold {
-                struct DebugCounter { static var lastLog = Date.distantPast }
-                if Date().timeIntervalSince(DebugCounter.lastLog) > 1.0 {
-                    notchDebugLog("🔍 HOVER DEBUG: mouse=\(mouseLocation), isOverNotch=\(isOverNotch), currentlyHovering=\(currentlyHovering), isOverExpandedZone=\(isOverExpandedZone), isOverExactOrEdge=\(isOverExactOrEdge)")
-                    DebugCounter.lastLog = Date()
+            if notchMotionDebugLogs {
+                // DEBUG: Log ALL mouse positions near top 200px to catch edge cases after SkyLight
+                let screenMaxY = targetScreen.frame.maxY
+                let yThreshold = screenMaxY - 100
+                
+                // Log periodically to see if we're even getting events
+                struct AllEventDebugCounter { static var count = 0; static var lastLog = Date.distantPast }
+                AllEventDebugCounter.count += 1
+                if Date().timeIntervalSince(AllEventDebugCounter.lastLog) > 2.0 {
+                    let isNearTop = mouseLocation.y > yThreshold
+                    notchDebugLog("🔎 MOUSE Y CHECK: mouse.y=\(mouseLocation.y), screenMaxY=\(screenMaxY), threshold=\(yThreshold), nearTop=\(isNearTop), displayID=\(targetScreen.displayID)")
+                    AllEventDebugCounter.lastLog = Date()
+                }
+                
+                // DEBUG: Log hover detection conditions when mouse is near top of screen
+                if mouseLocation.y > yThreshold {
+                    struct DebugCounter { static var lastLog = Date.distantPast }
+                    if Date().timeIntervalSince(DebugCounter.lastLog) > 1.0 {
+                        notchDebugLog("🔍 HOVER DEBUG: mouse=\(mouseLocation), isOverNotch=\(isOverNotch), currentlyHovering=\(currentlyHovering), isOverExpandedZone=\(isOverExpandedZone), isOverExactOrEdge=\(isOverExactOrEdge)")
+                        DebugCounter.lastLog = Date()
+                    }
                 }
             }
             
@@ -2848,19 +3172,6 @@ class NotchWindow: NSPanel {
         if isExpanded, let screen = resolvedScreen {
             let expandedZone = NotchWindowController.shared.expandedShelfInteractionZone(for: screen)
             isMouseInExpandedShelfZone = expandedZone.contains(mouseLocation)
-
-            // Keep menu bar items clickable while shelf is expanded.
-            // Only capture in the menu bar strip when cursor is actually over the notch trigger area.
-            if isMouseInExpandedShelfZone {
-                let menuBarHeight = max(24, screen.frame.maxY - screen.visibleFrame.maxY)
-                let isInMenuBarStrip = mouseLocation.y >= (screen.frame.maxY - menuBarHeight)
-                if isInMenuBarStrip {
-                    let notchHitZone = getNotchRect().insetBy(dx: -8, dy: -2)
-                    if !notchHitZone.contains(mouseLocation) {
-                        isMouseInExpandedShelfZone = false
-                    }
-                }
-            }
         }
         
         // CRITICAL FIX (v7.0.2): When dragging, only accept events if drag is OVER the valid drop zone!

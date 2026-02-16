@@ -91,12 +91,8 @@ struct ExtensionsShopView: View {
         VStack(spacing: 12) {
             // Section header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "puzzlepiece.extension.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.cyan)
-                    
-                    Text("Featured Extensions")
+                HStack {
+                    Text("Featured")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(AdaptiveColors.primaryTextAuto)
                 }
@@ -137,45 +133,42 @@ struct ExtensionsShopView: View {
                 }
             }
             
-            // Full-width hero: Quickshare (NEW)
-            if !ExtensionType.quickshare.isRemoved {
-                FeaturedExtensionCardWide(
-                    title: "Droppy Quickshare",
-                    subtitle: "Share files instantly",
-                    iconURL: "https://getdroppy.app/assets/icons/quickshare.jpg",
-                    screenshotURL: "https://getdroppy.app/assets/images/quickshare-screenshot.png",
-                    accentColor: .cyan,
-                    isInstalled: true,
-                    features: ["Instant upload", "Auto-copy link", "Track expiry"]
-                ) {
-                    QuickshareInfoView(
-                        installCount: extensionCounts["quickshare"],
-                        rating: extensionRatings["quickshare"]
-                    )
-                }
+            // Row 2: Main featured extension (Reminders)
+            FeaturedExtensionCardWide(
+                title: "Reminders",
+                subtitle: "Tasks & Notes",
+                iconURL: "https://getdroppy.app/assets/icons/reminders.png",
+                screenshotURL: "https://getdroppy.app/assets/images/reminders-screenshot.gif",
+                accentColor: .blue,
+                isInstalled: isTodoInstalled,
+                features: ["Natural language", "List mentions", "Apple sync"],
+                badgeText: "Version 2.0!"
+            ) {
+                ToDoInfoView(
+                    installCount: extensionCounts["todo"],
+                    rating: extensionRatings["todo"]
+                )
             }
             
-            // Row 2: Community extensions
+            // Row 3: Community extensions + Quickshare (bottom-left)
             HStack(spacing: 12) {
-                FeaturedExtensionCardCompact(
-                    category: "COMMUNITY",
-                    title: "Reminders",
-                    subtitle: "Tasks & Notes",
-                    iconURL: "https://getdroppy.app/assets/icons/reminders.png",
-                    iconPlaceholder: "checklist",
-                    iconPlaceholderColor: .blue,
-                    screenshotURL: "https://getdroppy.app/assets/images/reminders-screenshot.gif",
-                    accentColor: .blue,
-                    isInstalled: isTodoInstalled,
-                    isNew: true,
-                    isCommunity: true
-                ) {
-                    ToDoInfoView(
-                        installCount: extensionCounts["todo"],
-                        rating: extensionRatings["todo"]
-                    )
+                if !ExtensionType.quickshare.isRemoved {
+                    FeaturedExtensionCardCompact(
+                        category: "",
+                        title: "Droppy Quickshare",
+                        subtitle: "Share files instantly",
+                        iconURL: "https://getdroppy.app/assets/icons/quickshare.jpg",
+                        screenshotURL: "https://getdroppy.app/assets/images/quickshare-screenshot.png",
+                        accentColor: .cyan,
+                        isInstalled: true
+                    ) {
+                        QuickshareInfoView(
+                            installCount: extensionCounts["quickshare"],
+                            rating: extensionRatings["quickshare"]
+                        )
+                    }
                 }
-                
+
                 FeaturedExtensionCardCompact(
                     category: "COMMUNITY",
                     title: "Notify me!",
@@ -243,12 +236,8 @@ struct ExtensionsShopView: View {
         VStack(spacing: 12) {
             // Section header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AdaptiveColors.secondaryTextAuto)
-                    
-                    Text("All Extensions")
+                HStack {
+                    Text("Extensions")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(AdaptiveColors.primaryTextAuto)
                 }
@@ -849,6 +838,7 @@ struct FeaturedExtensionCardWide<DetailView: View>: View {
     let isInstalled: Bool
     let features: [String]
     var isNew: Bool = false
+    var badgeText: String? = nil
     let detailView: () -> DetailView
     
     @State private var showSheet = false
@@ -919,13 +909,20 @@ struct FeaturedExtensionCardWide<DetailView: View>: View {
                 // Content overlay
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 10) {
-                        // Title with optional NEW badge
+                        // Title with optional badge
                         HStack(spacing: 6) {
                             Text(title)
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundStyle(titleColor)
                             
-                            if isNew {
+                            if let badgeText {
+                                Text(badgeText)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.cyan.opacity(0.9))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.cyan.opacity(0.15)))
+                            } else if isNew {
                                 Text("New")
                                     .font(.system(size: 9, weight: .medium))
                                     .foregroundStyle(.cyan.opacity(0.9))

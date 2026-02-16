@@ -15,6 +15,7 @@ import CoreImage.CIFilterBuiltins
 
 enum AnnotationTool: String, CaseIterable, Identifiable {
     case arrow = "arrow.up.right"
+    case curvedArrow = "arrow.uturn.up"
     case line = "line.diagonal"
     case rectangle = "rectangle"
     case ellipse = "oval"
@@ -28,6 +29,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .arrow: return "Arrow"
+        case .curvedArrow: return "Curved Arrow"
         case .line: return "Line"
         case .rectangle: return "Rectangle"
         case .ellipse: return "Ellipse"
@@ -42,6 +44,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
     var defaultShortcut: Character {
         switch self {
         case .arrow: return "a"
+        case .curvedArrow: return "c"
         case .line: return "l"
         case .rectangle: return "r"
         case .ellipse: return "o"  // O for oval/ellipse
@@ -67,6 +70,8 @@ struct Annotation: Identifiable {
     var text: String = ""
     var font: String = "SF Pro"
     var blurStrength: CGFloat = 10  // For blur tool: lower = stronger pixelation (5-30)
+    // Canvas min-dimension when annotation was created, used to preserve visual scale across render sizes.
+    var referenceCanvasMinDimension: CGFloat = 0
 }
 
 // MARK: - Window Drag View (NSViewRepresentable for reliable window dragging)
@@ -110,6 +115,9 @@ struct ScreenshotEditorView: View {
     
     // Zoom
     @State private var zoomScale: CGFloat = 1.0
+    @State private var didApplyInitialZoom = false
+    @State private var pinchStartZoomScale: CGFloat?
+    @State private var didApplyInitialEditorColor = false
     
     // Font selection
     @State private var selectedFont: String = "SF Pro"
@@ -118,12 +126,16 @@ struct ScreenshotEditorView: View {
     // Annotation moving
     @State private var selectedAnnotationIndex: Int? = nil
     @State private var isDraggingAnnotation = false
+    @State private var draggedAnnotationInitialPoints: [CGPoint] = []
     
-    private let colors: [Color] = [.red, .orange, .yellow, .green, .cyan, .purple, .white]
+    private let colors: [Color] = [.red, .orange, .yellow, .green, .cyan, .purple, .black, .white]
     private let strokeWidths: [(CGFloat, String)] = [(2, "S"), (4, "M"), (6, "L")]
     
     // Transparent mode preference
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
+    @AppStorage(AppPreferenceKey.elementCaptureEditorDefaultColor) private var defaultEditorColorToken = PreferenceDefault.elementCaptureEditorDefaultColor
+    @AppStorage(AppPreferenceKey.elementCaptureEditorPrefer100Zoom) private var prefer100Zoom = PreferenceDefault.elementCaptureEditorPrefer100Zoom
+    @AppStorage(AppPreferenceKey.elementCaptureEditorPinchZoomEnabled) private var pinchZoomEnabled = PreferenceDefault.elementCaptureEditorPinchZoomEnabled
     
     // Blur strength preference (5-30, lower = stronger pixelation)
     @AppStorage(AppPreferenceKey.editorBlurStrength) private var blurStrength = PreferenceDefault.editorBlurStrength
@@ -202,8 +214,26 @@ struct ScreenshotEditorView: View {
                     .frame(width: scaledSize.width, height: scaledSize.height)
                 }
                 .frame(width: availableSize.width, height: availableSize.height)
+                .simultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            guard pinchZoomEnabled else { return }
+                            if pinchStartZoomScale == nil {
+                                pinchStartZoomScale = zoomScale
+                            }
+                            guard let base = pinchStartZoomScale else { return }
+                            zoomScale = clampedZoomScale(base * value)
+                        }
+                        .onEnded { _ in
+                            pinchStartZoomScale = nil
+                        }
+                )
                 .onAppear {
-                    canvasSize = scaledSize
+                    applyInitialZoomIfNeeded(fittedSize: fittedSize)
+                    canvasSize = CGSize(
+                        width: fittedSize.width * zoomScale,
+                        height: fittedSize.height * zoomScale
+                    )
                 }
             }
             .background(useTransparentBackground ? Color.clear : AdaptiveColors.panelBackgroundAuto)
@@ -217,7 +247,11 @@ struct ScreenshotEditorView: View {
         }
         .onAppear {
             setupKeyboardMonitor()
+            didApplyInitialEditorColor = false
+            applyInitialEditorColorIfNeeded()
             updateCursor()
+            didApplyInitialZoom = false
+            pinchStartZoomScale = nil
         }
         .onDisappear {
             removeKeyboardMonitor()
@@ -225,6 +259,7 @@ struct ScreenshotEditorView: View {
         }
         .onChange(of: selectedTool) { _, _ in
             updateCursor()
+            applyHighlighterDefaultColorIfNeeded()
         }
     }
     
@@ -250,6 +285,7 @@ struct ScreenshotEditorView: View {
                     switch action {
                     // Tools
                     case .arrow: selectedTool = .arrow; return nil
+                    case .curvedArrow: selectedTool = .curvedArrow; return nil
                     case .line: selectedTool = .line; return nil
                     case .rectangle: selectedTool = .rectangle; return nil
                     case .ellipse: selectedTool = .ellipse; return nil
@@ -296,11 +332,68 @@ struct ScreenshotEditorView: View {
     private func updateCursor() {
         // Use crosshair cursor for drawing tools
         switch selectedTool {
-        case .arrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur:
+        case .arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur:
             NSCursor.crosshair.set()
         case .text:
             NSCursor.iBeam.set()
         }
+    }
+
+    private func clampedZoomScale(_ value: CGFloat) -> CGFloat {
+        min(4.0, max(0.25, value))
+    }
+
+    private func applyInitialEditorColorIfNeeded() {
+        guard !didApplyInitialEditorColor else { return }
+        didApplyInitialEditorColor = true
+        selectedColor = colorForToken(defaultEditorColorToken)
+        applyHighlighterDefaultColorIfNeeded()
+    }
+
+    private func applyHighlighterDefaultColorIfNeeded() {
+        if selectedTool == .highlighter {
+            selectedColor = .yellow
+        }
+    }
+
+    private func colorForToken(_ token: String) -> Color {
+        switch token.lowercased() {
+        case "red": return .red
+        case "orange": return .orange
+        case "yellow": return .yellow
+        case "green": return .green
+        case "cyan": return .cyan
+        case "purple": return .purple
+        case "black": return .black
+        case "white": return .white
+        default: return .red
+        }
+    }
+
+    private func applyInitialZoomIfNeeded(fittedSize: CGSize) {
+        guard !didApplyInitialZoom else { return }
+        defer { didApplyInitialZoom = true }
+
+        guard prefer100Zoom else {
+            zoomScale = 1.0
+            return
+        }
+
+        let safeImageWidth = max(originalImage.size.width, 1)
+        let safeImageHeight = max(originalImage.size.height, 1)
+        let safeFittedWidth = max(fittedSize.width, 1)
+        let safeFittedHeight = max(fittedSize.height, 1)
+
+        let nativeScaleWidth = safeImageWidth / safeFittedWidth
+        let nativeScaleHeight = safeImageHeight / safeFittedHeight
+        var targetScale = min(nativeScaleWidth, nativeScaleHeight)
+
+        // Large captures are easier to edit when opened slightly below full native scale.
+        if targetScale > 1.2 {
+            targetScale *= 0.8
+        }
+
+        zoomScale = clampedZoomScale(targetScale)
     }
     
     // MARK: - Title Bar (Draggable)
@@ -476,6 +569,10 @@ struct ScreenshotEditorView: View {
                     Circle()
                         .fill(color)
                         .frame(width: 18, height: 18)
+                        .overlay(
+                            Circle()
+                                .stroke(AdaptiveColors.overlayAuto(0.24), lineWidth: 0.8)
+                        )
                         .overlay(
                             Circle()
                                 .stroke(selectedColor == color ? AdaptiveColors.primaryTextAuto : Color.clear, lineWidth: 2)
@@ -715,22 +812,30 @@ struct ScreenshotEditorView: View {
             y: value.startLocation.y / containerSize.height
         )
         
-        // Check if we're dragging an existing text annotation
+        // Check if we're dragging an existing annotation
         if isDraggingAnnotation, let index = selectedAnnotationIndex, index < annotations.count {
-            // Move the text annotation
-            annotations[index].points = [normalizedPoint]
+            // Move annotation by drag delta while keeping normalized points in bounds.
+            let proposedDelta = CGPoint(
+                x: normalizedPoint.x - normalizedStart.x,
+                y: normalizedPoint.y - normalizedStart.y
+            )
+            annotations[index].points = translatePoints(
+                draggedAnnotationInitialPoints,
+                by: proposedDelta
+            )
             return
         }
         
-        // Check if clicking on existing text annotation (to select for moving)
-        if value.translation.width == 0 && value.translation.height == 0 {
-            // This is the start of a drag - check for text annotation under cursor
+        // Check if clicking on existing annotation (to select for moving)
+        if abs(value.translation.width) <= 1 && abs(value.translation.height) <= 1 {
+            // This is the start of a drag - check for annotation under cursor
             let normalizedClickPoint = CGPoint(
                 x: value.startLocation.x / containerSize.width,
                 y: value.startLocation.y / containerSize.height
             )
-            if let textIndex = findTextAnnotationAt(point: normalizedClickPoint, in: containerSize) {
-                selectedAnnotationIndex = textIndex
+            if let annotationIndex = findAnnotationAt(point: normalizedClickPoint, in: containerSize) {
+                selectedAnnotationIndex = annotationIndex
+                draggedAnnotationInitialPoints = annotations[annotationIndex].points
                 isDraggingAnnotation = true
                 return
             }
@@ -741,6 +846,8 @@ struct ScreenshotEditorView: View {
             return
         }
         
+        let isShiftHeld = NSEvent.modifierFlags.contains(.shift)
+
         if currentAnnotation == nil {
             // Start new annotation
             var annotation = Annotation(
@@ -748,22 +855,31 @@ struct ScreenshotEditorView: View {
                 color: selectedColor,
                 strokeWidth: strokeWidth
             )
+            annotation.referenceCanvasMinDimension = max(1, min(containerSize.width, containerSize.height))
             // Capture blur strength for blur tool
             if selectedTool == .blur {
                 annotation.blurStrength = blurStrength
             }
-            annotation.points = [normalizedStart, normalizedPoint]
+            if isShiftHeld {
+                let constrainedPoint = applyShiftConstraint(
+                    from: normalizedStart,
+                    to: normalizedPoint,
+                    tool: selectedTool
+                )
+                annotation.points = [normalizedStart, constrainedPoint]
+            } else {
+                annotation.points = [normalizedStart, normalizedPoint]
+            }
             currentAnnotation = annotation
         } else {
             // Update current annotation
-            if selectedTool == .freehand || selectedTool == .highlighter {
+            if (selectedTool == .freehand || selectedTool == .highlighter) && !isShiftHeld {
                 currentAnnotation?.points.append(normalizedPoint)
             } else {
-                // For arrow, line, rect, ellipse - track start and end with Shift-constrain
+                // Shift-constrain applies across drawing tools.
                 var constrainedPoint = normalizedPoint
                 
-                // Check if Shift is held for constrain mode
-                if NSEvent.modifierFlags.contains(.shift) {
+                if isShiftHeld {
                     constrainedPoint = applyShiftConstraint(
                         from: normalizedStart,
                         to: normalizedPoint,
@@ -776,13 +892,15 @@ struct ScreenshotEditorView: View {
         }
     }
     
-    /// Applies Shift-key constraints: 45° angles for lines/arrows, square/circle for rect/ellipse
+    /// Applies Shift-key constraints across drawing tools.
+    /// - Line-like tools snap to 45° increments.
+    /// - Shape tools constrain to equal width/height.
     private func applyShiftConstraint(from start: CGPoint, to end: CGPoint, tool: AnnotationTool) -> CGPoint {
         let dx = end.x - start.x
         let dy = end.y - start.y
         
         switch tool {
-        case .arrow, .line:
+        case .arrow, .curvedArrow, .line, .freehand, .highlighter:
             // Snap to nearest 45° angle (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
             let angle = atan2(dy, dx)
             let snappedAngle = round(angle / (.pi / 4)) * (.pi / 4)
@@ -806,10 +924,11 @@ struct ScreenshotEditorView: View {
     }
     
     private func handleDragEnd(_ value: DragGesture.Value, in containerSize: CGSize) {
-        // Reset drag state for text moving
+        // Reset drag state for annotation moving
         if isDraggingAnnotation {
             isDraggingAnnotation = false
             selectedAnnotationIndex = nil
+            draggedAnnotationInitialPoints = []
             return
         }
         
@@ -835,10 +954,14 @@ struct ScreenshotEditorView: View {
                 y: value.location.y / containerSize.height
             )
             
-            if selectedTool != .freehand && selectedTool != .highlighter {
-                // Apply Shift-constraint to final points if Shift is held
+            let shiftHeldAtEnd = NSEvent.modifierFlags.contains(.shift)
+            let shouldFinalizeAsSegment =
+                (selectedTool != .freehand && selectedTool != .highlighter) || shiftHeldAtEnd
+
+            // Finalize line-like end points (including Shift-constrained freehand/highlighter).
+            if shouldFinalizeAsSegment {
                 var finalEnd = normalizedEnd
-                if NSEvent.modifierFlags.contains(.shift) {
+                if shiftHeldAtEnd {
                     finalEnd = applyShiftConstraint(
                         from: normalizedStart,
                         to: normalizedEnd,
@@ -869,6 +992,7 @@ struct ScreenshotEditorView: View {
             color: selectedColor,
             strokeWidth: strokeWidth
         )
+        annotation.referenceCanvasMinDimension = max(1, min(canvasSize.width, canvasSize.height))
         annotation.points = [textPosition]
         annotation.text = textInput
         annotation.font = selectedFont
@@ -890,28 +1014,225 @@ struct ScreenshotEditorView: View {
         annotations = lastState
     }
     
-    /// Find a text annotation at the given point, returning its index if found
-    private func findTextAnnotationAt(point: CGPoint, in containerSize: CGSize) -> Int? {
-        // Check text annotations in reverse order (top-most first)
+    /// Find any annotation at the given point, returning its index if found
+    private func findAnnotationAt(point: CGPoint, in containerSize: CGSize) -> Int? {
+        // Check in reverse order so top-most annotations are picked first.
         for (index, annotation) in annotations.enumerated().reversed() {
-            guard annotation.tool == .text, !annotation.points.isEmpty else { continue }
-            
-            let textPoint = annotation.points[0]
-            // Estimate text bounds - approximately 150x40 for typical text
-            let textWidth: CGFloat = CGFloat(annotation.text.count) * annotation.strokeWidth * 5
-            let textHeight: CGFloat = annotation.strokeWidth * 12
-            let textRect = CGRect(
-                x: textPoint.x,
-                y: textPoint.y,
-                width: max(60, textWidth),
-                height: textHeight
-            )
-            
-            if textRect.contains(point) {
+            if annotationContains(point: point, annotation: annotation, in: containerSize) {
                 return index
             }
         }
         return nil
+    }
+    
+    private func annotationContains(point: CGPoint, annotation: Annotation, in containerSize: CGSize) -> Bool {
+        guard !annotation.points.isEmpty else { return false }
+        
+        let hitPoint = scaleNormalizedPoint(point, to: containerSize)
+        let displayStrokeWidth = effectiveStrokeWidth(for: annotation, in: containerSize)
+        let baseTolerance = max(10, displayStrokeWidth * 3)
+        
+        switch annotation.tool {
+        case .arrow, .line:
+            guard let endPoint = annotation.points.last else { return false }
+            let start = scaleNormalizedPoint(annotation.points[0], to: containerSize)
+            let end = scaleNormalizedPoint(endPoint, to: containerSize)
+            return pointToSegmentDistance(hitPoint, start: start, end: end) <= baseTolerance
+            
+        case .curvedArrow:
+            guard let endPoint = annotation.points.last else { return false }
+            let start = scaleNormalizedPoint(annotation.points[0], to: containerSize)
+            let end = scaleNormalizedPoint(endPoint, to: containerSize)
+            return pointToCurvedArrowDistance(hitPoint, start: start, end: end) <= baseTolerance
+            
+        case .rectangle, .blur:
+            guard let endPoint = annotation.points.last else { return false }
+            let rect = rectFromNormalizedPoints(annotation.points[0], endPoint, in: containerSize)
+            return rect.insetBy(dx: -baseTolerance, dy: -baseTolerance).contains(hitPoint)
+            
+        case .ellipse:
+            guard let endPoint = annotation.points.last else { return false }
+            let rect = rectFromNormalizedPoints(annotation.points[0], endPoint, in: containerSize)
+            guard rect.width > 1, rect.height > 1 else { return false }
+            let expandedRect = rect.insetBy(dx: -baseTolerance, dy: -baseTolerance)
+            guard expandedRect.contains(hitPoint) else { return false }
+            
+            // Treat ellipse hit testing as inside-or-near-shape for easy grabbing.
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let rx = rect.width / 2
+            let ry = rect.height / 2
+            let nx = (hitPoint.x - center.x) / rx
+            let ny = (hitPoint.y - center.y) / ry
+            let normalizedDistance = (nx * nx) + (ny * ny)
+            let toleranceScale = max(baseTolerance / max(min(rx, ry), 1), 0.2)
+            return normalizedDistance <= (1.0 + toleranceScale)
+            
+        case .freehand, .highlighter:
+            let points = annotation.points.map { scaleNormalizedPoint($0, to: containerSize) }
+            guard points.count >= 2 else {
+                guard let first = points.first else { return false }
+                return hypot(hitPoint.x - first.x, hitPoint.y - first.y) <= baseTolerance
+            }
+            let lineTolerance = annotation.tool == .highlighter
+                ? max(baseTolerance, displayStrokeWidth * 5)
+                : baseTolerance
+            for index in 1..<points.count {
+                let start = points[index - 1]
+                let end = points[index]
+                if pointToSegmentDistance(hitPoint, start: start, end: end) <= lineTolerance {
+                    return true
+                }
+            }
+            return false
+            
+        case .text:
+            let textRect = textBounds(for: annotation, in: containerSize)
+            return textRect.insetBy(dx: -8, dy: -6).contains(hitPoint)
+        }
+    }
+    
+    private func translatePoints(_ points: [CGPoint], by proposedDelta: CGPoint) -> [CGPoint] {
+        guard !points.isEmpty else { return points }
+        
+        var minX = CGFloat.infinity
+        var maxX = -CGFloat.infinity
+        var minY = CGFloat.infinity
+        var maxY = -CGFloat.infinity
+        
+        for point in points {
+            minX = min(minX, point.x)
+            maxX = max(maxX, point.x)
+            minY = min(minY, point.y)
+            maxY = max(maxY, point.y)
+        }
+        
+        let clampedDeltaX = min(max(proposedDelta.x, -minX), 1 - maxX)
+        let clampedDeltaY = min(max(proposedDelta.y, -minY), 1 - maxY)
+        
+        return points.map { point in
+            CGPoint(
+                x: point.x + clampedDeltaX,
+                y: point.y + clampedDeltaY
+            )
+        }
+    }
+    
+    private func scaleNormalizedPoint(_ point: CGPoint, to containerSize: CGSize) -> CGPoint {
+        CGPoint(
+            x: point.x * containerSize.width,
+            y: point.y * containerSize.height
+        )
+    }
+    
+    private func rectFromNormalizedPoints(_ p1: CGPoint, _ p2: CGPoint, in containerSize: CGSize) -> CGRect {
+        let s1 = scaleNormalizedPoint(p1, to: containerSize)
+        let s2 = scaleNormalizedPoint(p2, to: containerSize)
+        return CGRect(
+            x: min(s1.x, s2.x),
+            y: min(s1.y, s2.y),
+            width: abs(s2.x - s1.x),
+            height: abs(s2.y - s1.y)
+        )
+    }
+    
+    private func textBounds(for annotation: Annotation, in containerSize: CGSize) -> CGRect {
+        guard let textOrigin = annotation.points.first else { return .zero }
+        let scaledOrigin = scaleNormalizedPoint(textOrigin, to: containerSize)
+        let displayStrokeWidth = effectiveStrokeWidth(for: annotation, in: containerSize)
+        
+        // Approximate dimensions to keep hit testing lightweight.
+        let textWidth = max(60, CGFloat(annotation.text.count) * displayStrokeWidth * 5)
+        let textHeight = max(16, displayStrokeWidth * 12)
+        
+        return CGRect(
+            x: scaledOrigin.x,
+            y: scaledOrigin.y,
+            width: textWidth,
+            height: textHeight
+        )
+    }
+    
+    private func pointToSegmentDistance(_ point: CGPoint, start: CGPoint, end: CGPoint) -> CGFloat {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        
+        guard dx != 0 || dy != 0 else {
+            return hypot(point.x - start.x, point.y - start.y)
+        }
+        
+        let t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)
+        let clampedT = min(max(t, 0), 1)
+        
+        let projection = CGPoint(
+            x: start.x + clampedT * dx,
+            y: start.y + clampedT * dy
+        )
+        return hypot(point.x - projection.x, point.y - projection.y)
+    }
+    
+    private func pointToCurvedArrowDistance(_ point: CGPoint, start: CGPoint, end: CGPoint) -> CGFloat {
+        let sampledPoints = sampledCurvedArrowPoints(from: start, to: end)
+        guard sampledPoints.count >= 2 else { return .greatestFiniteMagnitude }
+        
+        var minDistance = CGFloat.greatestFiniteMagnitude
+        for idx in 1..<sampledPoints.count {
+            let segmentDistance = pointToSegmentDistance(
+                point,
+                start: sampledPoints[idx - 1],
+                end: sampledPoints[idx]
+            )
+            minDistance = min(minDistance, segmentDistance)
+        }
+        
+        return minDistance
+    }
+    
+    private func sampledCurvedArrowPoints(from start: CGPoint, to end: CGPoint, segments: Int = 20) -> [CGPoint] {
+        let control = curvedArrowControlPoint(from: start, to: end)
+        let clampedSegments = max(2, segments)
+
+        var points: [CGPoint] = []
+        points.reserveCapacity(clampedSegments + 1)
+
+        for index in 0...clampedSegments {
+            let t = CGFloat(index) / CGFloat(clampedSegments)
+            let oneMinusT = 1 - t
+            let startWeight = oneMinusT * oneMinusT
+            let controlWeight = 2 * oneMinusT * t
+            let endWeight = t * t
+
+            let x = (startWeight * start.x) + (controlWeight * control.x) + (endWeight * end.x)
+            let y = (startWeight * start.y) + (controlWeight * control.y) + (endWeight * end.y)
+            points.append(CGPoint(x: x, y: y))
+        }
+
+        return points
+    }
+
+    private func effectiveStrokeWidth(for annotation: Annotation, in containerSize: CGSize) -> CGFloat {
+        let referenceMinDimension = annotation.referenceCanvasMinDimension
+        guard referenceMinDimension > 1 else { return annotation.strokeWidth }
+
+        let targetMinDimension = max(1, min(containerSize.width, containerSize.height))
+        return annotation.strokeWidth * (targetMinDimension / referenceMinDimension)
+    }
+    
+    private func curvedArrowControlPoint(from start: CGPoint, to end: CGPoint) -> CGPoint {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let distance = hypot(dx, dy)
+        guard distance > 0.001 else {
+            return CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
+        }
+        
+        let mid = CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
+        let normal = CGPoint(x: -dy / distance, y: dx / distance)
+        let curveAmount = min(max(distance * 0.28, 20), 120)
+        
+        return CGPoint(
+            x: mid.x + normal.x * curveAmount,
+            y: mid.y + normal.y * curveAmount
+        )
     }
     
     private func saveAnnotatedImage() {
@@ -922,6 +1243,12 @@ struct ScreenshotEditorView: View {
     // MARK: - Rendering
     
     private func renderAnnotatedImage() -> NSImage {
+        let renderSize = editorRenderSize(fallback: .zero)
+        
+        if let renderedImage = renderRenderedViewImage(renderSize: renderSize) {
+            return renderedImage
+        }
+        
         guard let bitmap = renderAnnotatedBitmap() else {
             return originalImage
         }
@@ -932,13 +1259,62 @@ struct ScreenshotEditorView: View {
     }
     
     private func renderAnnotatedPNGData() -> Data? {
+        let renderSize = editorRenderSize(fallback: .zero)
+        
+        if let renderedImage = renderRenderedViewImage(renderSize: renderSize),
+           let tiffData = renderedImage.tiffRepresentation,
+           let bitmapRep = NSBitmapImageRep(data: tiffData) {
+            return bitmapRep.representation(using: .png, properties: [:])
+        }
+        
         guard let bitmap = renderAnnotatedBitmap() else { return nil }
         return bitmap.representation(using: .png, properties: [:])
     }
     
+    private func renderRenderedViewImage(renderSize: NSSize) -> NSImage? {
+        guard renderSize.width > 0, renderSize.height > 0 else { return nil }
+        
+        let exportView = ZStack {
+            Image(nsImage: originalImage)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: renderSize.width, height: renderSize.height)
+            
+            AnnotationCanvas(
+                annotations: annotations,
+                currentAnnotation: currentAnnotation,
+                originalImage: originalImage,
+                imageSize: renderSize,
+                containerSize: renderSize
+            )
+            .frame(width: renderSize.width, height: renderSize.height)
+        }
+        .frame(width: renderSize.width, height: renderSize.height)
+
+        // Primary path: offscreen AppKit snapshot for WYSIWYG parity with on-screen SwiftUI rendering.
+        let hosting = NSHostingView(rootView: exportView)
+        hosting.frame = NSRect(origin: .zero, size: renderSize)
+        hosting.layoutSubtreeIfNeeded()
+        
+        if let bitmapRep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+            bitmapRep.size = renderSize
+            hosting.cacheDisplay(in: hosting.bounds, to: bitmapRep)
+            let image = NSImage(size: renderSize)
+            image.addRepresentation(bitmapRep)
+            return image
+        }
+
+        // Fallback: ImageRenderer.
+        let renderer = ImageRenderer(content: exportView)
+        renderer.proposedSize = ProposedViewSize(width: renderSize.width, height: renderSize.height)
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        return renderer.nsImage
+    }
+    
     private func renderAnnotatedBitmap() -> NSBitmapImageRep? {
         let source = resolvedSourceImage()
-        let renderSize = source.size
+        let renderSize = editorRenderSize(fallback: source.size)
         let renderWidth = max(1, Int(renderSize.width.rounded(.toNearestOrAwayFromZero)))
         let renderHeight = max(1, Int(renderSize.height.rounded(.toNearestOrAwayFromZero)))
         
@@ -970,13 +1346,8 @@ struct ScreenshotEditorView: View {
         
         let renderRect = NSRect(origin: .zero, size: renderSize)
         
-        // Draw from a single resolved source image representation so saved output
-        // matches the editor preview and does not switch NSImage reps unexpectedly.
-        if let cgImage = source.cgImage {
-            context.cgContext.draw(cgImage, in: renderRect)
-        } else {
-            originalImage.draw(in: renderRect, from: .zero, operation: .copy, fraction: 1.0)
-        }
+        // Draw exactly the same NSImage source used by the editor preview.
+        originalImage.draw(in: renderRect, from: .zero, operation: .copy, fraction: 1.0)
         
         // Freeze the exact rendered base image for blur sampling so annotation sampling
         // always uses the same coordinate space as the export bitmap.
@@ -996,7 +1367,24 @@ struct ScreenshotEditorView: View {
         return bitmap
     }
     
+    private func editorRenderSize(fallback: NSSize) -> NSSize {
+        // Keep export geometry on the same coordinate basis used by the on-screen editor.
+        if originalImage.size.width > 0, originalImage.size.height > 0 {
+            return originalImage.size
+        }
+        if fallback.width > 0, fallback.height > 0 {
+            return fallback
+        }
+        return NSSize(width: 1, height: 1)
+    }
+    
     private func resolvedSourceImage() -> (cgImage: CGImage?, size: NSSize) {
+        // Prefer AppKit's currently resolved CGImage first. This is usually the exact
+        // visible representation and avoids selecting stale/cropped cached reps.
+        if let cgImage = originalImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            return (cgImage, NSSize(width: cgImage.width, height: cgImage.height))
+        }
+        
         let expectedAspect: CGFloat? = {
             guard originalImage.size.width > 0, originalImage.size.height > 0 else { return nil }
             return originalImage.size.width / originalImage.size.height
@@ -1036,25 +1424,30 @@ struct ScreenshotEditorView: View {
         }
         
         let isLessPreferred: (Candidate, Candidate) -> Bool = { lhs, rhs in
-            let lhsArea = Int64(lhs.width) * Int64(lhs.height)
-            let rhsArea = Int64(rhs.width) * Int64(rhs.height)
-            if lhsArea == rhsArea {
+            // Prefer closest aspect first to prevent wrong cropped reps.
+            let aspectSlack: CGFloat = 0.001
+            if abs(lhs.aspectDelta - rhs.aspectDelta) > aspectSlack {
                 return lhs.aspectDelta > rhs.aspectDelta
             }
+            
+            // Prefer candidates that have a concrete CGImage backing.
+            if (lhs.cgImage != nil) != (rhs.cgImage != nil) {
+                return lhs.cgImage == nil
+            }
+            
+            // Then pick the highest resolution.
+            let lhsArea = Int64(lhs.width) * Int64(lhs.height)
+            let rhsArea = Int64(rhs.width) * Int64(rhs.height)
             return lhsArea < rhsArea
         }
         
         let bestAspectMatch = candidates
-            .filter { $0.aspectDelta <= 0.03 } // Ignore cached reps with obviously wrong aspect.
+            .filter { $0.aspectDelta <= 0.03 }
             .max(by: isLessPreferred)
-        let bestAnyAspect = candidates.max(by: isLessPreferred)
+        let bestClosest = candidates.max(by: isLessPreferred)
         
-        if let candidate = bestAspectMatch ?? bestAnyAspect {
+        if let candidate = bestAspectMatch ?? bestClosest {
             return (candidate.cgImage, NSSize(width: candidate.width, height: candidate.height))
-        }
-
-        if let cgImage = originalImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-            return (cgImage, NSSize(width: cgImage.width, height: cgImage.height))
         }
         
         if let bitmapRep = originalImage.representations
@@ -1076,15 +1469,22 @@ struct ScreenshotEditorView: View {
         let nsColor = NSColor(annotation.color)
         nsColor.setStroke()
         nsColor.setFill()
+        let effectiveStrokeWidth = effectiveStrokeWidth(
+            for: annotation,
+            in: CGSize(width: size.width, height: size.height)
+        )
         
         switch annotation.tool {
         case .arrow:
-            drawArrow(from: annotation.points[0], to: annotation.points.last ?? annotation.points[0], strokeWidth: annotation.strokeWidth, in: size)
+            drawArrow(from: annotation.points[0], to: annotation.points.last ?? annotation.points[0], strokeWidth: effectiveStrokeWidth, in: size)
+            
+        case .curvedArrow:
+            drawCurvedArrow(from: annotation.points[0], to: annotation.points.last ?? annotation.points[0], strokeWidth: effectiveStrokeWidth, in: size)
             
         case .line:
             // Simple straight line (no arrowhead)
             let path = NSBezierPath()
-            path.lineWidth = annotation.strokeWidth
+            path.lineWidth = effectiveStrokeWidth
             path.lineCapStyle = .round
             path.move(to: scalePoint(annotation.points[0], to: size))
             path.line(to: scalePoint(annotation.points.last ?? annotation.points[0], to: size))
@@ -1093,18 +1493,18 @@ struct ScreenshotEditorView: View {
         case .rectangle:
             let rect = rectFromPoints(annotation.points[0], annotation.points.last ?? annotation.points[0], in: size)
             let path = NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4)
-            path.lineWidth = annotation.strokeWidth
+            path.lineWidth = effectiveStrokeWidth
             path.stroke()
             
         case .ellipse:
             let rect = rectFromPoints(annotation.points[0], annotation.points.last ?? annotation.points[0], in: size)
             let path = NSBezierPath(ovalIn: rect)
-            path.lineWidth = annotation.strokeWidth
+            path.lineWidth = effectiveStrokeWidth
             path.stroke()
             
         case .freehand:
             let path = NSBezierPath()
-            path.lineWidth = annotation.strokeWidth
+            path.lineWidth = effectiveStrokeWidth
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
             
@@ -1121,7 +1521,7 @@ struct ScreenshotEditorView: View {
         case .highlighter:
             // Semi-transparent marker effect
             let path = NSBezierPath()
-            path.lineWidth = annotation.strokeWidth * 4 // Wider for highlighter effect
+            path.lineWidth = effectiveStrokeWidth * 4 // Wider for highlighter effect
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
             
@@ -1144,8 +1544,9 @@ struct ScreenshotEditorView: View {
             guard rect.width > 4 && rect.height > 4 else { return }
             let blurSourceImage = sourceImage ?? originalImage
             
-            // Use annotation's blur strength (lower = stronger pixelation)
-            let pixelSize = Int(annotation.blurStrength)
+            // Scale blur block size with render scale to match editor preview proportions.
+            let blurScale = effectiveStrokeWidth / max(annotation.strokeWidth, 0.001)
+            let pixelSize = max(1, Int((annotation.blurStrength * blurScale).rounded()))
             let tinySize = NSSize(width: pixelSize, height: pixelSize)
             let tinyImage = NSImage(size: tinySize)
             tinyImage.lockFocus()
@@ -1166,7 +1567,7 @@ struct ScreenshotEditorView: View {
             let scaledPoint = scalePoint(annotation.points[0], to: size)
             // Get the correct font
             let fontName = annotation.font == "SF Pro" ? ".AppleSystemUIFont" : annotation.font
-            let font = NSFont(name: fontName, size: annotation.strokeWidth * 8) ?? NSFont.systemFont(ofSize: annotation.strokeWidth * 8, weight: .semibold)
+            let font = NSFont(name: fontName, size: effectiveStrokeWidth * 8) ?? NSFont.systemFont(ofSize: effectiveStrokeWidth * 8, weight: .semibold)
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: nsColor
@@ -1213,6 +1614,62 @@ struct ScreenshotEditorView: View {
         arrowPath.stroke()
     }
     
+    private func drawCurvedArrow(from start: CGPoint, to end: CGPoint, strokeWidth: CGFloat, in size: NSSize) {
+        let scaledStart = scalePoint(start, to: size)
+        let scaledEnd = scalePoint(end, to: size)
+        let control = curvedArrowControlPoint(from: scaledStart, to: scaledEnd)
+        
+        let cubicControl1 = CGPoint(
+            x: scaledStart.x + (2.0 / 3.0) * (control.x - scaledStart.x),
+            y: scaledStart.y + (2.0 / 3.0) * (control.y - scaledStart.y)
+        )
+        let cubicControl2 = CGPoint(
+            x: scaledEnd.x + (2.0 / 3.0) * (control.x - scaledEnd.x),
+            y: scaledEnd.y + (2.0 / 3.0) * (control.y - scaledEnd.y)
+        )
+        
+        let path = NSBezierPath()
+        path.lineWidth = strokeWidth
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.move(to: scaledStart)
+        path.curve(to: scaledEnd, controlPoint1: cubicControl1, controlPoint2: cubicControl2)
+        path.stroke()
+        
+        let tangent = CGPoint(
+            x: scaledEnd.x - control.x,
+            y: scaledEnd.y - control.y
+        )
+        let fallback = CGPoint(
+            x: scaledEnd.x - scaledStart.x,
+            y: scaledEnd.y - scaledStart.y
+        )
+        let headVector = hypot(tangent.x, tangent.y) > 0.001 ? tangent : fallback
+        let angle = atan2(headVector.y, headVector.x)
+        
+        let arrowLength: CGFloat = 15 + strokeWidth * 2
+        let arrowAngle: CGFloat = .pi / 6
+        
+        let arrowPath = NSBezierPath()
+        arrowPath.lineWidth = strokeWidth
+        arrowPath.lineCapStyle = .round
+        arrowPath.lineJoinStyle = .round
+        
+        let point1 = CGPoint(
+            x: scaledEnd.x - arrowLength * cos(angle - arrowAngle),
+            y: scaledEnd.y - arrowLength * sin(angle - arrowAngle)
+        )
+        let point2 = CGPoint(
+            x: scaledEnd.x - arrowLength * cos(angle + arrowAngle),
+            y: scaledEnd.y - arrowLength * sin(angle + arrowAngle)
+        )
+        
+        arrowPath.move(to: point1)
+        arrowPath.line(to: scaledEnd)
+        arrowPath.line(to: point2)
+        arrowPath.stroke()
+    }
+    
     private func rectFromPoints(_ p1: CGPoint, _ p2: CGPoint, in size: NSSize) -> NSRect {
         let s1 = scalePoint(p1, to: size)
         let s2 = scalePoint(p2, to: size)
@@ -1232,6 +1689,7 @@ struct ScreenshotEditorView: View {
             y: (1.0 - point.y) * size.height  // Flip Y for NSImage (0-1 normalized, 0=top, 1=bottom in SwiftUI)
         )
     }
+    
 }
 
 // MARK: - Annotation Canvas
@@ -1261,13 +1719,19 @@ struct AnnotationCanvas: View {
         guard !annotation.points.isEmpty else { return }
         
         let color = annotation.color
-        let strokeStyle = StrokeStyle(lineWidth: annotation.strokeWidth, lineCap: .round, lineJoin: .round)
+        let effectiveStrokeWidth = effectiveStrokeWidth(for: annotation, in: size)
+        let strokeStyle = StrokeStyle(lineWidth: effectiveStrokeWidth, lineCap: .round, lineJoin: .round)
         
         switch annotation.tool {
         case .arrow:
             let start = scalePoint(annotation.points[0], to: size)
             let end = scalePoint(annotation.points.last ?? annotation.points[0], to: size)
             drawArrow(from: start, to: end, color: color, strokeStyle: strokeStyle, in: context)
+            
+        case .curvedArrow:
+            let start = scalePoint(annotation.points[0], to: size)
+            let end = scalePoint(annotation.points.last ?? annotation.points[0], to: size)
+            drawCurvedArrow(from: start, to: end, color: color, strokeStyle: strokeStyle, in: context)
             
         case .line:
             let start = scalePoint(annotation.points[0], to: size)
@@ -1309,7 +1773,7 @@ struct AnnotationCanvas: View {
                     path.addLine(to: scaled)
                 }
             }
-            let highlightStyle = StrokeStyle(lineWidth: annotation.strokeWidth * 4, lineCap: .round, lineJoin: .round)
+            let highlightStyle = StrokeStyle(lineWidth: effectiveStrokeWidth * 4, lineCap: .round, lineJoin: .round)
             context.stroke(path, with: .color(color.opacity(0.4)), style: highlightStyle)
             
         case .blur:
@@ -1329,8 +1793,9 @@ struct AnnotationCanvas: View {
                 height: rect.height * scaleY
             )
             
-            // Use annotation's blur strength (lower = stronger pixelation)
-            let pixelSize = Int(annotation.blurStrength)
+            // Scale blur block size with render scale to match editor preview proportions.
+            let blurScale = effectiveStrokeWidth / max(annotation.strokeWidth, 0.001)
+            let pixelSize = max(1, Int((annotation.blurStrength * blurScale).rounded()))
             let tinySize = NSSize(width: pixelSize, height: pixelSize)
             let tinyImage = NSImage(size: tinySize)
             tinyImage.lockFocus()
@@ -1349,7 +1814,9 @@ struct AnnotationCanvas: View {
             
         case .text:
             let scaledPoint = scalePoint(annotation.points[0], to: size)
-            let fontName = annotation.font == "SF Pro" ? Font.system(size: annotation.strokeWidth * 8, weight: .semibold) : Font.custom(annotation.font, size: annotation.strokeWidth * 8)
+            let fontName = annotation.font == "SF Pro"
+                ? Font.system(size: effectiveStrokeWidth * 8, weight: .semibold)
+                : Font.custom(annotation.font, size: effectiveStrokeWidth * 8)
             context.draw(Text(annotation.text).font(fontName).foregroundColor(color), at: scaledPoint, anchor: .topLeading)
         }
     }
@@ -1363,6 +1830,44 @@ struct AnnotationCanvas: View {
         
         // Arrowhead
         let angle = atan2(end.y - start.y, end.x - start.x)
+        let arrowLength: CGFloat = 15 + strokeStyle.lineWidth * 2
+        let arrowAngle: CGFloat = .pi / 6
+        
+        let point1 = CGPoint(
+            x: end.x - arrowLength * cos(angle - arrowAngle),
+            y: end.y - arrowLength * sin(angle - arrowAngle)
+        )
+        let point2 = CGPoint(
+            x: end.x - arrowLength * cos(angle + arrowAngle),
+            y: end.y - arrowLength * sin(angle + arrowAngle)
+        )
+        
+        var arrowPath = Path()
+        arrowPath.move(to: point1)
+        arrowPath.addLine(to: end)
+        arrowPath.addLine(to: point2)
+        context.stroke(arrowPath, with: .color(color), style: strokeStyle)
+    }
+    
+    private func drawCurvedArrow(from start: CGPoint, to end: CGPoint, color: Color, strokeStyle: StrokeStyle, in context: GraphicsContext) {
+        let control = curvedArrowControlPoint(from: start, to: end)
+        
+        var curvePath = Path()
+        curvePath.move(to: start)
+        curvePath.addQuadCurve(to: end, control: control)
+        context.stroke(curvePath, with: .color(color), style: strokeStyle)
+        
+        let tangent = CGPoint(
+            x: end.x - control.x,
+            y: end.y - control.y
+        )
+        let fallback = CGPoint(
+            x: end.x - start.x,
+            y: end.y - start.y
+        )
+        let headVector = hypot(tangent.x, tangent.y) > 0.001 ? tangent : fallback
+        let angle = atan2(headVector.y, headVector.x)
+        
         let arrowLength: CGFloat = 15 + strokeStyle.lineWidth * 2
         let arrowAngle: CGFloat = .pi / 6
         
@@ -1396,5 +1901,31 @@ struct AnnotationCanvas: View {
     // Scale normalized 0-1 point to display coordinates
     private func scalePoint(_ point: CGPoint, to size: CGSize) -> CGPoint {
         CGPoint(x: point.x * size.width, y: point.y * size.height)
+    }
+
+    private func effectiveStrokeWidth(for annotation: Annotation, in size: CGSize) -> CGFloat {
+        let referenceMinDimension = annotation.referenceCanvasMinDimension
+        guard referenceMinDimension > 1 else { return annotation.strokeWidth }
+
+        let targetMinDimension = max(1, min(size.width, size.height))
+        return annotation.strokeWidth * (targetMinDimension / referenceMinDimension)
+    }
+    
+    private func curvedArrowControlPoint(from start: CGPoint, to end: CGPoint) -> CGPoint {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let distance = hypot(dx, dy)
+        guard distance > 0.001 else {
+            return CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
+        }
+        
+        let mid = CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
+        let normal = CGPoint(x: -dy / distance, y: dx / distance)
+        let curveAmount = min(max(distance * 0.28, 20), 120)
+        
+        return CGPoint(
+            x: mid.x + normal.x * curveAmount,
+            y: mid.y + normal.y * curveAmount
+        )
     }
 }

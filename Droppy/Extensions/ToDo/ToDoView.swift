@@ -7,6 +7,65 @@
 
 import SwiftUI
 
+private enum ToDoViewFormatters {
+    static let parseTimeFormatters: [DateFormatter] = {
+        ["HH:mm", "H:mm", "HHmm", "Hmm", "H", "h:mm a", "h:mma", "ha"].map { format in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = .autoupdatingCurrent
+            formatter.dateFormat = format
+            return formatter
+        }
+    }()
+
+    static let shortTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
+
+    static let dueDateWithTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
+        return formatter
+    }()
+
+    static let dueDateWithoutYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter
+    }()
+
+    static let dueDateWithYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM yyyy")
+        return formatter
+    }()
+
+    static let fullDueDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy jm")
+        return formatter
+    }()
+
+    static let fullDueDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy")
+        return formatter
+    }()
+}
 
 struct ToDoView: View {
     @State private var manager = ToDoManager.shared
@@ -14,6 +73,7 @@ struct ToDoView: View {
     @State private var showingNewDueDatePicker = false
     @State private var activeListMentionQuery: String?
     @State private var showingMentionPicker = false
+    @AppStorage(AppPreferenceKey.todoHideUndatedReminders) private var hideUndatedReminders = PreferenceDefault.todoHideUndatedReminders
     
     var body: some View {
         VStack(spacing: 12) {
@@ -110,6 +170,25 @@ struct ToDoView: View {
                         setInteractingPopover: { manager.isInteractingWithPopover = $0 }
                     )
                 }
+
+                Menu {
+                    Toggle(
+                        isOn: Binding(
+                            get: { hideUndatedReminders },
+                            set: { newValue in
+                                hideUndatedReminders = newValue
+                                manager.setHideUndatedRemindersEnabled(newValue)
+                            }
+                        )
+                    ) {
+                        Label("Hide reminders without due date", systemImage: "calendar.badge.exclamationmark")
+                    }
+                } label: {
+                    Image(systemName: hideUndatedReminders ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .foregroundColor(hideUndatedReminders ? .blue : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Filter options")
                 
                 // Submit Button
                 Button(action: submitTask) {
@@ -136,36 +215,36 @@ struct ToDoView: View {
             // Removed negative top padding causing clipping
 
             // List
-            if manager.items.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "checklist")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary.opacity(0.5))
-                    Text("no_tasks_yet")
-                        .foregroundColor(.secondary)
-                        .font(.subheadline)
-                    Text("type_above_hint")
-                        .foregroundColor(.secondary.opacity(0.6))
-                        .font(.caption)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.vertical, 40)
-            } else {
-                ScrollView {
+            ScrollView {
+                if manager.items.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 40))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Text("no_tasks_yet")
+                            .foregroundColor(.secondary)
+                            .font(.subheadline)
+                        Text("type_above_hint")
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 220)
+                    .padding(.vertical, 40)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                } else {
                     VStack(spacing: 1) {
                         if !overviewTaskItems.isEmpty {
-                            ForEach(Array(overviewTaskItems.enumerated()), id: \.element.id) { index, item in
+                            let lastOverviewItemID = overviewTaskItems.last?.id
+                            ForEach(overviewTaskItems) { item in
                                 ToDoRow(
                                     item: item,
                                     manager: manager,
-                                    reminderListOptions: reminderListMenuOptions
+                                    reminderListOptions: reminderListMenuOptions,
+                                    subtaskDepth: manager.reminderHierarchyDepth(for: item)
                                 )
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .top).combined(with: .opacity),
-                                        removal: .scale(scale: 0.98).combined(with: .opacity)
-                                    ))
+                                    .transition(.move(edge: .top).combined(with: .opacity))
 
-                                if index < overviewTaskItems.count - 1 {
+                                if item.id != lastOverviewItemID {
                                     Divider()
                                         .background(AdaptiveColors.overlayAuto(0.06))
                                         .padding(.horizontal, 24)
@@ -186,24 +265,25 @@ struct ToDoView: View {
                                     .font(.system(size: 11, weight: .semibold))
                                 Text("Upcoming Events")
                                     .font(.system(size: 11, weight: .semibold))
+                                    .contentTransition(.interpolate)
+                                    .animation(.smooth(duration: 0.22), value: upcomingCalendarItems.count)
                                 Spacer(minLength: 0)
                             }
                             .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(0.85))
                             .padding(.horizontal, 24)
                             .padding(.vertical, 4)
 
-                            ForEach(Array(upcomingCalendarItems.enumerated()), id: \.element.id) { index, item in
+                            let lastUpcomingItemID = upcomingCalendarItems.last?.id
+                            ForEach(upcomingCalendarItems) { item in
                                 ToDoRow(
                                     item: item,
                                     manager: manager,
-                                    reminderListOptions: reminderListMenuOptions
+                                    reminderListOptions: reminderListMenuOptions,
+                                    subtaskDepth: manager.reminderHierarchyDepth(for: item)
                                 )
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .top).combined(with: .opacity),
-                                        removal: .scale(scale: 0.98).combined(with: .opacity)
-                                    ))
+                                    .transition(.move(edge: .top).combined(with: .opacity))
 
-                                if index < upcomingCalendarItems.count - 1 {
+                                if item.id != lastUpcomingItemID {
                                     Divider()
                                         .background(AdaptiveColors.overlayAuto(0.06))
                                         .padding(.horizontal, 24)
@@ -248,6 +328,9 @@ struct ToDoView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.showUndoToast)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: manager.showCleanupToast)
+        .animation(.smooth(duration: 0.25), value: manager.items.isEmpty)
+        .animation(.smooth(duration: 0.28), value: overviewTaskItems.map(\.id))
+        .animation(.smooth(duration: 0.28), value: upcomingCalendarItems.map(\.id))
         .onChange(of: isInputFocused) { _, focused in
             manager.isEditingText = focused
         }
@@ -335,8 +418,10 @@ struct ToDoView: View {
         if let explicit = manager.newItemReminderListID {
             return explicit
         }
-        guard let parsedQuery else { return nil }
-        return manager.resolveReminderList(matching: parsedQuery)?.id
+        if let parsedQuery {
+            return manager.resolveReminderList(matching: parsedQuery)?.id
+        }
+        return manager.preferredReminderListIDForNewTasks()
     }
 
     private var reminderListMenuOptions: [ToDoReminderListOption] {
@@ -596,12 +681,7 @@ private struct ToDoDueDatePopoverContentView: View {
             .replacingOccurrences(of: ".", with: ":")
             .uppercased()
 
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-
-        for format in ["HH:mm", "H:mm", "HHmm", "Hmm", "H", "h:mm a", "h:mma", "ha"] {
-            formatter.dateFormat = format
+        for formatter in ToDoViewFormatters.parseTimeFormatters {
             if let date = formatter.date(from: normalized) {
                 let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
                 if let hour = comps.hour, let minute = comps.minute {
@@ -613,19 +693,11 @@ private struct ToDoDueDatePopoverContentView: View {
     }
 
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: date)
+        ToDoViewFormatters.shortTimeFormatter.string(from: date)
     }
 
     private var timePlaceholder: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: Date())
+        ToDoViewFormatters.shortTimeFormatter.string(from: Date())
     }
 }
 
@@ -633,11 +705,15 @@ struct ToDoRow: View {
     let item: ToDoItem
     let manager: ToDoManager
     let reminderListOptions: [ToDoReminderListOption]
+    var subtaskDepth: Int = 0
+    private static var colorCache: [String: Color] = [:]
     @State private var isHovering = false
     @State private var isShowingInfoPopover = false
     @State private var isEditing = false
     @State private var editText = ""
     @State private var editDueDate: Date?
+    private var clampedSubtaskDepth: Int { min(max(subtaskDepth, 0), 4) }
+    private var subtaskIndent: CGFloat { CGFloat(clampedSubtaskDepth) * 16 }
 
     var body: some View {
         HStack(spacing: DroppySpacing.smd) {
@@ -672,16 +748,26 @@ struct ToDoRow: View {
                 .accessibilityHint("Toggles completion for \(item.title)")
             }
             // Title - color based on priority
-            Text(item.title)
-                .font(.system(size: 13, weight: isCalendarEvent ? .semibold : (item.isCompleted ? .regular : .medium)))
-                .strikethrough(item.isCompleted)
-                .foregroundColor(
-                    item.isCompleted
-                        ? .secondary
-                        : (isCalendarEvent ? calendarEventTint : (item.priority == .normal ? .primary : item.priority.color))
-                )
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 5) {
+                if clampedSubtaskDepth > 0 {
+                    Image(systemName: "arrow.turn.down.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(0.72))
+                        .contentTransition(.interpolate)
+                }
+                Text(item.title)
+                    .font(.system(size: 13, weight: isCalendarEvent ? .semibold : (item.isCompleted ? .regular : .medium)))
+                    .strikethrough(item.isCompleted)
+                    .foregroundColor(
+                        item.isCompleted
+                            ? .secondary
+                            : (isCalendarEvent ? calendarEventTint : (item.priority == .normal ? .primary : item.priority.color))
+                    )
+                    .lineLimit(1)
+                    .contentTransition(.interpolate)
+                    .animation(.smooth(duration: 0.22), value: item.title)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             // Stats / Controls
             HStack(spacing: 8) {
@@ -698,11 +784,11 @@ struct ToDoRow: View {
                                 .foregroundStyle(AdaptiveColors.secondaryTextAuto.opacity(0.85))
                                 .help(externalIconHelp)
                         }
-                        if let reminderListColor {
+                        if let sourceListColor {
                             Image(systemName: "list.bullet.circle.fill")
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(reminderListColor.opacity(0.9))
-                                .help(reminderListHelp)
+                                .foregroundStyle(sourceListColor.opacity(0.9))
+                                .help(sourceListHelp)
                         }
                     }
                 }
@@ -716,6 +802,8 @@ struct ToDoRow: View {
                         Text(formattedDueDateText(dueDate))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
+                            .contentTransition(.interpolate)
+                            .animation(.smooth(duration: 0.22), value: dueDate.timeIntervalSinceReferenceDate)
                     }
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(
@@ -748,6 +836,7 @@ struct ToDoRow: View {
                 }
             }
         }
+        .padding(.leading, subtaskIndent)
         .padding(.horizontal, DroppySpacing.md)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
@@ -955,26 +1044,41 @@ struct ToDoRow: View {
         }
     }
 
-    private var reminderListColor: Color? {
-        guard !isCalendarEvent else { return nil }
+    private var sourceListColor: Color? {
+        guard item.externalSource != nil else { return nil }
         return colorFromHex(item.externalListColorHex)
     }
 
-    private var reminderListHelp: String {
-        if let title = item.externalListTitle, !title.isEmpty {
-            return "Apple Reminders list: \(title)"
+    private var sourceListHelp: String {
+        switch item.externalSource {
+        case .calendar:
+            if let title = item.externalListTitle, !title.isEmpty {
+                return "Apple Calendar: \(title)"
+            }
+            return "Apple Calendar"
+        case .reminders:
+            if let title = item.externalListTitle, !title.isEmpty {
+                return "Apple Reminders list: \(title)"
+            }
+            return "Apple Reminders list"
+        case .none:
+            return ""
         }
-        return "Apple Reminders list"
     }
 
     private func colorFromHex(_ hex: String?) -> Color? {
         guard let hex else { return nil }
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
+        if let cached = Self.colorCache[trimmed] {
+            return cached
+        }
         guard trimmed.count == 6, let value = Int(trimmed, radix: 16) else { return nil }
         let red = Double((value >> 16) & 0xFF) / 255.0
         let green = Double((value >> 8) & 0xFF) / 255.0
         let blue = Double(value & 0xFF) / 255.0
-        return Color(red: red, green: green, blue: blue)
+        let color = Color(red: red, green: green, blue: blue)
+        Self.colorCache[trimmed] = color
+        return color
     }
 
     private func dueDateHasTime(_ date: Date) -> Bool {
@@ -984,17 +1088,13 @@ struct ToDoRow: View {
 
     private func formattedDueDateText(_ date: Date) -> String {
         let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
         if dueDateHasTime(date) {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
+            return ToDoViewFormatters.dueDateWithTimeFormatter.string(from: date)
         } else if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM")
+            return ToDoViewFormatters.dueDateWithoutYearFormatter.string(from: date)
         } else {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM yyyy")
+            return ToDoViewFormatters.dueDateWithYearFormatter.string(from: date)
         }
-        return formatter.string(from: date)
     }
 
     private var infoPopoverContent: some View {
@@ -1016,6 +1116,8 @@ struct ToDoRow: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(AdaptiveColors.primaryTextAuto)
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.interpolate)
+                .animation(.smooth(duration: 0.22), value: item.title)
 
             infoDetailRow(icon: "square.stack.3d.up", label: "Source", value: sourceDetailsLabel)
 
@@ -1053,6 +1155,7 @@ struct ToDoRow: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(AdaptiveColors.primaryTextAuto.opacity(0.95))
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.interpolate)
             Spacer(minLength: 0)
         }
     }
@@ -1073,15 +1176,11 @@ struct ToDoRow: View {
     }
 
     private func formattedFullDueDateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
         if dueDateHasTime(date) {
-            formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy jm")
+            return ToDoViewFormatters.fullDueDateTimeFormatter.string(from: date)
         } else {
-            formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy")
+            return ToDoViewFormatters.fullDueDateFormatter.string(from: date)
         }
-        return formatter.string(from: date)
     }
 
     private var isCalendarEvent: Bool {

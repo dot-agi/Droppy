@@ -202,6 +202,33 @@ final class ControlItem {
     
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
+
+    /// Reused context menu to avoid recreating menu/window objects on every right click.
+    private lazy var contextMenu: NSMenu = {
+        let menu = NSMenu(title: "Menu Bar Manager")
+
+        let settingsItem = NSMenuItem(
+            title: "Menu Bar Manager Settings…",
+            action: #selector(openSettings),
+            keyEquivalent: ""
+        )
+        settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
+
+        let disableItem = NSMenuItem(
+            title: "Disable Menu Bar Manager",
+            action: #selector(disableExtension),
+            keyEquivalent: ""
+        )
+        disableItem.target = self
+        disableItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Disable")
+        menu.addItem(disableItem)
+
+        return menu
+    }()
     
     /// The menu bar section associated with the control item.
     private var section: MenuBarSection? {
@@ -341,7 +368,8 @@ final class ControlItem {
         }
         button.target = self
         button.action = #selector(performAction)
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // Show context menu on right-down to avoid accidental activation of the first menu item.
+        button.sendAction(on: [.leftMouseUp, .rightMouseDown])
     }
     
     /// Updates the appearance of the status item using the given hiding state.
@@ -366,40 +394,9 @@ final class ControlItem {
             case .hideItems: iconSet.visibleSymbol
             case .showItems: iconSet.hiddenSymbol
             }
-            
-            // Create the base image
-            var image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Toggle Menu Bar")
-            
-            // Apply gradient if enabled
-            if manager?.useGradientIcon == true, let baseImage = image {
-                // Use the original image size to prevent distortion
-                let size = baseImage.size
-                let gradientImage = NSImage(size: size, flipped: false) { bounds in
-                    // Draw gradient background masked by the symbol
-                    guard let cgImage = baseImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
-                    guard let context = NSGraphicsContext.current?.cgContext else { return false }
-                    
-                    // Create grayscale gradient (light to dark, top to bottom)
-                    let lightGray = NSColor(white: 0.7, alpha: 1.0).cgColor
-                    let darkGray = NSColor(white: 0.3, alpha: 1.0).cgColor
-                    let colors = [lightGray, darkGray] as CFArray
-                    guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) else { return false }
-                    
-                    // Clip to the symbol shape
-                    context.clip(to: bounds, mask: cgImage)
-                    
-                    // Draw gradient from top to bottom
-                    context.drawLinearGradient(gradient, start: CGPoint(x: bounds.midX, y: bounds.maxY), end: CGPoint(x: bounds.midX, y: 0), options: [])
-                    
-                    return true
-                }
-                gradientImage.isTemplate = false
-                image = gradientImage
-            }
-            
-            button.image = image
-            
-            print("[MenuBarManager] Updated main item appearance: \(iconName)")
+            button.image =
+                manager?.toggleIconImage(for: state)
+                ?? NSImage(systemSymbolName: iconName, accessibilityDescription: "Toggle Menu Bar")
             
         case .hidden:
             guard manager?.showChevronSeparator == true else {
@@ -472,7 +469,7 @@ final class ControlItem {
                 // Normal toggle behavior when hover is disabled
                 section?.toggle()
             }
-        case .rightMouseUp:
+        case .rightMouseDown:
             showContextMenu()
         default:
             break
@@ -481,31 +478,13 @@ final class ControlItem {
     
     /// Shows a context menu for the control item.
     private func showContextMenu() {
-        let menu = NSMenu(title: "Menu Bar Manager")
-        
-        let settingsItem = NSMenuItem(
-            title: "Menu Bar Manager Settings…",
-            action: #selector(openSettings),
-            keyEquivalent: ""
-        )
-        settingsItem.target = self
-        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
-        menu.addItem(settingsItem)
-        
-        menu.addItem(.separator())
-        
-        let disableItem = NSMenuItem(
-            title: "Disable Menu Bar Manager",
-            action: #selector(disableExtension),
-            keyEquivalent: ""
-        )
-        disableItem.target = self
-        disableItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Disable")
-        menu.addItem(disableItem)
-        
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+        guard let button = statusItem.button else { return }
+
+        if let event = NSApp.currentEvent {
+            NSMenu.popUpContextMenu(contextMenu, with: event, for: button)
+        } else {
+            contextMenu.popUp(positioning: nil, at: NSPoint(x: button.bounds.midX, y: button.bounds.maxY), in: button)
+        }
     }
     
     @objc private func openSettings() {
@@ -595,7 +574,7 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
     var visibleSymbol: String {
         switch self {
         case .eye: return "eye.fill"
-        case .chevron: return "chevron.right"
+        case .chevron: return "chevron.left"
         case .circle: return "circle.fill"
         case .line: return "line.3.horizontal"
         case .dot: return "smallcircle.filled.circle"
@@ -608,7 +587,7 @@ enum MBMIconSet: String, CaseIterable, Identifiable {
     var hiddenSymbol: String {
         switch self {
         case .eye: return "eye.slash.fill"
-        case .chevron: return "chevron.left"
+        case .chevron: return "chevron.right"
         case .circle: return "circle"
         case .line: return "line.3.horizontal.decrease"
         case .dot: return "smallcircle.circle"
@@ -656,13 +635,21 @@ final class MenuBarManager: ObservableObject {
     
     /// Hover delay in seconds
     @Published var showOnHoverDelay: Double {
-        didSet { UserDefaults.standard.set(showOnHoverDelay, forKey: "MenuBarManager_ShowOnHoverDelay") }
+        didSet {
+            let clamped = min(max(showOnHoverDelay, 0), 2)
+            if clamped != showOnHoverDelay {
+                showOnHoverDelay = clamped
+                return
+            }
+            UserDefaults.standard.set(clamped, forKey: "MenuBarManager_ShowOnHoverDelay")
+        }
     }
     
     /// Icon set for the toggle button
     @Published var iconSet: MBMIconSet {
         didSet { 
             UserDefaults.standard.set(iconSet.rawValue, forKey: "MenuBarManager_IconSet")
+            toggleIconCache.removeAll()
             updateIconAppearance()
         }
     }
@@ -671,6 +658,7 @@ final class MenuBarManager: ObservableObject {
     @Published var useGradientIcon: Bool {
         didSet {
             UserDefaults.standard.set(useGradientIcon, forKey: "MenuBarManager_UseGradientIcon")
+            toggleIconCache.removeAll()
             updateIconAppearance()
         }
     }
@@ -683,6 +671,11 @@ final class MenuBarManager: ObservableObject {
     /// Whether to show a separator between visible and hidden icons.
     @Published var showChevronSeparator: Bool {
         didSet {
+            // Separator is required for correct hide/reveal behavior.
+            if showChevronSeparator == false {
+                showChevronSeparator = true
+                return
+            }
             UserDefaults.standard.set(showChevronSeparator, forKey: "MenuBarManager_ShowChevronSeparator")
             // Update the hidden section's appearance
             if let hiddenSection = section(withName: .hidden) {
@@ -708,6 +701,9 @@ final class MenuBarManager: ObservableObject {
     
     /// Whether currently applying spacing changes
     @Published var isApplyingSpacing: Bool = false
+
+    /// Cache for rendered toggle icons so hover/show-hide doesn't redraw every transition.
+    private var toggleIconCache: [String: NSImage] = [:]
     
     /// Default spacing value used by macOS
     private let defaultSpacingValue = 16
@@ -777,9 +773,79 @@ final class MenuBarManager: ObservableObject {
             process.waitUntilExit()
         }.value
     }
+
+    /// Returns the visible toggle icon image for the provided state.
+    func toggleIconImage(for state: HidingState) -> NSImage? {
+        let symbolName = switch state {
+        case .hideItems: iconSet.visibleSymbol
+        case .showItems: iconSet.hiddenSymbol
+        }
+        let cacheKey = "\(symbolName)|\(useGradientIcon)"
+
+        if let cachedImage = toggleIconCache[cacheKey] {
+            return cachedImage
+        }
+
+        guard let baseImage = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Toggle Menu Bar") else {
+            return nil
+        }
+
+        if !useGradientIcon {
+            baseImage.isTemplate = true
+            toggleIconCache[cacheKey] = baseImage
+            return baseImage
+        }
+
+        guard let cgImage = baseImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            baseImage.isTemplate = true
+            toggleIconCache[cacheKey] = baseImage
+            return baseImage
+        }
+
+        let gradientImage = NSImage(size: baseImage.size, flipped: false) { bounds in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            let lightGray = NSColor(white: 0.7, alpha: 1.0).cgColor
+            let darkGray = NSColor(white: 0.3, alpha: 1.0).cgColor
+            let colors = [lightGray, darkGray] as CFArray
+            guard let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: colors,
+                locations: [0, 1]
+            ) else {
+                return false
+            }
+
+            context.clip(to: bounds, mask: cgImage)
+            context.drawLinearGradient(
+                gradient,
+                start: CGPoint(x: bounds.midX, y: bounds.maxY),
+                end: CGPoint(x: bounds.midX, y: bounds.minY),
+                options: []
+            )
+            return true
+        }
+        gradientImage.isTemplate = false
+        toggleIconCache[cacheKey] = gradientImage
+        return gradientImage
+    }
     
     /// Mouse monitoring
     private var mouseMonitor: Any?
+
+    /// Last processed mouse-move timestamp for hover handling.
+    private var lastMouseMoveProcessTime: TimeInterval = 0
+
+    /// NSMenu tracking depth for fast early-out while any menu is open.
+    private var activeMenuTrackingDepth: Int = 0
+
+    /// Cached result for active menu-window detection to avoid scanning NSApp.windows on every mouse event.
+    private var cachedHasActiveMenuWindow = false
+
+    /// Timestamp for the menu-window cache.
+    private var lastActiveMenuWindowCheckTime: TimeInterval = 0
+
+    /// Tracks whether hover logic is currently paused because a menu is open.
+    private var isHoverPausedForActiveMenu = false
     
     /// Auto-hide timer
     private var autoHideTimer: Timer?
@@ -852,8 +918,9 @@ final class MenuBarManager: ObservableObject {
         
         self.isEnabled = !wasExplicitlyRemoved
         self.showOnHover = UserDefaults.standard.bool(forKey: "MenuBarManager_ShowOnHover")
+        let hasStoredDelay = UserDefaults.standard.object(forKey: "MenuBarManager_ShowOnHoverDelay") != nil
         let storedDelay = UserDefaults.standard.double(forKey: "MenuBarManager_ShowOnHoverDelay")
-        self.showOnHoverDelay = storedDelay == 0 ? 0.3 : storedDelay
+        self.showOnHoverDelay = hasStoredDelay ? min(max(storedDelay, 0), 2) : 0.3
         self.iconSet = MBMIconSet(rawValue: UserDefaults.standard.string(forKey: "MenuBarManager_IconSet") ?? "") ?? .eye
         
         // Load additional settings
@@ -861,11 +928,8 @@ final class MenuBarManager: ObservableObject {
         let storedAutoHide = UserDefaults.standard.double(forKey: "MenuBarManager_AutoHideDelay")
         self.autoHideDelay = storedAutoHide  // 0 means don't auto-hide
         // Default to true for separator display
-        if UserDefaults.standard.object(forKey: "MenuBarManager_ShowChevronSeparator") == nil {
-            self.showChevronSeparator = true
-        } else {
-            self.showChevronSeparator = UserDefaults.standard.bool(forKey: "MenuBarManager_ShowChevronSeparator")
-        }
+        self.showChevronSeparator = true
+        UserDefaults.standard.set(true, forKey: "MenuBarManager_ShowChevronSeparator")
         
         // Load item spacing offset (default is 0)
         self.itemSpacingOffset = UserDefaults.standard.integer(forKey: "MenuBarManager_ItemSpacingOffset")
@@ -954,6 +1018,37 @@ final class MenuBarManager: ObservableObject {
                 self?.isEnabled = false
             }
             .store(in: &c)
+
+        NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.activeMenuTrackingDepth += 1
+                self.cachedHasActiveMenuWindow = true
+                self.isHoverPausedForActiveMenu = true
+                self.cancelAutoHide()
+                self.cancelPendingHoverHide()
+                if let monitor = self.mouseMonitor {
+                    NSEvent.removeMonitor(monitor)
+                    self.mouseMonitor = nil
+                }
+            }
+            .store(in: &c)
+
+        NotificationCenter.default.publisher(for: NSMenu.didEndTrackingNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.activeMenuTrackingDepth = max(0, self.activeMenuTrackingDepth - 1)
+                if self.activeMenuTrackingDepth == 0 {
+                    self.cachedHasActiveMenuWindow = false
+                    self.isHoverPausedForActiveMenu = false
+                    if self.showOnHover {
+                        self.setupMouseMonitoring()
+                    }
+                }
+            }
+            .store(in: &c)
         
         cancellables = c
     }
@@ -968,6 +1063,7 @@ final class MenuBarManager: ObservableObject {
         guard showOnHover else {
             cancelAutoHide()
             cancelPendingHoverHide()
+            resetMenuWindowDetectionState()
             return
         }
 
@@ -979,6 +1075,24 @@ final class MenuBarManager: ObservableObject {
     /// Handles mouse movement for show on hover.
     private func handleMouseMoved() {
         guard showOnHover else { return }
+
+        // High-frequency global mouse events can flood this path.
+        // Cap processing to ~120 Hz to reduce CPU churn.
+        let now = ProcessInfo.processInfo.systemUptime
+        let minInterval: TimeInterval = 1.0 / 120.0
+        guard now - lastMouseMoveProcessTime >= minInterval else { return }
+        lastMouseMoveProcessTime = now
+
+        // Keep menu interactions smooth by pausing hover logic while any menu is open.
+        if hasActiveMenuWindow(now: now) {
+            if !isHoverPausedForActiveMenu {
+                cancelAutoHide()
+                cancelPendingHoverHide()
+                isHoverPausedForActiveMenu = true
+            }
+            return
+        }
+        isHoverPausedForActiveMenu = false
         
         // When icons are locked visible via eye click, skip hover behavior
         guard !isLockedVisible else { return }
@@ -1048,6 +1162,41 @@ final class MenuBarManager: ObservableObject {
             }
         }
     }
+
+    private func hasActiveMenuWindow(now: TimeInterval) -> Bool {
+        if RunLoop.current.currentMode == .eventTracking || RunLoop.main.currentMode == .eventTracking {
+            cachedHasActiveMenuWindow = true
+            return true
+        }
+
+        if activeMenuTrackingDepth > 0 {
+            cachedHasActiveMenuWindow = true
+            return true
+        }
+
+        // Re-check at most ~30 Hz; active menu windows don't need per-event detection fidelity.
+        let checkInterval: TimeInterval = 1.0 / 30.0
+        if now - lastActiveMenuWindowCheckTime < checkInterval {
+            return cachedHasActiveMenuWindow
+        }
+        lastActiveMenuWindowCheckTime = now
+
+        let hasActiveMenu = NSApp.windows.contains { window in
+            guard window.isVisible else { return false }
+            guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
+            let className = NSStringFromClass(type(of: window)).lowercased()
+            return className.contains("menu")
+        }
+
+        cachedHasActiveMenuWindow = hasActiveMenu
+        return hasActiveMenu
+    }
+
+    private func resetMenuWindowDetectionState() {
+        cachedHasActiveMenuWindow = false
+        lastActiveMenuWindowCheckTime = 0
+        isHoverPausedForActiveMenu = false
+    }
     
     /// Returns the menu bar section with the given name.
     func section(withName name: MenuBarSection.Name) -> MenuBarSection? {
@@ -1084,6 +1233,7 @@ final class MenuBarManager: ObservableObject {
     func disable() {
         cancelAutoHide()
         cancelPendingHoverHide()
+        resetMenuWindowDetectionState()
         if let mouseMonitor {
             NSEvent.removeMonitor(mouseMonitor)
             self.mouseMonitor = nil
@@ -1110,6 +1260,7 @@ final class MenuBarManager: ObservableObject {
         disable()
         cancelAutoHide()
         cancelPendingHoverHide()
+        resetMenuWindowDetectionState()
         if let mouseMonitor {
             NSEvent.removeMonitor(mouseMonitor)
             self.mouseMonitor = nil

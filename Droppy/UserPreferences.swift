@@ -43,13 +43,13 @@ enum AppPreferenceKey {
     
     // MARK: - Media Player
     static let showMediaPlayer = "showMediaPlayer"
-    static let enableMouseSwipeMediaSwitch = "enableMouseSwipeMediaSwitch"  // Allow mouse wheel gesture for media/shelf switch
-    static let mouseSwipeMediaSwitchModifier = "mouseSwipeMediaSwitchModifier"  // "option", "shift", "control"
+    static let showExternalMouseSwitchButton = "showExternalMouseSwitchButton"  // Show floating shelf/media switch when external mouse is connected
     static let autoFadeMediaHUD = "autoFadeMediaHUD"
     static let autofadeDefaultDelay = "autofadeDefaultDelay"  // Default delay in seconds
     static let autofadeAppRulesEnabled = "autofadeAppRulesEnabled"  // Enable app-specific rules
     static let autofadeDisplayRulesEnabled = "autofadeDisplayRulesEnabled"  // Enable display-specific rules
     static let debounceMediaChanges = "debounceMediaChanges"
+    static let enableMediaAlbumArtGlow = "enableMediaAlbumArtGlow"  // Enable album art shadow/glow in media HUD
     static let enableRealAudioVisualizer = "enableRealAudioVisualizer"
     static let enableGradientVisualizer = "enableGradientVisualizer"  // Gradient colors across visualizer bars
 
@@ -79,6 +79,7 @@ enum AppPreferenceKey {
     static let autoExpandOnExternalDisplays = "autoExpandOnExternalDisplays"  // Allow hover auto-expand on external displays
     static let autoExpandDelay = "autoExpandDelay"
     static let autoOpenMediaHUDOnShelfExpand = "autoOpenMediaHUDOnShelfExpand"  // Auto-show media HUD when shelf expands
+    static let showMediaShelfSwitchBadge = "showMediaShelfSwitchBadge"  // Show top-left switch badge in shelf/media views
     static let autoShrinkShelf = "autoShrinkShelf"  // Legacy
     static let autoShrinkDelay = "autoShrinkDelay"  // Legacy
     
@@ -94,6 +95,7 @@ enum AppPreferenceKey {
     static let enablePowerFolders = "enablePowerFolders"
     static let enableQuickActions = "enableQuickActions"
     static let quickActionsMailApp = "quickActionsMailApp"  // "systemDefault", "appleMail", "outlook"
+    static let quickActionsCloudProvider = "quickActionsCloudProvider"  // "droppyQuickshare", "iCloudDrive"
     static let enableTrackedFolders = "enableTrackedFolders"
     static let enableMultiBasket = "enableMultiBasket"  // Allow spawning multiple baskets simultaneously
     static let basketSwitcherShortcut = "basketSwitcherShortcut"  // Custom shortcut to show basket switcher
@@ -136,6 +138,9 @@ enum AppPreferenceKey {
     
     // MARK: - Extension: Element Capture
     static let editorBlurStrength = "elementCapture_blurStrength"  // Blur intensity (5-30, lower = stronger pixelation)
+    static let elementCaptureEditorDefaultColor = "elementCapture_editorDefaultColor"
+    static let elementCaptureEditorPrefer100Zoom = "elementCapture_editorPrefer100Zoom"
+    static let elementCaptureEditorPinchZoomEnabled = "elementCapture_editorPinchZoomEnabled"
     static let ocrAutoCopyExtractedText = "ocr_autoCopyExtractedText"  // Auto-copy OCR results and skip result window
 
     // MARK: - Extension: Window Snap
@@ -164,6 +169,7 @@ enum AppPreferenceKey {
     static let caffeineInstalled = "caffeine_installed"
     static let caffeineEnabled = "caffeine_enabled"  // Whether to show in HUD section
     static let caffeineMode = "caffeine_mode"  // CaffeineMode rawValue
+    static let caffeineInstantlyExpandShelfOnHover = "caffeine_instantlyExpandShelfOnHover"  // Skip hover timer HUD and keep normal shelf auto-expand
 
     // MARK: - Extension: Todo
     static let todoInstalled = "todo_installed"
@@ -172,6 +178,16 @@ enum AppPreferenceKey {
     static let todoSyncCalendarEnabled = "todo_syncCalendarEnabled"
     static let todoSyncRemindersEnabled = "todo_syncRemindersEnabled"
     static let todoSyncRemindersListIDs = "todo_syncRemindersListIDs"  // JSON array of selected reminder list identifiers
+    static let todoDefaultReminderListID = "todo_defaultReminderListID"
+    static let todoSyncCalendarListIDs = "todo_syncCalendarListIDs"  // JSON array of selected calendar identifiers
+    static let todoShelfSplitViewEnabled = "todo_shelfSplitViewEnabled"
+    static let todoDueSoonNotificationsEnabled = "todo_dueSoonNotificationsEnabled"
+    static let todoDueSoonNotificationsChimeEnabled = "todo_dueSoonNotificationsChimeEnabled"
+    static let todoHideUndatedReminders = "todo_hideUndatedReminders"
+    static let todoShowUpcomingInMenuBar = "todo_showUpcomingInMenuBar"
+    static let todoQuickOpenShortcut = "todo_quickOpenShortcut"  // JSON-encoded SavedShortcut data
+    static let todoShowTaskViewTimezone = "todo_showTaskViewTimezone"
+    static let todoShowTaskWeekNumber = "todo_showTaskWeekNumber"
     
     // MARK: - Extension: Voice Transcribe
     static let voiceTranscribeAutoCopyResult = "voiceTranscribe_autoCopyResult"  // Auto-copy transcription and skip result window
@@ -228,15 +244,15 @@ enum PreferenceDefault {
     
     // MARK: - Media Player
     static let showMediaPlayer = true
-    static let enableMouseSwipeMediaSwitch = false
-    static let mouseSwipeMediaSwitchModifier = "option"
-    static let autoFadeMediaHUD = true
+    static let showExternalMouseSwitchButton = true
+    static let autoFadeMediaHUD = false
     static let autofadeDefaultDelay: Double = 5.0  // 5 seconds default
     static let autofadeAppRulesEnabled = false  // App-specific rules disabled by default
     static let autofadeDisplayRulesEnabled = false  // Display-specific rules disabled by default
     static let debounceMediaChanges = false
+    static let enableMediaAlbumArtGlow = true
     static let enableRealAudioVisualizer = false  // Opt-in: requires Screen Recording
-    static let enableGradientVisualizer = false   // Opt-in: gradient colors across visualizer bars
+    static let enableGradientVisualizer = true    // Keep one visualizer mode enabled by default
 
     // MARK: - Media Source Filter
     static let mediaSourceFilterEnabled = false  // Off by default: show all media sources
@@ -265,6 +281,7 @@ enum PreferenceDefault {
     static let autoExpandOnExternalDisplays = true  // Keep legacy behavior by default; users can disable if it conflicts with menu bar usage
     static let autoExpandDelay: Double = 0.25
     static let autoOpenMediaHUDOnShelfExpand = false  // Auto-open media HUD when shelf expands (opt-in)
+    static let showMediaShelfSwitchBadge = true  // Keep media/shelf switch badge visible by default
     static let autoShrinkShelf = true  // Legacy
     static let autoShrinkDelay = 3  // Legacy
     
@@ -279,6 +296,7 @@ enum PreferenceDefault {
     static let enablePowerFolders = true
     static let enableQuickActions = false  // Advanced feature, opt-in
     static let quickActionsMailApp = "systemDefault"
+    static let quickActionsCloudProvider = "droppyQuickshare"
     static let enableTrackedFolders = false  // Advanced feature, opt-in
     static let enableMultiBasket = true  // Multi-basket by default for spawning multiple simultaneous baskets
     
@@ -318,6 +336,9 @@ enum PreferenceDefault {
     
     // MARK: - Extension: Element Capture
     static let editorBlurStrength: Double = 10  // 10x10 pixelation (lower = stronger blur)
+    static let elementCaptureEditorDefaultColor = "red"
+    static let elementCaptureEditorPrefer100Zoom = false
+    static let elementCaptureEditorPinchZoomEnabled = true
     static let ocrAutoCopyExtractedText = false
 
     // MARK: - Extension: Window Snap
@@ -346,6 +367,7 @@ enum PreferenceDefault {
     static let caffeineInstalled = false  // Disabled by default, user installs from Extension Store
     static let caffeineEnabled = true  // Enabled by default when installed
     static let caffeineMode = "Both"  // CaffeineMode.both.rawValue
+    static let caffeineInstantlyExpandShelfOnHover = false  // Keep current behavior by default: show High Alert timer on hover
 
     // MARK: - Extension: Todo
     static let todoInstalled = false  // Disabled by default, user installs from Extension Store
@@ -354,6 +376,15 @@ enum PreferenceDefault {
     static let todoSyncCalendarEnabled = false
     static let todoSyncRemindersEnabled = false
     static let todoSyncRemindersListIDs = "[]"
+    static let todoDefaultReminderListID = ""
+    static let todoSyncCalendarListIDs = "[]"
+    static let todoShelfSplitViewEnabled = true
+    static let todoDueSoonNotificationsEnabled = true
+    static let todoDueSoonNotificationsChimeEnabled = true
+    static let todoHideUndatedReminders = false
+    static let todoShowUpcomingInMenuBar = true
+    static let todoShowTaskViewTimezone = false
+    static let todoShowTaskWeekNumber = true
     
     // MARK: - Extension: Voice Transcribe
     static let voiceTranscribeAutoCopyResult = false

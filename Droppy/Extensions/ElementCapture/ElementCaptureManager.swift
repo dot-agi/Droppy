@@ -64,7 +64,7 @@ enum ElementCaptureMode: String, CaseIterable, Identifiable {
 // MARK: - Editor Shortcut Actions
 enum EditorShortcut: String, CaseIterable, Identifiable {
     // Tool shortcuts
-    case arrow, line, rectangle, ellipse, freehand, highlighter, blur, text
+    case arrow, curvedArrow, line, rectangle, ellipse, freehand, highlighter, blur, text
     // Action shortcuts
     case strokeSmall, strokeMedium, strokeLarge
     case zoomIn, zoomOut, zoomReset
@@ -76,6 +76,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .arrow: return "Arrow"
+        case .curvedArrow: return "Curved Arrow"
         case .line: return "Line"
         case .rectangle: return "Rectangle"
         case .ellipse: return "Ellipse"
@@ -99,6 +100,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .arrow: return "arrow.up.right"
+        case .curvedArrow: return "arrow.uturn.up"
         case .line: return "line.diagonal"
         case .rectangle: return "rectangle"
         case .ellipse: return "oval"
@@ -127,6 +129,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     var defaultKeyCode: Int {
         switch self {
         case .arrow: return 0        // A
+        case .curvedArrow: return 8  // C
         case .line: return 37        // L
         case .rectangle: return 15   // R
         case .ellipse: return 31     // O
@@ -164,7 +167,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     /// Is this a tool shortcut vs action shortcut
     var isTool: Bool {
         switch self {
-        case .arrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text:
+        case .arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text:
             return true
         default:
             return false
@@ -173,7 +176,7 @@ enum EditorShortcut: String, CaseIterable, Identifiable {
     
     /// Tool shortcuts only
     static var tools: [EditorShortcut] {
-        [.arrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text]
+        [.arrow, .curvedArrow, .line, .rectangle, .ellipse, .freehand, .highlighter, .blur, .text]
     }
     
     /// Action shortcuts only
@@ -223,6 +226,7 @@ final class ElementCaptureManager: ObservableObject {
     private var captureCursorPushed = false
     private var activeMode: ElementCaptureMode = .element  // Current capture mode
     private var isOCRCapture = false  // Flag for OCR mode capture
+    private var screenParametersObserver: NSObjectProtocol?
     
     // MARK: - Configuration
     
@@ -235,7 +239,21 @@ final class ElementCaptureManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        // Empty - shortcuts loaded via loadAndStartMonitoring after app launch
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.handleScreenParametersChanged()
+            }
+        }
+    }
+
+    deinit {
+        if let observer = screenParametersObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     /// Called from AppDelegate after app finishes launching
@@ -544,7 +562,7 @@ final class ElementCaptureManager: ObservableObject {
         
         if !PermissionManager.shared.isAccessibilityGranted {
             print("🔐 ElementCaptureManager: Requesting Accessibility via native dialog")
-            PermissionManager.shared.requestAccessibility()
+            PermissionManager.shared.requestAccessibility(context: .userInitiated)
         }
         
         if !PermissionManager.shared.isScreenRecordingGranted {
@@ -975,6 +993,7 @@ final class ElementCaptureManager: ObservableObject {
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return nil
         }
+        let excludedWindowIDs = excludedCaptureHelperWindowIDs()
         
         // Find the topmost window containing the point
         for windowInfo in windowList {
@@ -985,6 +1004,10 @@ final class ElementCaptureManager: ObservableObject {
                   let height = boundsDict["Height"] else {
                 continue
             }
+            let windowID = (windowInfo[kCGWindowNumber as String] as? NSNumber).map { CGWindowID($0.uint32Value) }
+            if let windowID, excludedWindowIDs.contains(windowID) {
+                continue
+            }
             
             let windowFrame = CGRect(x: x, y: y, width: width, height: height)
             
@@ -992,12 +1015,6 @@ final class ElementCaptureManager: ObservableObject {
             if windowFrame.contains(point) {
                 // Skip windows that are too small (likely decorations) or our own overlay
                 guard width > 50 && height > 50 else { continue }
-                
-                // Skip Droppy's own windows
-                if let ownerName = windowInfo[kCGWindowOwnerName as String] as? String,
-                   ownerName == "Droppy" {
-                    continue
-                }
                 
                 return windowFrame
             }
@@ -1250,8 +1267,8 @@ final class ElementCaptureManager: ObservableObject {
         }
 
         do {
-            // Capture the exact selected display surface in that screen's local coordinate space.
-            let image = try await captureRect(screen.frame, on: screen)
+            // Capture full display directly to avoid coordinate transform drift on mixed-DPI docked setups.
+            let image = try await captureFullDisplay(on: screen)
             let nsImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
 
             copyToClipboard(image)
@@ -1343,6 +1360,15 @@ final class ElementCaptureManager: ObservableObject {
             throw CaptureError.noElement
         }
 
+        // Full-screen requests are captured via a dedicated path to avoid mixed-resolution
+        // conversion edge cases during dock/undock transitions.
+        if abs(clampedCocoaRect.origin.x - screen.frame.origin.x) < 0.5 &&
+            abs(clampedCocoaRect.origin.y - screen.frame.origin.y) < 0.5 &&
+            abs(clampedCocoaRect.width - screen.frame.width) < 0.5 &&
+            abs(clampedCocoaRect.height - screen.frame.height) < 0.5 {
+            return try await captureFullDisplay(on: screen)
+        }
+
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == targetDisplayID }) else {
             print("[ElementCapture] No display found for ID: \(targetDisplayID)")
@@ -1417,10 +1443,10 @@ final class ElementCaptureManager: ObservableObject {
             throw CaptureError.noElement
         }
 
-        // Exclude Droppy's own windows (selection/highlight/preview/editor) from capture.
-        let ownPID = ProcessInfo.processInfo.processIdentifier
+        // Exclude only active Element Capture helper windows.
+        let excludedWindowIDs = excludedCaptureHelperWindowIDs()
         let windowsToExclude = content.windows.filter { window in
-            window.owningApplication?.processID == ownPID
+            excludedWindowIDs.contains(CGWindowID(window.windowID))
         }
         let filter = SCContentFilter(display: display, excludingWindows: windowsToExclude)
         let config = SCStreamConfiguration()
@@ -1436,6 +1462,99 @@ final class ElementCaptureManager: ObservableObject {
         
         print("[ElementCapture] Capture(local): displayID=\(targetDisplayID), screen=\(screen.frame), displayBounds=\(displayBounds), requested=\(requestedRect), clamped=\(clampedCocoaRect), source=\(sourceRect), outputScale=\(String(format: "%.2f", outputScaleX))x\(String(format: "%.2f", outputScaleY)), output=\(config.width)x\(config.height)")
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+    }
+
+    /// Capture the full selected display directly in ScreenCaptureKit display space.
+    /// This avoids Cocoa<->display coordinate conversion errors on mixed-DPI setups.
+    private func captureFullDisplay(on screen: NSScreen) async throws -> CGImage {
+        guard CGPreflightScreenCaptureAccess() else {
+            print("[ElementCapture] Screen recording permission not granted - aborting capture")
+            CGRequestScreenCaptureAccess()
+            throw CaptureError.permissionDenied
+        }
+
+        guard let targetDisplayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+            throw CaptureError.noDisplay
+        }
+
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let display = content.displays.first(where: { $0.displayID == targetDisplayID }) else {
+            print("[ElementCapture] No display found for ID: \(targetDisplayID)")
+            throw CaptureError.noDisplay
+        }
+
+        let displayBounds = CGRect(
+            x: 0,
+            y: 0,
+            width: max(CGFloat(display.width), 1),
+            height: max(CGFloat(display.height), 1)
+        )
+        guard displayBounds.width >= 1, displayBounds.height >= 1 else {
+            throw CaptureError.noElement
+        }
+
+        let excludedWindowIDs = excludedCaptureHelperWindowIDs()
+        let windowsToExclude = content.windows.filter { window in
+            excludedWindowIDs.contains(CGWindowID(window.windowID))
+        }
+        let filter = SCContentFilter(display: display, excludingWindows: windowsToExclude)
+        let config = SCStreamConfiguration()
+        config.sourceRect = displayBounds
+        config.width = max(max(Int(CGDisplayPixelsWide(targetDisplayID)), Int(displayBounds.width.rounded(.up))), 1)
+        config.height = max(max(Int(CGDisplayPixelsHigh(targetDisplayID)), Int(displayBounds.height.rounded(.up))), 1)
+        config.scalesToFit = false
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.showsCursor = false
+        if #available(macOS 14.0, *) {
+            config.captureResolution = .best
+        }
+
+        print("[ElementCapture] Capture(full display): displayID=\(targetDisplayID), displayBounds=\(displayBounds), output=\(config.width)x\(config.height)")
+        return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+    }
+
+    private func handleScreenParametersChanged() {
+        guard isActive else { return }
+
+        let mouseLocation = NSEvent.mouseLocation
+        guard let activeScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main else {
+            return
+        }
+
+        if let displayID = activeScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
+            currentScreenDisplayID = displayID
+        }
+
+        // Refresh overlays to the currently active display geometry after dock/undock.
+        if activeMode == .element {
+            lastDetectedFrame = .zero
+            currentElementFrame = .zero
+            hasElement = false
+            highlightWindow?.resetHighlight()
+            highlightWindow?.setFrame(activeScreen.frame, display: true, animate: false)
+            highlightWindow?.orderFrontRegardless()
+        } else if activeMode == .area || activeMode == .ocr {
+            areaSelectionWindow?.setFrame(activeScreen.frame, display: true, animate: false)
+            areaSelectionWindow?.orderFrontRegardless()
+        }
+
+        print("[ElementCapture] Screen parameters changed; resynced capture surfaces")
+    }
+
+    /// Window IDs for transient capture helper UI that should never appear in screenshots.
+    /// NOTE: The screenshot editor window is intentionally NOT excluded so users can capture it.
+    private func excludedCaptureHelperWindowIDs() -> Set<CGWindowID> {
+        var ids = Set<CGWindowID>()
+        if let number = highlightWindow?.windowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        if let number = areaSelectionWindow?.windowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        if let number = CapturePreviewWindowController.shared.currentWindowNumber, number > 0 {
+            ids.insert(CGWindowID(number))
+        }
+        return ids
     }
     
     private func copyToClipboard(_ image: CGImage) {
@@ -1735,6 +1854,8 @@ final class CapturePreviewWindowController {
     private var autoDismissTimer: Timer?
     private var escapeMonitor: Any?
     private var globalEscapeMonitor: Any?
+
+    var currentWindowNumber: Int? { window?.windowNumber }
     
     private init() {}
     

@@ -18,8 +18,7 @@ enum OnboardingPage: Int, CaseIterable {
     case basket
     case clipboard
     case media
-    // DISABLED: Lock screen features causing issues, will debug later
-    // case lockScreen
+    case lockScreen
     case extensions
     case ready
 }
@@ -27,6 +26,13 @@ enum OnboardingPage: Int, CaseIterable {
 // MARK: - Main Onboarding View
 
 struct OnboardingView: View {
+    static let standardWindowSize = CGSize(width: 700, height: 580)
+    static let readyWindowSize = CGSize(width: 700, height: 667)  // ~15% taller
+
+    static func windowSize(for page: OnboardingPage) -> CGSize {
+        page == .ready ? readyWindowSize : standardWindowSize
+    }
+
     // Shelf & Basket
     @AppStorage(AppPreferenceKey.enableNotchShelf) private var enableShelf = PreferenceDefault.enableNotchShelf
     @AppStorage(AppPreferenceKey.enableFloatingBasket) private var enableBasket = PreferenceDefault.enableFloatingBasket
@@ -55,18 +61,32 @@ struct OnboardingView: View {
     @AppStorage(AppPreferenceKey.disableAnalytics) private var disableAnalytics = PreferenceDefault.disableAnalytics
     
     @State private var currentPage: OnboardingPage = .welcome
-    @State private var isNextHovering = false
-    @State private var isBackHovering = false
     @State private var showConfetti = false
     @State private var direction: Int = 1
     @State private var faceScale: CGFloat = 1.0
     @State private var faceRotation: Double = 0
     
     let onComplete: () -> Void
-    
-    private var hasNotch: Bool {
-        guard let screen = NSScreen.main else { return false }
-        return screen.safeAreaInsets.top > 0
+    let onPageChange: (OnboardingPage) -> Void
+
+    init(
+        onComplete: @escaping () -> Void,
+        onPageChange: @escaping (OnboardingPage) -> Void = { _ in }
+    ) {
+        self.onComplete = onComplete
+        self.onPageChange = onPageChange
+    }
+
+    private var windowSize: CGSize {
+        Self.windowSize(for: currentPage)
+    }
+
+    private var contentHeight: CGFloat {
+        switch currentPage {
+        case .welcome: return 510
+        case .ready: return 487
+        default: return 400
+        }
     }
     
     var body: some View {
@@ -79,14 +99,14 @@ struct OnboardingView: View {
             
             // Content - fixed height, centered within
             contentSection
-                .frame(height: currentPage == .welcome ? 510 : 400)
+                .frame(height: contentHeight)
                 .clipped()
             
             // Footer - fixed at bottom
             footerSection
                 .frame(height: 70)
         }
-        .frame(width: 700, height: 580)
+        .frame(width: windowSize.width, height: windowSize.height)
         .background {
             if useTransparentBackground {
                 AnyView(Rectangle().fill(.ultraThinMaterial))
@@ -110,6 +130,10 @@ struct OnboardingView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 animateNotchFace()
             }
+            onPageChange(currentPage)
+        }
+        .onChange(of: currentPage) { _, newPage in
+            onPageChange(newPage)
         }
     }
     
@@ -248,7 +272,7 @@ struct OnboardingView: View {
         case .basket: return "Floating Basket"
         case .clipboard: return "Clipboard Manager"
         case .media: return "Media & HUDs"
-        // DISABLED: case .lockScreen: return "Lock Screen Widgets"
+        case .lockScreen: return "Lock Screen HUD"
         case .extensions: return "Extensions"
         case .ready: return "You're All Set!"
         }
@@ -257,12 +281,12 @@ struct OnboardingView: View {
     private var pageSubtitle: String {
         switch currentPage {
         case .welcome: return "I'm Droppy, your new productivity companion"
-        case .shelf: return "A temporary storage area right in your menu bar"
-        case .basket: return "A drop zone that appears wherever you need it"
+        case .shelf: return "Temporary file storage in your notch or island"
+        case .basket: return "Floating basket with Quick Actions while dragging"
         case .clipboard: return "Your complete clipboard history at your fingertips"
-        case .media: return "Beautiful notifications for music, volume, and more"
-        // DISABLED: case .lockScreen: return "Show your notch and media controls on the lock screen"
-        case .extensions: return "Extend Droppy with powerful modules"
+        case .media: return "Now Playing plus system HUDs, all in one place"
+        case .lockScreen: return "Show smooth lock and unlock animations"
+        case .extensions: return "Turn on extra tools in Settings > Extensions"
         case .ready: return "Droppy is ready to make your Mac more productive"
         }
     }
@@ -273,7 +297,7 @@ struct OnboardingView: View {
     private func pageContent(for page: OnboardingPage) -> some View {
         switch page {
         case .welcome:
-            WelcomeContent(hasNotch: hasNotch, useDynamicIslandStyle: $useDynamicIslandStyle)
+            WelcomeContent(useDynamicIslandStyle: $useDynamicIslandStyle)
         case .shelf:
             ShelfContent(enableShelf: $enableShelf, enableAutoClean: $enableAutoClean)
         case .basket:
@@ -290,16 +314,21 @@ struct OnboardingView: View {
                 enableDNDHUD: $enableDNDHUD,
                 enableUpdateHUD: $enableUpdateHUD
             )
-        // DISABLED: Lock screen features causing issues
-        // case .lockScreen:
-        //     LockScreenContent(
-        //         enableLockScreenHUD: $enableLockScreenHUD,
-        //         enableLockScreenMediaWidget: $enableLockScreenMediaWidget
-        //     )
+        case .lockScreen:
+            LockScreenContent(
+                enableLockScreenHUD: $enableLockScreenHUD,
+                enableLockScreenMediaWidget: $enableLockScreenMediaWidget
+            )
         case .extensions:
             ExtensionsContent()
         case .ready:
-            ReadyContent(disableAnalytics: $disableAnalytics)
+            ReadyContent(
+                disableAnalytics: $disableAnalytics,
+                enableShelf: enableShelf,
+                enableBasket: enableBasket,
+                instantBasketOnDrag: instantBasketOnDrag,
+                enableClipboard: enableClipboard
+            )
         }
     }
 }
@@ -307,7 +336,6 @@ struct OnboardingView: View {
 // MARK: - Page 1: Welcome
 
 private struct WelcomeContent: View {
-    let hasNotch: Bool
     @Binding var useDynamicIslandStyle: Bool
     
     // External display style setting (separate from built-in)
@@ -368,10 +396,10 @@ private struct WelcomeContent: View {
                     .foregroundStyle(.secondary)
                 
                 VStack(spacing: 0) {
-                    WelcomeFeatureRow(icon: "tray.and.arrow.down.fill", color: .blue, text: "Drag files to your notch for quick access", isFirst: true)
-                    WelcomeFeatureRow(icon: "doc.on.clipboard.fill", color: .cyan, text: "Search your clipboard history with OCR")
-                    WelcomeFeatureRow(icon: "music.note", color: .green, text: "See Now Playing right in your menu bar")
-                    WelcomeFeatureRow(icon: "wand.and.stars", color: .pink, text: "Auto-compress images and convert files", isLast: true)
+                    WelcomeFeatureRow(icon: "tray.and.arrow.down.fill", color: .blue, text: "Drag files to your notch or island for quick access", isFirst: true)
+                    WelcomeFeatureRow(icon: "doc.on.clipboard.fill", color: .cyan, text: "Search clipboard history with OCR-powered text extraction")
+                    WelcomeFeatureRow(icon: "music.note", color: .green, text: "See Now Playing directly in your notch area")
+                    WelcomeFeatureRow(icon: "wand.and.stars", color: .pink, text: "Compress and convert files with Smart Export", isLast: true)
                 }
                 .background(AdaptiveColors.overlayAuto(0.03))
                 .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
@@ -486,7 +514,7 @@ private struct ShelfContent: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Drag any file to your notch to store it temporarily.\nGrab it later and drop it anywhere you need.")
+            Text("Drag files to your notch or island to store them temporarily.\nGrab them later and drop them anywhere you need.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -507,7 +535,7 @@ private struct ShelfContent: View {
             HStack(spacing: 14) {
                 FeatureChip(icon: "folder.fill", text: "Pin folders")
                 FeatureChip(icon: "square.stack.3d.up.fill", text: "Multiple files")
-                FeatureChip(icon: "airplane", text: "AirDrop zone")
+                FeatureChip(icon: "bolt.fill", text: "Quick Actions")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -523,8 +551,8 @@ private struct BasketContent: View {
     var body: some View {
         VStack(spacing: 20) {
             Text(instantBasketOnDrag
-                ? "A floating drop zone appears instantly when you drag.\nPerfect when your notch is on a different screen."
-                : "Shake files to summon a floating drop zone anywhere.\nPerfect when your notch is on a different screen."
+                ? "A floating basket with Quick Actions appears as soon as you start dragging.\nUseful when your notch or island is on another display."
+                : "Shake files while dragging to summon a floating basket with Quick Actions.\nUseful when your notch or island is on another display."
             )
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
@@ -545,7 +573,8 @@ private struct BasketContent: View {
             
             HStack(spacing: 14) {
                 FeatureChip(icon: "hand.draw.fill", text: instantBasketOnDrag ? "Appears on drag" : "Shake to summon")
-                FeatureChip(icon: "arrow.left.and.right", text: "Auto-hides to edge")
+                FeatureChip(icon: "bolt.fill", text: "Quick Actions")
+                FeatureChip(icon: "arrow.left.and.right", text: "Auto-hides when idle")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -577,7 +606,7 @@ private struct ClipboardContent: View {
             .clipShape(Capsule())
             .foregroundStyle(.cyan)
             
-            Text("Access everything you've copied.\nSearch, extract text from images, and pin favorites.")
+            Text("Access everything you've copied.\nSearch instantly, extract text from images, and pin favorites.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -633,7 +662,7 @@ private struct MediaContent: View {
             }
             .frame(width: 400)
             
-            Text("Beautiful HUDs appear in your notch\ninstead of the default macOS overlays")
+            Text("Volume and brightness replace the default macOS overlays.\nOther HUDs appear only when relevant.")
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -1039,10 +1068,43 @@ private struct OnboardingExtensionIcon<T: ExtensionDefinition>: View {
 // MARK: - Page 8: Ready
 
 private struct ReadyContent: View {
+    private let cardWidth: CGFloat = 420
+
     @Binding var disableAnalytics: Bool
+    let enableShelf: Bool
+    let enableBasket: Bool
+    let instantBasketOnDrag: Bool
+    let enableClipboard: Bool
     @State private var showCheckmark = false
     @State private var showGuide = false
     @State private var showRows: [Bool] = [false, false, false, false]
+    @State private var isAnalyticsHovering = false
+    
+    private var shelfGuideAction: String {
+        enableShelf ? "Move mouse to notch/island" : "Enable Shelf in Settings"
+    }
+    
+    private var shelfGuideResult: String {
+        enableShelf ? "Opens shelf" : "Settings > Shelf"
+    }
+    
+    private var basketGuideAction: String {
+        guard enableBasket else { return "Enable Basket in Settings" }
+        return instantBasketOnDrag ? "Drag any file" : "Shake while dragging"
+    }
+    
+    private var basketGuideResult: String {
+        guard enableBasket else { return "Settings > Basket" }
+        return instantBasketOnDrag ? "Basket appears instantly" : "Summons basket"
+    }
+    
+    private var clipboardGuideAction: String {
+        enableClipboard ? "Press ⌘⇧Space (default)" : "Enable Clipboard in Settings"
+    }
+    
+    private var clipboardGuideResult: String {
+        enableClipboard ? "Opens clipboard" : "Settings > Clipboard"
+    }
     
     var body: some View {
         VStack(spacing: 24) {
@@ -1076,26 +1138,27 @@ private struct ReadyContent: View {
                     .animation(DroppyAnimation.viewChange.delay(0.3), value: showGuide)
                 
                 VStack(spacing: 0) {
-                    GuideRow(icon: "cursorarrow.motionlines", color: .blue, action: "Move mouse to notch", result: "Opens shelf", isFirst: true)
+                    GuideRow(icon: "cursorarrow.motionlines", color: .blue, action: shelfGuideAction, result: shelfGuideResult, isFirst: true)
                         .opacity(showRows[0] ? 1 : 0)
                         .offset(x: showRows[0] ? 0 : -20)
                         .animation(DroppyAnimation.notchState.delay(0.4), value: showRows[0])
                     
-                    GuideRow(icon: "hand.draw.fill", color: .purple, action: "Shake while dragging", result: "Summons basket")
+                    GuideRow(icon: "hand.draw.fill", color: .purple, action: basketGuideAction, result: basketGuideResult)
                         .opacity(showRows[1] ? 1 : 0)
                         .offset(x: showRows[1] ? 0 : -20)
                         .animation(DroppyAnimation.notchState.delay(0.5), value: showRows[1])
                     
-                    GuideRow(icon: "command", color: .cyan, action: "Press ⌘⇧Space", result: "Opens clipboard")
+                    GuideRow(icon: "command", color: .cyan, action: clipboardGuideAction, result: clipboardGuideResult)
                         .opacity(showRows[2] ? 1 : 0)
                         .offset(x: showRows[2] ? 0 : -20)
                         .animation(DroppyAnimation.notchState.delay(0.6), value: showRows[2])
                     
-                    GuideRow(icon: "gearshape.fill", color: .gray, action: "Right-click notch", result: "Opens settings", isLast: true)
+                    GuideRow(icon: "gearshape.fill", color: .gray, action: "Right-click notch/island", result: "Opens settings", isLast: true)
                         .opacity(showRows[3] ? 1 : 0)
                         .offset(x: showRows[3] ? 0 : -20)
                         .animation(DroppyAnimation.notchState.delay(0.7), value: showRows[3])
                 }
+                .frame(width: cardWidth)
                 .background(AdaptiveColors.overlayAuto(0.03))
                 .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
                 .overlay(
@@ -1103,15 +1166,9 @@ private struct ReadyContent: View {
                         .stroke(AdaptiveColors.overlayAuto(0.05), lineWidth: 1)
                 )
             }
-            .frame(width: 420)
+            .frame(width: cardWidth)
 
-            OnboardingToggle(
-                icon: "hand.raised.fill",
-                title: "Skip all analytics",
-                color: .orange,
-                isOn: $disableAnalytics
-            )
-            .frame(width: 420)
+            analyticsToggleCard
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .onAppear {
@@ -1122,6 +1179,67 @@ private struct ReadyContent: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 showGuide = true
                 showRows = [true, true, true, true]
+            }
+        }
+    }
+    
+    private var analyticsToggleCard: some View {
+        Button {
+            disableAnalytics.toggle()
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.orange, .orange.opacity(0.7)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+                    
+                    RoundedRectangle(cornerRadius: DroppyRadius.ms, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [AdaptiveColors.overlayAuto(0.25), Color.clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+                    
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .droppyTextShadow()
+                }
+                
+                Text("Skip all analytics")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                Image(systemName: disableAnalytics ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(disableAnalytics ? .green : .secondary.opacity(0.5))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .frame(width: cardWidth)
+            .background(isAnalyticsHovering ? AdaptiveColors.overlayAuto(0.06) : AdaptiveColors.overlayAuto(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous)
+                    .stroke(disableAnalytics ? Color.orange.opacity(0.3) : AdaptiveColors.overlayAuto(0.06), lineWidth: 1)
+            )
+            .scaleEffect(isAnalyticsHovering ? 1.01 : 1.0)
+        }
+        .buttonStyle(DroppySelectableButtonStyle(isSelected: disableAnalytics))
+        .onHover { hovering in
+            withAnimation(DroppyAnimation.hover) {
+                isAnalyticsHovering = hovering
             }
         }
     }
@@ -1147,20 +1265,21 @@ private struct GuideRow: View {
                 Text(action)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .frame(width: 180, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             // Arrow
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.quaternary)
-                .frame(width: 30)
+                .frame(width: 22)
             
             // Right section: Result
             Text(result)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.primary)
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 20)

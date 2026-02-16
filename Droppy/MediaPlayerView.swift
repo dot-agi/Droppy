@@ -43,6 +43,12 @@ private struct ScrollWheelCaptureModifier: ViewModifier {
         guard monitor == nil else { return }
         
         monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [self] event in
+            // While AppKit is tracking menus, skip media swipe capture entirely.
+            // This keeps status-item menu scrolling responsive.
+            if RunLoop.current.currentMode == .eventTracking {
+                return event
+            }
+
             // Check if mouse is over this view's frame
             let mouseLocation = NSEvent.mouseLocation
             
@@ -232,6 +238,7 @@ struct MediaPlayerView: View {
     // MARK: - Preferences
     @AppStorage(AppPreferenceKey.enableRightClickHide) private var enableRightClickHide = PreferenceDefault.enableRightClickHide
     @AppStorage(AppPreferenceKey.enableGradientVisualizer) private var enableGradientVisualizer = PreferenceDefault.enableGradientVisualizer
+    @AppStorage(AppPreferenceKey.enableMediaAlbumArtGlow) private var enableMediaAlbumArtGlow = PreferenceDefault.enableMediaAlbumArtGlow
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
     @AppStorage(AppPreferenceKey.enableHUDReplacement) private var enableHUDReplacement = PreferenceDefault.enableHUDReplacement
     @AppStorage(AppPreferenceKey.enableBatteryHUD) private var enableBatteryHUD = PreferenceDefault.enableBatteryHUD
@@ -366,7 +373,8 @@ struct MediaPlayerView: View {
     }
 
     private var timelineRootContent: some View {
-        TimelineView(.animation(minimumInterval: 0.1, paused: !musicManager.isPlaying && !isDragging)) { context in
+        let shouldPauseTimeline = (!musicManager.isPlaying && !isDragging) || isMenuTrackingRunLoopActive()
+        return TimelineView(.animation(minimumInterval: 0.1, paused: shouldPauseTimeline)) { context in
             let currentDate = context.date
 
             HStack(alignment: .top, spacing: 16) {
@@ -434,7 +442,7 @@ struct MediaPlayerView: View {
             }
             .padding(NotchLayoutConstants.contentEdgeInsets(notchHeight: notchHeight, isExternalWithNotchStyle: isExternalWithNotchStyle))
             .background(alignment: .bottomLeading) {
-                if musicManager.albumArt.size.width > 0 {
+                if enableMediaAlbumArtGlow && musicManager.albumArt.size.width > 0 {
                     Ellipse()
                         .fill(
                             RadialGradient(
@@ -456,6 +464,10 @@ struct MediaPlayerView: View {
                 }
             }
         }
+    }
+
+    private func isMenuTrackingRunLoopActive() -> Bool {
+        RunLoop.main.currentMode == .eventTracking || RunLoop.current.currentMode == .eventTracking
     }
 
     private func applyUniversalHUDObservers(to view: AnyView) -> AnyView {
@@ -688,7 +700,7 @@ struct MediaPlayerView: View {
             )
             // Composite the entire view before applying shadow to prevent ghosting during animations
             .compositingGroup()
-            .droppyCardShadow()
+            .droppyCardShadow(opacity: enableMediaAlbumArtGlow ? 0.25 : 0)
         }
         .buttonStyle(DroppyCardButtonStyle(cornerRadius: DroppyRadius.large))
         .scaleEffect((isAlbumArtPressed ? 0.95 : (isAlbumArtHovering ? 1.02 : 1.0)) * albumArtPauseScale)
@@ -768,7 +780,7 @@ struct MediaPlayerView: View {
         ZStack {
             // MARK: - Album Art Glow (very subtle blurred halo)
             // PERFORMANCE FIX (Issue #81): Use drawingGroup() for GPU-accelerated blur rendering
-            if musicManager.albumArt.size.width > 0 && musicManager.isPlaying {
+            if enableMediaAlbumArtGlow && musicManager.albumArt.size.width > 0 && musicManager.isPlaying {
                 Image(nsImage: musicManager.albumArt)
                     .resizable()
                     .aspectRatio(1, contentMode: .fill)
@@ -838,7 +850,7 @@ struct MediaPlayerView: View {
                         .stroke(AdaptiveColors.overlayAuto(0.12), lineWidth: 0.5)
                 )
                 .compositingGroup()
-                .droppyCardShadow(opacity: 0.3)
+                .droppyCardShadow(opacity: enableMediaAlbumArtGlow ? 0.3 : 0)
             }
             .buttonStyle(DroppyCardButtonStyle(cornerRadius: DroppyRadius.lx))
             .scaleEffect((isAlbumArtPressed ? 0.96 : (isAlbumArtHovering ? 1.02 : 1.0)) * albumArtPauseScale)

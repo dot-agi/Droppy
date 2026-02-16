@@ -138,6 +138,8 @@ class TerminalNotchManager: ObservableObject {
             } else if let mainScreen = NSScreen.main {
                 DroppyState.shared.expandShelf(for: mainScreen.displayID)
             }
+            // Terminal input requires Droppy to be the active app.
+            NSApp.activate(ignoringOtherApps: true)
             // Focus the terminal when shown
             focusTerminal()
         } else {
@@ -220,8 +222,7 @@ class TerminalNotchManager: ObservableObject {
     
     /// Open the selected terminal app (no automation - just launches the app)
     func openInTerminalApp() {
-        // Use NSWorkspace to simply open the selected terminal app.
-        // This doesn't require any special permissions.
+        // Use NSWorkspace to open and activate the selected terminal app.
         let preferredAppRaw = UserDefaults.standard.preference(
             AppPreferenceKey.terminalNotchExternalApp,
             default: PreferenceDefault.terminalNotchExternalApp
@@ -229,13 +230,13 @@ class TerminalNotchManager: ObservableObject {
         let preferredApp = TerminalNotchExternalApp(rawValue: preferredAppRaw) ?? .appleTerminal
 
         if let appURL = preferredApp.resolvedApplicationURL {
-            NSWorkspace.shared.openApplication(at: appURL, configuration: NSWorkspace.OpenConfiguration())
+            launchAndActivateExternalTerminal(at: appURL)
             return
         }
 
         // Fallback to Apple Terminal if the selected app is unavailable.
         if let fallbackURL = TerminalNotchExternalApp.appleTerminal.resolvedApplicationURL {
-            NSWorkspace.shared.openApplication(at: fallbackURL, configuration: NSWorkspace.OpenConfiguration())
+            launchAndActivateExternalTerminal(at: fallbackURL)
         }
     }
 
@@ -283,6 +284,19 @@ class TerminalNotchManager: ObservableObject {
     }
     
     // MARK: - Private Methods
+
+    private func launchAndActivateExternalTerminal(at appURL: URL) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { app, _ in
+            if #available(macOS 14.0, *) {
+                app?.activate(options: [.activateAllWindows])
+            } else {
+                app?.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            }
+        }
+    }
     
     private func focusTerminal() {
         // Will be handled by the view

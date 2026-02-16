@@ -52,8 +52,7 @@ class NotchDragContainer: NSView {
 
     private func currentExpandedShelfWidth() -> CGFloat {
         if ToDoManager.shared.isShelfListExpanded &&
-            ToDoManager.shared.isRemindersSyncEnabled &&
-            ToDoManager.shared.isCalendarSyncEnabled {
+            ToDoManager.shared.isShelfSplitViewEnabled {
             return max(expandedShelfBaseWidth, todoSplitShelfWidth)
         }
         return expandedShelfBaseWidth
@@ -289,6 +288,13 @@ class NotchDragContainer: NSView {
         // Only proceed if notch shelf is enabled
         // CRITICAL: Use object() ?? true to match @AppStorage default
         guard (UserDefaults.standard.object(forKey: "enableNotchShelf") as? Bool) ?? true else {
+            super.mouseDown(with: event)
+            return
+        }
+
+        // When expanded, never steal clicks in the notch strip.
+        // Let SwiftUI controls (media/buttons/toggles) handle interaction directly.
+        guard !isExpandedOnTargetDisplay() else {
             super.mouseDown(with: event)
             return
         }

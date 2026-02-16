@@ -18,6 +18,28 @@ class QuickLookDataSource: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDel
     }
 }
 
+/// Avoids SwiftUI's VideoPlayer metadata path by hosting AVPlayerView directly.
+private struct SafeVideoPreview: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        if nsView.player !== player {
+            nsView.player = player
+        }
+    }
+
+    static func dismantleNSView(_ nsView: AVPlayerView, coordinator: ()) {
+        nsView.player?.pause()
+        nsView.player = nil
+    }
+}
+
 struct ClipboardManagerView: View {
     @ObservedObject var manager = ClipboardManager.shared
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
@@ -50,6 +72,7 @@ struct ClipboardManagerView: View {
     @State private var selectedTagFilter: UUID? = nil  // nil = show all
     @State private var isTagPopoverVisible = false
     @State private var showTagManagement = false
+    @State private var showClearAllConfirmation = false
     
     // Cached sorted/filtered history (updated only when needed)
     @State private var cachedSortedHistory: [ClipboardItem] = []
@@ -220,6 +243,16 @@ struct ClipboardManagerView: View {
                             .keyboardShortcut("f", modifiers: .command)
                             .help("Search (⌘F)")
                         }
+
+                        ToolbarItem(placement: .automatic) {
+                            Button(role: .destructive) {
+                                showClearAllConfirmation = true
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .disabled(manager.history.isEmpty)
+                            .help("Clear All")
+                        }
                     }
                     .sheet(isPresented: $showTagManagement) {
                         TagManagementSheet(manager: manager)
@@ -246,6 +279,18 @@ struct ClipboardManagerView: View {
         .frame(minWidth: 1040, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
         .background(pasteShortcutButton)
         .background(navigationShortcutButtons)
+        .confirmationDialog(
+            "Clear all clipboard history?",
+            isPresented: $showClearAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear All", role: .destructive) {
+                clearAllClipboardHistory()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently remove all clipboard items.")
+        }
     }
     
     private var pasteShortcutButton: some View {
@@ -416,6 +461,13 @@ struct ClipboardManagerView: View {
         } else {
             selectedItems = []
         }
+    }
+
+    private func clearAllClipboardHistory() {
+        manager.clearAllHistory()
+        selectedItems = []
+        pendingSelectionId = nil
+        lastClickedItemId = nil
     }
     
     /// Show Quick Look preview for selected image items
@@ -1845,7 +1897,7 @@ struct ClipboardPreviewView: View {
                             // Check if this is a video file
                             if isVideoFile, let player = videoPlayer {
                                 // Video Player View
-                                VideoPlayer(player: player)
+                                SafeVideoPreview(player: player)
                                     .aspectRatio(16/9, contentMode: .fit)
                                     .frame(maxHeight: 280)
                                     .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.medium, style: .continuous))

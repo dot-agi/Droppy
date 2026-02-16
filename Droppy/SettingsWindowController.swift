@@ -162,6 +162,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     // MARK: - NSWindowDelegate
     
     func windowWillClose(_ notification: Notification) {
+        if let closingWindow = notification.object as? NSWindow {
+            // Aggressively release the hosted SwiftUI tree when the window closes.
+            closingWindow.contentView = nil
+            closingWindow.delegate = nil
+        }
         window = nil
     }
 }

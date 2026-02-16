@@ -8,6 +8,85 @@
 
 import SwiftUI
 import AppKit
+import QuartzCore
+
+private enum ToDoShelfFormatters {
+    static let parseTimeFormatters: [DateFormatter] = {
+        ["HH:mm", "H:mm", "HHmm", "Hmm", "H", "h:mm a", "h:mma", "ha"].map { format in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = .autoupdatingCurrent
+            formatter.dateFormat = format
+            return formatter
+        }
+    }()
+
+    static let shortTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
+
+    static let dueDateWithTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
+        return formatter
+    }()
+
+    static let dueDateWithoutYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter
+    }()
+
+    static let dueDateWithYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("d MMM yyyy")
+        return formatter
+    }()
+
+    static let fullDueDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy jm")
+        return formatter
+    }()
+
+    static let fullDueDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy")
+        return formatter
+    }()
+}
+
+private struct TimelineSectionOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: [Date: CGFloat] = [:]
+
+    static func reduce(value: inout [Date: CGFloat], nextValue: () -> [Date: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
+private struct TimelineRowRenderID: Hashable {
+    let id: UUID
+    let isCompleted: Bool
+    let priority: ToDoPriority
+}
+
+extension Notification.Name {
+    static let todoShelfNavigateTimeline = Notification.Name("ToDoShelfNavigateTimeline")
+}
 
 struct ToDoShelfBar: View {
     static let hostHorizontalInset: CGFloat = 30
@@ -15,9 +94,14 @@ struct ToDoShelfBar: View {
 
     var manager: ToDoManager
     @Binding var isListExpanded: Bool
+    var hostDisplayID: CGDirectDisplayID? = nil
     var notchHeight: CGFloat = 0  // Height of physical notch to clear
     var useAdaptiveForegroundsForTransparentNotch: Bool = false
     @AppStorage(AppPreferenceKey.useTransparentBackground) private var useTransparentBackground = PreferenceDefault.useTransparentBackground
+    @AppStorage(AppPreferenceKey.todoShelfSplitViewEnabled) private var isSplitViewEnabled = PreferenceDefault.todoShelfSplitViewEnabled
+    @AppStorage(AppPreferenceKey.todoShowTaskWeekNumber) private var showTaskWeekNumber = PreferenceDefault.todoShowTaskWeekNumber
+    @AppStorage(AppPreferenceKey.todoShowTaskViewTimezone) private var showTaskViewTimezone = PreferenceDefault.todoShowTaskViewTimezone
+    @AppStorage(AppPreferenceKey.todoSyncCalendarEnabled) private var calendarSyncEnabled = PreferenceDefault.todoSyncCalendarEnabled
 
     @State private var inputText: String = ""
     @State private var inputPriority: ToDoPriority = .normal
@@ -27,9 +111,40 @@ struct ToDoShelfBar: View {
     @State private var isInputBarHovered = false
     @State private var activeListMentionQuery: String?
     @State private var showingMentionPicker = false
+    @State private var selectedTimelineItemID: UUID?
+    @State private var detailDraftSourceID: UUID?
+    @State private var detailTitleDraft = ""
+    @State private var detailDueDateDraft: Date?
+    @State private var showingDetailDueDatePicker = false
+    @State private var selectedStripDayStart = Calendar.current.startOfDay(for: Date())
+    @State private var stripWindowStartDay = Calendar.current.startOfDay(for: Date())
+    @State private var timelineScrollTargetDay: Date?
+    @State private var timelineScrollTargetItemID: TimelineRowRenderID?
+    @State private var suppressStripSelectionFromScroll = false
+    @State private var stripScrollSyncWorkItem: DispatchWorkItem?
+    @State private var stripSelectionUpdateWorkItem: DispatchWorkItem?
+    @State private var pendingStripSelectionOffsets: [Date: CGFloat] = [:]
+    @State private var lastStripSelectionUpdateAt: TimeInterval = 0
+    @State private var splitToggleInteractionWorkItem: DispatchWorkItem?
+    @State private var detailTitleCommitWorkItem: DispatchWorkItem?
+    @State private var timelineSnapshot = TimelineSnapshot.empty
+    @State private var completingTimelineItemIDs: Set<UUID> = []
+    @State private var skipNextExpandedResizeRecalc = false
+    @FocusState private var isDetailTitleFieldFocused: Bool
 
     private var useAdaptiveForegrounds: Bool {
         useTransparentBackground && useAdaptiveForegroundsForTransparentNotch
+    }
+
+    private var timelineColumnHorizontalPadding: CGFloat {
+        isSplitViewEnabled ? 10 : Layout.listHorizontalPadding
+    }
+
+    private var isHostShelfExpanded: Bool {
+        if let hostDisplayID {
+            return DroppyState.shared.isExpanded(for: hostDisplayID)
+        }
+        return DroppyState.shared.isExpanded
     }
 
     private enum Layout {
@@ -45,14 +160,34 @@ struct ToDoShelfBar: View {
         static let sideControlContentPadding: CGFloat = 4
         static let listBottomSpacing: CGFloat = 8
         static let emptyListBottomSpacing: CGFloat = 0
-        static let listHeight: CGFloat = 180
-        static let listTopPadding: CGFloat = 12
+        static let listHeight: CGFloat = 250
+        static let timelineHeaderHeight: CGFloat = 84
+        static let timelineContentTopSpacing: CGFloat = 8
+        static let listTopPadding: CGFloat = 18
         static let listBottomPadding: CGFloat = 8
         static let listHorizontalPadding: CGFloat = inputHorizontalPadding
         static let emptyStateHeight: CGFloat = 80
         static let undoToastBottomPadding: CGFloat = 56
         static let undoToastTopPadding: CGFloat = 8
         static let undoToastEmptyStateClearance: CGFloat = 38
+    }
+
+    private struct TimelineSnapshot {
+        let mode: TimelineContentMode
+        let hasVisibleTaskItems: Bool
+        let visibleItems: [ToDoItem]
+        let daySections: [TimelineDaySection]
+        let selectionSignature: Int
+        let daySectionSignature: Int
+
+        static let empty = TimelineSnapshot(
+            mode: .tasksOnly,
+            hasVisibleTaskItems: false,
+            visibleItems: [],
+            daySections: [],
+            selectionSignature: 0,
+            daySectionSignature: 0
+        )
     }
 
     var body: some View {
@@ -105,12 +240,21 @@ struct ToDoShelfBar: View {
         .animation(DroppyAnimation.transition, value: manager.showUndoToast)
         .animation(DroppyAnimation.transition, value: manager.showCleanupToast)
         .onAppear {
+            if isListExpanded {
+                refreshTimelineSnapshot()
+            }
+            manager.setShelfSplitViewEnabled(isSplitViewEnabled)
+            stripWindowStartDay = selectedStripDayStart
             if manager.isRemindersSyncEnabled || manager.isCalendarSyncEnabled {
-                manager.syncExternalSourcesNow()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    manager.syncExternalSourcesNow(minimumInterval: 12)
+                }
             }
             if manager.isRemindersSyncEnabled {
                 manager.refreshReminderListsNow()
             }
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
         }
         .onChange(of: showingInputDueDatePicker) { _, showing in
             manager.isInteractingWithPopover = showing
@@ -120,21 +264,97 @@ struct ToDoShelfBar: View {
         }
         .onChange(of: isListExpanded) { _, expanded in
             manager.isShelfListExpanded = expanded
-            NotchWindowController.shared.forceRecalculateAllWindowSizes()
+            if skipNextExpandedResizeRecalc {
+                skipNextExpandedResizeRecalc = false
+            } else if isHostShelfExpanded {
+                NotchWindowController.shared.recalculateAllWindowSizesCoalesced()
+            }
             guard expanded else { return }
+            refreshTimelineSnapshot()
+            let today = Calendar.current.startOfDay(for: Date())
+            selectedStripDayStart = today
+            ensureSelectedDayVisibleInStrip()
+            // Always reopen timeline from today/top so the view never appears
+            // offset too low from the previously scrolled position.
+            selectedTimelineItemID = nil
+            timelineScrollTargetDay = today
+            timelineScrollTargetItemID = nil
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
             if manager.isRemindersSyncEnabled || manager.isCalendarSyncEnabled {
-                manager.syncExternalSourcesNow()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    manager.syncExternalSourcesNow(minimumInterval: 12)
+                }
             }
         }
         .onDisappear {
+            stripScrollSyncWorkItem?.cancel()
+            stripSelectionUpdateWorkItem?.cancel()
+            splitToggleInteractionWorkItem?.cancel()
+            commitPendingDetailTitleEdit()
             manager.isInteractingWithPopover = false
             manager.isEditingText = false
+        }
+        .onChange(of: manager.items) { _, _ in
+            guard isListExpanded, isHostShelfExpanded else { return }
+            refreshTimelineSnapshot(animation: DroppyAnimation.itemInsertion)
+        }
+        .onChange(of: calendarSyncEnabled) { _, _ in
+            guard isListExpanded, isHostShelfExpanded else { return }
+            refreshTimelineSnapshot(animation: DroppyAnimation.smoothContent)
+        }
+        .onChange(of: manager.hideUndatedRemindersChangeToken) { _, _ in
+            guard isListExpanded, isHostShelfExpanded else { return }
+            refreshTimelineSnapshot(animation: DroppyAnimation.smoothContent)
         }
         .onChange(of: inputText) { _, newValue in
             refreshListMentionState(for: newValue)
         }
         .onChange(of: manager.availableReminderLists) { _, _ in
             showingMentionPicker = shouldShowMentionTooltip
+        }
+        .onChange(of: showingDetailDueDatePicker) { _, showing in
+            manager.isInteractingWithPopover = showing
+        }
+        .onChange(of: isSplitViewEnabled) { _, _ in
+            manager.setShelfSplitViewEnabled(isSplitViewEnabled)
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
+            NotchWindowController.shared.recalculateAllWindowSizesCoalesced()
+        }
+        .onChange(of: timelineSelectionSignature) { _, _ in
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
+            alignSelectedStripDayWithTimeline()
+        }
+        .onChange(of: selectedTimelineItemID) { _, _ in
+            isDetailTitleFieldFocused = false
+            commitPendingDetailTitleEdit()
+            syncDetailDraftFromSelection()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .todoShelfNavigateTimeline)) { note in
+            guard isListExpanded,
+                  !manager.isEditingText,
+                  !isDetailTitleFieldFocused,
+                  !manager.isInteractingWithPopover else { return }
+            guard let step = note.userInfo?["step"] as? Int else { return }
+            navigateTimelineSelection(step: step)
+        }
+        .onChange(of: detailTitleDraft) { _, newValue in
+            guard isSplitViewEnabled, let item = selectedTimelineItem, !isCalendarEvent(item) else { return }
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, trimmed != item.title else { return }
+            detailTitleCommitWorkItem?.cancel()
+            let workItem = DispatchWorkItem {
+                manager.updateTitle(for: item, to: trimmed)
+            }
+            detailTitleCommitWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16, execute: workItem)
+        }
+        .onChange(of: detailDueDateDraft) { _, newValue in
+            guard isSplitViewEnabled, let item = selectedTimelineItem, !isCalendarEvent(item) else { return }
+            guard item.dueDate != newValue else { return }
+            manager.updateDueDate(for: item, to: newValue)
         }
 
     }
@@ -298,13 +518,10 @@ struct ToDoShelfBar: View {
             // Keep the window-size source of truth in sync BEFORE animating the visual expansion,
             // so physical-notch layouts stay top-pinned without a one-frame top gap.
             manager.isShelfListExpanded = nextExpanded
+            skipNextExpandedResizeRecalc = true
             NotchWindowController.shared.forceRecalculateAllWindowSizes()
             withAnimation(DroppyAnimation.smoothContent) {
                 isListExpanded = nextExpanded
-            }
-            // Apply once more on the next runloop tick to catch any deferred layout pass.
-            DispatchQueue.main.async {
-                NotchWindowController.shared.forceRecalculateAllWindowSizes()
             }
         } label: {
             HStack(spacing: DroppySpacing.xs) {
@@ -356,197 +573,531 @@ struct ToDoShelfBar: View {
 
     private var taskListSection: some View {
         VStack(spacing: 0) {
-            if manager.items.isEmpty {
-                // Empty state with notch clearance built-in
-                emptyState
+            timelineToolbar
+                .padding(.top, 0)
+                .padding(.horizontal, timelineColumnHorizontalPadding)
+                .zIndex(2)
+
+            if timelineVisibleItems.isEmpty {
+                emptyTimelineState
                     .padding(.top, emptyStateTopPadding)
-            } else if useSplitTaskCalendarLayout {
-                splitTaskCalendarList
+            } else if isSplitViewEnabled {
+                timelineSplitView
+                    .padding(.top, Layout.timelineContentTopSpacing)
             } else {
-                combinedTaskCalendarList
+                timelineScrollableColumn
+                    .padding(.top, Layout.timelineContentTopSpacing)
+                    .frame(height: Layout.listHeight)
+                    .clipShape(Rectangle())
             }
 
-            // Spacer between list and input bar
             Spacer()
-                .frame(height: manager.items.isEmpty ? Layout.emptyListBottomSpacing : Layout.listBottomSpacing)
+                .frame(height: timelineVisibleItems.isEmpty ? Layout.emptyListBottomSpacing : Layout.listBottomSpacing)
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }
 
-    private var combinedTaskCalendarList: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            // CRITICAL FIX: Use VStack instead of LazyVStack to prevent NSGenericException layout loops during drag
-            VStack(alignment: .leading, spacing: 1) {
-                if !overviewTaskItems.isEmpty {
-                    ForEach(Array(overviewTaskItems.enumerated()), id: \.element.id) { index, item in
-                        TaskRow(
-                            item: item,
-                            manager: manager,
-                            reminderListOptions: reminderListMenuOptions,
-                            useAdaptiveForegrounds: useAdaptiveForegrounds
-                        )
-                            .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
-
-                        if index < overviewTaskItems.count - 1 {
-                            Divider()
-                                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
-                                .padding(.horizontal, 24)
-                        }
-                    }
-                }
-
-                if !upcomingCalendarItems.isEmpty {
-                    if !overviewTaskItems.isEmpty {
-                        Divider()
-                            .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.08))
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 4)
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("Upcoming Events")
-                            .font(.system(size: 10, weight: .semibold))
-                        Spacer(minLength: 0)
-                    }
+    private var timelineToolbar: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Text(timelineModeTitle)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(
                         useAdaptiveForegrounds
-                            ? AdaptiveColors.secondaryTextAuto.opacity(0.85)
-                            : .white.opacity(0.72)
+                            ? AdaptiveColors.secondaryTextAuto.opacity(0.9)
+                            : .white.opacity(0.74)
                     )
-                    .padding(.horizontal, 24)
+                    .contentTransition(.interpolate)
+                    .animation(DroppyAnimation.state, value: timelineModeTitle)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(
+                                useAdaptiveForegrounds
+                                    ? AdaptiveColors.overlayAuto(0.08)
+                                    : Color.white.opacity(0.08)
+                            )
+                    )
 
-                    ForEach(Array(upcomingCalendarItems.enumerated()), id: \.element.id) { index, item in
-                        TaskRow(
-                            item: item,
-                            manager: manager,
-                            reminderListOptions: reminderListMenuOptions,
-                            useAdaptiveForegrounds: useAdaptiveForegrounds
+                if showTaskWeekNumber {
+                    Text("W\(visibleStripWeekNumber)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(
+                            useAdaptiveForegrounds
+                                ? AdaptiveColors.secondaryTextAuto.opacity(0.88)
+                                : .white.opacity(0.68)
                         )
-                            .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
-
-                        if index < upcomingCalendarItems.count - 1 {
-                            Divider()
-                                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
-                                .padding(.horizontal, 24)
-                        }
-                    }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    useAdaptiveForegrounds
+                                        ? AdaptiveColors.overlayAuto(0.08)
+                                        : Color.white.opacity(0.08)
+                                )
+                        )
                 }
-            }
-            .padding(.top, Layout.listTopPadding)
-            .padding(.bottom, Layout.listBottomPadding)
-            .padding(.horizontal, Layout.listHorizontalPadding)
-        }
-        .frame(height: Layout.listHeight)
-        .clipShape(Rectangle())
-        .overlay(alignment: .bottom) {
-            if showsBottomListScrim {
-                bottomListScrim
-                    .transition(.opacity)
-            }
-        }
-    }
 
-    private var splitTaskCalendarList: some View {
-        HStack(spacing: 0) {
-            splitListColumn(
-                title: "Tasks",
-                systemImage: "checklist",
-                items: overviewTaskItems,
-                emptyText: String(localized: "no_tasks_yet")
-            )
-
-            Divider()
-                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.12) : Color.white.opacity(0.12))
-                .frame(maxHeight: .infinity)
-                .padding(.vertical, 8)
-
-            splitListColumn(
-                title: "Upcoming Events",
-                systemImage: "calendar.badge.clock",
-                items: upcomingCalendarItems,
-                emptyText: "No upcoming events"
-            )
-        }
-        .frame(height: Layout.listHeight)
-        .clipShape(Rectangle())
-    }
-
-    private func splitListColumn(
-        title: String,
-        systemImage: String,
-        items: [ToDoItem],
-        emptyText: String
-    ) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 10, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 10, weight: .semibold))
                 Spacer(minLength: 0)
+
+                Button {
+                    HapticFeedback.medium.perform()
+                    beginSplitToggleInteractionHold()
+                    isSplitViewEnabled.toggle()
+                    manager.setShelfSplitViewEnabled(isSplitViewEnabled)
+                    NotchWindowController.shared.recalculateAllWindowSizesCoalesced()
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(
+                                useAdaptiveForegrounds
+                                    ? AdaptiveColors.overlayAuto(isSplitViewEnabled ? 0.14 : 0.08)
+                                    : Color.white.opacity(isSplitViewEnabled ? 0.14 : 0.08)
+                            )
+
+                        Image(systemName: isSplitViewEnabled ? "rectangle.split.2x1.fill" : "rectangle.split.2x1")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(
+                                isSplitViewEnabled
+                                    ? Color.blue.opacity(0.95)
+                                    : (useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.88) : .white.opacity(0.62))
+                            )
+                    }
+                    .frame(width: 30, height: 24)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .help(isSplitViewEnabled ? "Disable split details" : "Enable split details")
             }
-            .foregroundStyle(
-                useAdaptiveForegrounds
-                    ? AdaptiveColors.secondaryTextAuto.opacity(0.85)
-                    : .white.opacity(0.72)
-            )
-            .padding(.horizontal, 18)
-            .padding(.top, 8)
-            .padding(.bottom, 6)
+            .padding(.top, -topToolbarLift)
 
-            Divider()
-                .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.08))
-                .padding(.horizontal, 14)
+            nativeDayStrip
+        }
+    }
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 1) {
-                    if items.isEmpty {
-                        Text(emptyText)
-                            .font(.system(size: 11, weight: .medium))
+    private var nativeDayStrip: some View {
+        let calendar = Calendar.current
+        let stripStart = stripWindowStartDay
+
+        return HStack(spacing: 6) {
+            ForEach(0..<7, id: \.self) { offset in
+                let day = calendar.date(byAdding: .day, value: offset, to: stripStart) ?? stripStart
+                let dayStart = calendar.startOfDay(for: day)
+                let isSelectedDay = calendar.isDate(dayStart, inSameDayAs: selectedStripDayStart)
+
+                Button {
+                    HapticFeedback.tap()
+                    withAnimation(DroppyAnimation.smoothContent) {
+                        selectedStripDayStart = dayStart
+                        timelineScrollTargetDay = dayStart
+                    }
+                    ensureSelectedDayVisibleInStrip()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(day, format: .dateTime.weekday(.abbreviated))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(
                                 useAdaptiveForegrounds
-                                    ? AdaptiveColors.secondaryTextAuto.opacity(0.65)
-                                    : .white.opacity(0.4)
+                                    ? AdaptiveColors.primaryTextAuto.opacity(isSelectedDay ? 0.95 : 0.84)
+                                    : .white.opacity(isSelectedDay ? 0.9 : 0.75)
                             )
-                            .padding(.horizontal, 18)
-                            .padding(.top, 14)
-                    } else {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            TaskRow(
-                                item: item,
-                                manager: manager,
-                                reminderListOptions: reminderListMenuOptions,
-                                useAdaptiveForegrounds: useAdaptiveForegrounds
-                            )
-                            .id("\(item.id)-\(item.isCompleted)-\(item.priority.rawValue)")
+                            .contentTransition(.interpolate)
+                            .animation(DroppyAnimation.state, value: stripWindowStartDay)
 
-                            if index < items.count - 1 {
-                                Divider()
-                                    .background(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.06))
-                                    .padding(.horizontal, 20)
-                            }
-                        }
+                        Text(day, format: .dateTime.day())
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                isSelectedDay
+                                    ? .white
+                                    : (useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto.opacity(0.92) : .white.opacity(0.88))
+                            )
+                            .contentTransition(.numericText(value: Double(Calendar.current.component(.day, from: day))))
+                            .animation(DroppyAnimation.state, value: stripWindowStartDay)
+                            .frame(width: 22, height: 22)
+                            .background(
+                                Circle()
+                                    .fill(
+                                        isSelectedDay
+                                            ? Color.red.opacity(0.95)
+                                            : Color.clear
+                                    )
+                            )
                     }
+                    .frame(height: 24)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.top, 6)
-                .padding(.bottom, Layout.listBottomPadding)
-                .padding(.horizontal, Layout.listHorizontalPadding)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 18, coordinateSpace: .local)
+                .onEnded { value in
+                    let horizontal = value.predictedEndTranslation.width
+                    let vertical = value.predictedEndTranslation.height
+                    guard abs(horizontal) > abs(vertical), abs(horizontal) > 40 else { return }
+                    if horizontal < 0 {
+                        shiftDisplayedWeek(by: 1)
+                    } else {
+                        shiftDisplayedWeek(by: -1)
+                    }
+                }
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(
+                    useAdaptiveForegrounds
+                        ? AdaptiveColors.overlayAuto(0.05)
+                        : Color.white.opacity(0.04)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(
+                    useAdaptiveForegrounds
+                        ? AdaptiveColors.overlayAuto(0.1)
+                        : Color.white.opacity(0.08),
+                    lineWidth: 1
+                )
+        )
     }
 
-    private var emptyState: some View {
+    private var timelineScrollableColumn: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(timelineDaySections) { section in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(formattedDayHeader(for: section.dayStart))
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(
+                                    useAdaptiveForegrounds
+                                        ? AdaptiveColors.secondaryTextAuto.opacity(0.82)
+                                        : .white.opacity(0.62)
+                                )
+                                .contentTransition(.interpolate)
+                                .animation(DroppyAnimation.state, value: section.dayStart)
+                                .padding(.horizontal, 8)
+                                .padding(.bottom, 2)
+                                .background(
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(
+                                            key: TimelineSectionOffsetPreferenceKey.self,
+                                            value: [section.dayStart: proxy.frame(in: .named("timeline-scroll")).minY]
+                                        )
+                                    }
+                                )
+
+                            ForEach(section.items, id: \.id) { item in
+                                ShelfTimelineRow(
+                                    item: item,
+                                    manager: manager,
+                                    subtaskDepth: manager.reminderHierarchyDepth(for: item),
+                                    isSelected: isSplitViewEnabled && selectedTimelineItemID == item.id,
+                                    isCompleting: completingTimelineItemIDs.contains(item.id),
+                                    allowCompactDetailsPopover: !isSplitViewEnabled,
+                                    useAdaptiveForegrounds: useAdaptiveForegrounds,
+                                    timeLabel: formattedTimelineTimeLabel(for: item),
+                                    detailDateLabel: item.dueDate.map { formattedDetailDate(for: $0) },
+                                    onSelect: {
+                                        isDetailTitleFieldFocused = false
+                                        selectedTimelineItemID = item.id
+                                    },
+                                    onToggleCompletion: {
+                                        animateTimelineCompletion(for: item)
+                                    },
+                                    onDelete: {
+                                        manager.removeItem(item)
+                                        refreshTimelineSnapshot(animation: DroppyAnimation.itemInsertion)
+                                        syncTimelineSelection()
+                                        syncDetailDraftFromSelection()
+                                    }
+                                )
+                                .id(
+                                    TimelineRowRenderID(
+                                        id: item.id,
+                                        isCompleted: item.isCompleted,
+                                        priority: item.priority
+                                    )
+                                )
+                                .transition(.scale(scale: 0.9).combined(with: .opacity))
+                            }
+                        }
+                        .id(section.dayStart)
+                    }
+                }
+                .padding(.top, Layout.listTopPadding)
+                .padding(.bottom, Layout.listBottomPadding)
+                .padding(.horizontal, timelineColumnHorizontalPadding)
+                .animation(DroppyAnimation.itemInsertion, value: timelineDaySectionSignature)
+            }
+            .coordinateSpace(name: "timeline-scroll")
+            .onPreferenceChange(TimelineSectionOffsetPreferenceKey.self) { offsets in
+                scheduleStripSelectionUpdate(with: offsets)
+            }
+            .onChange(of: timelineScrollTargetDay) { _, targetDay in
+                guard let targetDay, let resolvedDay = resolvedTimelineScrollDay(for: targetDay) else { return }
+                suspendStripSelectionSyncDuringProgrammaticScroll()
+                withAnimation(DroppyAnimation.smoothContent) {
+                    proxy.scrollTo(resolvedDay, anchor: .top)
+                }
+            }
+            .onChange(of: timelineScrollTargetItemID) { _, targetItemID in
+                guard let targetItemID else { return }
+                suspendStripSelectionSyncDuringProgrammaticScroll()
+                withAnimation(DroppyAnimation.smoothContent) {
+                    proxy.scrollTo(targetItemID, anchor: .center)
+                }
+            }
+            .onChange(of: timelineDaySectionSignature) { _, _ in
+                guard let targetDay = timelineScrollTargetDay,
+                      let resolvedDay = resolvedTimelineScrollDay(for: targetDay) else { return }
+                DispatchQueue.main.async {
+                    withAnimation(DroppyAnimation.smoothContent) {
+                        proxy.scrollTo(resolvedDay, anchor: .top)
+                    }
+                }
+            }
+            .onAppear {
+                if timelineScrollTargetDay == nil {
+                    timelineScrollTargetDay = selectedStripDayStart
+                }
+            }
+            .background(
+                ToDoShelfScrollViewResolver { scrollView in
+                    // Prevent macOS keyboard focus ring around timeline list.
+                    scrollView.focusRingType = .none
+                    scrollView.contentView.focusRingType = .none
+                    scrollView.documentView?.focusRingType = .none
+                }
+            )
+        }
+    }
+
+    private var timelineSplitView: some View {
+        HStack(spacing: 0) {
+            timelineScrollableColumn
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            timelineDetailPane
+                .frame(width: 300)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+        }
+        .frame(height: Layout.listHeight)
+        .clipShape(Rectangle())
+    }
+
+    private var timelineDetailPane: some View {
+        Group {
+            if let item = selectedTimelineItem {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isCalendarEvent(item) ? "calendar.badge.clock" : "checklist")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(
+                                isCalendarEvent(item)
+                                    ? calendarTint(for: item).opacity(0.95)
+                                    : (useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto : .white.opacity(0.8))
+                            )
+                        Text(isCalendarEvent(item) ? "Event Details" : "Task Details")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.9) : .white.opacity(0.72))
+                            .contentTransition(.interpolate)
+                            .animation(DroppyAnimation.state, value: isCalendarEvent(item))
+                        Spacer(minLength: 0)
+                    }
+
+                    if isCalendarEvent(item) {
+                        Text(item.title)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : .white.opacity(0.95))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .contentTransition(.interpolate)
+                            .animation(DroppyAnimation.state, value: item.id)
+
+                        if let dueDate = item.dueDate {
+                            Text(formattedDetailDate(for: dueDate))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.85) : .white.opacity(0.64))
+                                .contentTransition(.interpolate)
+                                .animation(DroppyAnimation.state, value: dueDate.timeIntervalSinceReferenceDate)
+                        }
+
+                        if let listTitle = item.externalListTitle, !listTitle.isEmpty {
+                            Label(listTitle, systemImage: "calendar")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(calendarTint(for: item).opacity(0.95))
+                        }
+
+                        Label("Read-only (Apple Calendar)", systemImage: "lock.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.78) : .white.opacity(0.6))
+
+                        Spacer(minLength: 0)
+                    } else {
+                        TextField("Task title", text: $detailTitleDraft)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : .white.opacity(0.95))
+                            .focused($isDetailTitleFieldFocused)
+                            // SwiftUI/AppKit nudges NSTextField text up slightly in edit mode.
+                            // Keep perceived baseline stable between display and editing states.
+                            .offset(y: isDetailTitleFieldFocused ? 1 : 0)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(height: 24, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(useAdaptiveForegrounds ? AdaptiveColors.buttonBackgroundAuto.opacity(0.95) : Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(
+                                        useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.16) : Color.white.opacity(0.12),
+                                        lineWidth: 1
+                                    )
+                            )
+
+                        HStack(spacing: 6) {
+                            priorityChip(.high, title: "High", item: item)
+                            priorityChip(.medium, title: "Medium", item: item)
+                            priorityChip(.normal, title: "Normal", item: item)
+                        }
+
+                        HStack(spacing: 8) {
+                            Label(detailDueDateDraft == nil ? "No due date" : formattedDetailDate(for: detailDueDateDraft ?? Date()), systemImage: "calendar")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.88) : .white.opacity(0.7))
+                                .contentTransition(.interpolate)
+                                .animation(DroppyAnimation.state, value: detailDueDateDraft?.timeIntervalSinceReferenceDate ?? -1)
+
+                            Spacer(minLength: 0)
+
+                            Button(detailDueDateDraft == nil ? "Add Date" : "Edit Date") {
+                                showingDetailDueDatePicker = true
+                            }
+                            .buttonStyle(DroppyPillButtonStyle(size: .small))
+                            .contentTransition(.interpolate)
+                            .animation(DroppyAnimation.state, value: detailDueDateDraft == nil)
+                            .popover(isPresented: $showingDetailDueDatePicker) {
+                                ToDoDueDatePopoverContentLocal(
+                                    dueDate: Binding(
+                                        get: { detailDueDateDraft },
+                                        set: { detailDueDateDraft = $0 }
+                                    ),
+                                    primaryButtonTitle: "Done",
+                                    onPrimary: { showingDetailDueDatePicker = false },
+                                    setInteractingPopover: { manager.isInteractingWithPopover = $0 }
+                                )
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            Button {
+                                animateTimelineCompletion(for: item)
+                            } label: {
+                                Text(item.isCompleted ? "Mark Pending" : "Mark Complete")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(DroppyPillButtonStyle(size: .small))
+
+                            Button(role: .destructive) {
+                                manager.removeItem(item)
+                                refreshTimelineSnapshot(animation: DroppyAnimation.itemInsertion)
+                                syncTimelineSelection()
+                                syncDetailDraftFromSelection()
+                            } label: {
+                                Text("Delete")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(DroppyAccentButtonStyle(color: .red, size: .small))
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(
+                            useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.12) : Color.white.opacity(0.1),
+                            lineWidth: 1
+                        )
+                )
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.6) : .white.opacity(0.45))
+                    Text("Select an item")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.72) : .white.opacity(0.55))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.06) : Color.white.opacity(0.03))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(
+                            useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.12) : Color.white.opacity(0.08),
+                            lineWidth: 1
+                        )
+                )
+            }
+        }
+    }
+
+    private func priorityChip(_ priority: ToDoPriority, title: String, item: ToDoItem) -> some View {
+        Button {
+            manager.updatePriority(for: item, to: priority)
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(
+                    item.priority == priority
+                        ? .white
+                        : (useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.9) : .white.opacity(0.75))
+                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(
+                            item.priority == priority
+                                ? priority.color.opacity(0.85)
+                                : (useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.1) : Color.white.opacity(0.08))
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var emptyTimelineState: some View {
         VStack(spacing: DroppySpacing.xsm) {
-            // Subtle icon with gradient
             ZStack {
                 Circle()
                     .fill(useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.04) : Color.white.opacity(0.04))
                     .frame(width: 36, height: 36)
-                Image(systemName: "checklist")
+                Image(systemName: timelineEmptyIcon)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
@@ -558,41 +1109,13 @@ struct ToDoShelfBar: View {
                         )
                     )
             }
-            Text("no_tasks_yet")
+            Text(timelineEmptyLabel)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.75) : .white.opacity(0.3))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .frame(height: Layout.emptyStateHeight, alignment: .center) // Fixed height for consistent layout
-    }
-
-    private var bottomListScrim: some View {
-        LinearGradient(
-            colors: useTransparentBackground
-                ? [
-                    Color.clear,
-                    (useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.03) : Color.white.opacity(0.03)),
-                    (useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.07) : Color.white.opacity(0.07))
-                ]
-                : [
-                    Color.clear,
-                    Color.black.opacity(0.12),
-                    Color.black.opacity(0.24)
-                ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 6)
-        .compositingGroup()
-        .mask(
-            LinearGradient(
-                colors: [.clear, .white],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .allowsHitTesting(false)
+        .frame(height: Layout.emptyStateHeight, alignment: .center)
     }
 
     private var reminderListMenuOptions: [ToDoReminderListOption] {
@@ -612,6 +1135,20 @@ struct ToDoShelfBar: View {
         }
     }
 
+    private func beginSplitToggleInteractionHold() {
+        splitToggleInteractionWorkItem?.cancel()
+        let wasAlreadyInteracting = manager.isInteractingWithPopover
+        manager.isInteractingWithPopover = true
+
+        let workItem = DispatchWorkItem {
+            if !wasAlreadyInteracting {
+                manager.isInteractingWithPopover = false
+            }
+        }
+        splitToggleInteractionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: workItem)
+    }
+
     private func submitTask() {
         let parsed = ToDoInputIntelligence.parseTaskDraft(inputText)
         let trimmed = parsed.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -629,6 +1166,11 @@ struct ToDoShelfBar: View {
                 dueDate: resolvedDueDate,
                 reminderListID: resolvedReminderListID
             )
+        }
+        if isListExpanded {
+            refreshTimelineSnapshot(animation: DroppyAnimation.itemInsertion)
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
         }
 
         // Reset with animation
@@ -680,8 +1222,10 @@ struct ToDoShelfBar: View {
         if let explicit = inputReminderListID {
             return explicit
         }
-        guard let parsedQuery else { return nil }
-        return manager.resolveReminderList(matching: parsedQuery)?.id
+        if let parsedQuery {
+            return manager.resolveReminderList(matching: parsedQuery)?.id
+        }
+        return manager.preferredReminderListIDForNewTasks()
     }
 }
 
@@ -940,6 +1484,49 @@ struct ToDoStableTextField: NSViewRepresentable {
     }
 }
 
+private struct ToDoShelfScrollViewResolver: NSViewRepresentable {
+    let onResolve: (NSScrollView) -> Void
+
+    final class Coordinator {
+        var didResolve = false
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if !context.coordinator.didResolve {
+                context.coordinator.didResolve = resolveScrollView(from: view)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard !context.coordinator.didResolve else { return }
+        DispatchQueue.main.async {
+            if !context.coordinator.didResolve {
+                context.coordinator.didResolve = resolveScrollView(from: nsView)
+            }
+        }
+    }
+
+    private func resolveScrollView(from view: NSView) -> Bool {
+        var current: NSView? = view
+        while let candidate = current {
+            if let scroll = candidate.enclosingScrollView {
+                onResolve(scroll)
+                return true
+            }
+            current = candidate.superview
+        }
+        return false
+    }
+}
+
 private struct ToDoDueDateCircleButtonLocal: View {
     var tint: Color
     var action: () -> Void
@@ -1187,12 +1774,7 @@ private struct ToDoDueDatePopoverContentLocal: View {
             .replacingOccurrences(of: ".", with: ":")
             .uppercased()
 
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-
-        for format in ["HH:mm", "H:mm", "HHmm", "Hmm", "H", "h:mm a", "h:mma", "ha"] {
-            formatter.dateFormat = format
+        for formatter in ToDoShelfFormatters.parseTimeFormatters {
             if let date = formatter.date(from: normalized) {
                 let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
                 if let hour = comps.hour, let minute = comps.minute {
@@ -1204,19 +1786,11 @@ private struct ToDoDueDatePopoverContentLocal: View {
     }
 
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: date)
+        ToDoShelfFormatters.shortTimeFormatter.string(from: date)
     }
 
     private var timePlaceholder: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: Date())
+        ToDoShelfFormatters.shortTimeFormatter.string(from: Date())
     }
 }
 
@@ -1224,11 +1798,396 @@ private struct ToDoDueDatePopoverContentLocal: View {
 
 // MARK: - Task Row
 
+private struct ShelfTimelineRow: View {
+    let item: ToDoItem
+    let manager: ToDoManager
+    let subtaskDepth: Int
+    let isSelected: Bool
+    let isCompleting: Bool
+    let allowCompactDetailsPopover: Bool
+    let useAdaptiveForegrounds: Bool
+    let timeLabel: String
+    let detailDateLabel: String?
+    let onSelect: () -> Void
+    let onToggleCompletion: () -> Void
+    let onDelete: () -> Void
+    private static var colorCache: [String: Color] = [:]
+    @State private var isShowingInfoPopover = false
+    @State private var isEditing = false
+    @State private var editText = ""
+    @State private var editDueDate: Date?
+    @State private var isPressPulse = false
+    private var clampedSubtaskDepth: Int { min(max(subtaskDepth, 0), 4) }
+    private var subtaskIndent: CGFloat { CGFloat(clampedSubtaskDepth) * 14 }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if isCalendarEvent {
+                Circle()
+                    .fill(calendarTint.opacity(0.95))
+                    .frame(width: 7, height: 7)
+                    .frame(width: 18, height: 18)
+            } else {
+                Button {
+                    HapticFeedback.medium.perform()
+                    onToggleCompletion()
+                } label: {
+                    Image(systemName: "circle")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(item.priority.color.opacity(0.9))
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 5) {
+                    if clampedSubtaskDepth > 0 {
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(
+                                useAdaptiveForegrounds
+                                    ? AdaptiveColors.secondaryTextAuto.opacity(0.72)
+                                    : .white.opacity(0.58)
+                            )
+                            .contentTransition(.interpolate)
+                    }
+                    Text(item.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .foregroundStyle(
+                            isCalendarEvent
+                                ? calendarTint.opacity(0.95)
+                                : (useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto.opacity(0.95) : .white.opacity(0.92))
+                        )
+                        .contentTransition(.interpolate)
+                        .animation(DroppyAnimation.state, value: item.title)
+                }
+
+                HStack(spacing: 5) {
+                    Text(timeLabel)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.82) : .white.opacity(0.6))
+                    if let sourceLabel {
+                        if let sourceMarkerColor {
+                            Circle()
+                                .fill(sourceMarkerColor.opacity(0.92))
+                                .frame(width: 5.5, height: 5.5)
+                        } else {
+                            Text("•")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.82) : .white.opacity(0.6))
+                        }
+                        Text(sourceLabel)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(sourceLabelColor)
+                    }
+                }
+                .contentTransition(.interpolate)
+                .animation(DroppyAnimation.state, value: timeLabel)
+            }
+
+            Spacer(minLength: 0)
+
+            if !isCalendarEvent {
+                Button {
+                    HapticFeedback.delete()
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.74) : .white.opacity(0.4))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, subtaskIndent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .scaleEffect(isCompleting ? 0.92 : 1.0, anchor: .center)
+        .opacity(isCompleting ? 0.0 : 1.0)
+        .blur(radius: isCompleting ? 0.8 : 0)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(rowBackgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(rowBorderColor, lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            Capsule()
+                .fill(Color.blue.opacity(0.9))
+                .frame(width: 2.5, height: isSelected ? 18 : 2.5)
+                .offset(x: -9)
+                .opacity(isSelected ? 0.9 : 0.0)
+                .animation(DroppyAnimation.smooth(duration: 0.2), value: isSelected)
+        }
+        .onTapGesture {
+            onSelect()
+            withAnimation(DroppyAnimation.smooth(duration: 0.1)) {
+                isPressPulse = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.11) {
+                withAnimation(DroppyAnimation.smooth(duration: 0.1)) {
+                    isPressPulse = false
+                }
+            }
+        }
+        .allowsHitTesting(!isCompleting)
+        .scaleEffect(isPressPulse ? 0.985 : 1.0, anchor: .center)
+        .animation(DroppyAnimation.smooth(duration: 0.18), value: isCompleting)
+        .animation(DroppyAnimation.smooth(duration: 0.2), value: isSelected)
+        .animation(DroppyAnimation.smooth(duration: 0.12), value: isPressPulse)
+        .modifier(
+            CompactTimelineDetailsModifier(
+                enabled: allowCompactDetailsPopover,
+                item: item,
+                manager: manager,
+                isShowingInfoPopover: $isShowingInfoPopover,
+                isEditing: $isEditing,
+                editText: $editText,
+                editDueDate: $editDueDate,
+                infoPopover: compactInfoPopover,
+                editPopover: compactEditPopover,
+                onSelect: onSelect
+            )
+        )
+    }
+
+    private var sourceLabel: String? {
+        switch item.externalSource {
+        case .calendar:
+            if let listTitle = item.externalListTitle, !listTitle.isEmpty {
+                return listTitle
+            }
+            return "Calendar"
+        case .reminders:
+            if let listTitle = item.externalListTitle, !listTitle.isEmpty {
+                return listTitle
+            }
+            return "Reminders"
+        case .none:
+            return nil
+        }
+    }
+
+    private var isCalendarEvent: Bool {
+        item.externalSource == .calendar
+    }
+
+    private var rowBackgroundColor: Color {
+        if isSelected {
+            return useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.14) : Color.white.opacity(0.16)
+        }
+        if isCalendarEvent {
+            return calendarTint.opacity(0.12)
+        }
+        return useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.08) : Color.white.opacity(0.06)
+    }
+
+    private var rowBorderColor: Color {
+        if isSelected {
+            return Color.blue.opacity(0.65)
+        }
+        if isCalendarEvent {
+            return calendarTint.opacity(0.25)
+        }
+        return useAdaptiveForegrounds ? AdaptiveColors.overlayAuto(0.12) : Color.white.opacity(0.1)
+    }
+
+    private var calendarTint: Color {
+        guard let hex = item.externalListColorHex else { return .blue }
+        let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
+        guard trimmed.count == 6, let value = Int(trimmed, radix: 16) else { return .blue }
+        return Color(
+            red: Double((value >> 16) & 0xFF) / 255.0,
+            green: Double((value >> 8) & 0xFF) / 255.0,
+            blue: Double(value & 0xFF) / 255.0
+        )
+    }
+
+    private var reminderListColor: Color? {
+        guard item.externalSource == .reminders else { return nil }
+        guard let hex = item.externalListColorHex else { return Color.blue }
+        let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
+        guard trimmed.count == 6, let value = Int(trimmed, radix: 16) else { return Color.blue }
+        return Color(
+            red: Double((value >> 16) & 0xFF) / 255.0,
+            green: Double((value >> 8) & 0xFF) / 255.0,
+            blue: Double(value & 0xFF) / 255.0
+        )
+    }
+
+    private var sourceMarkerColor: Color? {
+        if isCalendarEvent {
+            return calendarTint
+        }
+        return reminderListColor
+    }
+
+    private var sourceLabelColor: Color {
+        if isCalendarEvent {
+            return calendarTint.opacity(0.95)
+        }
+        if let reminderListColor {
+            return reminderListColor.opacity(0.92)
+        }
+        return useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.82) : .white.opacity(0.6)
+    }
+
+    private var compactInfoPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(calendarTint)
+                Text("Event Details")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : .white.opacity(0.95))
+                Spacer(minLength: 0)
+            }
+
+            Text(item.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.primaryTextAuto : .white.opacity(0.95))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let detailDateLabel {
+                Label(detailDateLabel, systemImage: "clock")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.86) : .white.opacity(0.72))
+            }
+
+            if let listTitle = item.externalListTitle, !listTitle.isEmpty {
+                Label(listTitle, systemImage: "calendar")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(calendarTint.opacity(0.95))
+            }
+
+            Label("Read-only (Apple Calendar)", systemImage: "lock.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.8) : .white.opacity(0.62))
+        }
+        .padding(12)
+        .frame(width: 300)
+    }
+
+    private var compactEditPopover: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Edit Task")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AdaptiveColors.secondaryTextAuto)
+
+            TextField("Task title", text: $editText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(AdaptiveColors.primaryTextAuto)
+                .droppyTextInputChrome(
+                    backgroundOpacity: 1.0,
+                    borderOpacity: 1.0,
+                    useAdaptiveColors: true
+                )
+                .onSubmit {
+                    saveTaskEdits()
+                }
+
+            ToDoDueDatePopoverContentLocal(
+                dueDate: $editDueDate,
+                primaryButtonTitle: nil,
+                onPrimary: nil,
+                isEmbedded: true,
+                setInteractingPopover: { manager.isInteractingWithPopover = $0 }
+            )
+
+            HStack(spacing: 10) {
+                Button("Cancel") {
+                    isEditing = false
+                }
+                .buttonStyle(DroppyPillButtonStyle(size: .small))
+
+                Button("Save") {
+                    saveTaskEdits()
+                }
+                .buttonStyle(DroppyAccentButtonStyle(color: .blue, size: .small))
+                .disabled(editText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(14)
+        .frame(width: 260)
+    }
+
+    private func saveTaskEdits() {
+        let trimmed = editText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        manager.updateTitle(for: item, to: trimmed)
+        manager.updateDueDate(for: item, to: editDueDate)
+        isEditing = false
+    }
+}
+
+private struct CompactTimelineDetailsModifier<InfoPopover: View, EditPopover: View>: ViewModifier {
+    let enabled: Bool
+    let item: ToDoItem
+    let manager: ToDoManager
+    @Binding var isShowingInfoPopover: Bool
+    @Binding var isEditing: Bool
+    @Binding var editText: String
+    @Binding var editDueDate: Date?
+    let infoPopover: InfoPopover
+    let editPopover: EditPopover
+    let onSelect: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .onTapGesture(count: 2) {
+                    onSelect()
+                    HapticFeedback.tap()
+                    if item.externalSource == .calendar {
+                        isEditing = false
+                        isShowingInfoPopover = true
+                    } else {
+                        isShowingInfoPopover = false
+                        editText = item.title
+                        editDueDate = item.dueDate
+                        isEditing = true
+                    }
+                }
+                .popover(
+                    isPresented: $isShowingInfoPopover,
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    infoPopover
+                }
+                .popover(isPresented: $isEditing) {
+                    editPopover
+                }
+                .onChange(of: isShowingInfoPopover) { _, _ in
+                    manager.isInteractingWithPopover = isShowingInfoPopover || isEditing
+                }
+                .onChange(of: isEditing) { _, _ in
+                    manager.isInteractingWithPopover = isShowingInfoPopover || isEditing
+                }
+                .onDisappear {
+                    manager.isInteractingWithPopover = false
+                }
+        } else {
+            content
+        }
+    }
+}
+
 private struct TaskRow: View {
     let item: ToDoItem
     let manager: ToDoManager
     let reminderListOptions: [ToDoReminderListOption]
     let useAdaptiveForegrounds: Bool
+    private static var colorCache: [String: Color] = [:]
     @State private var isHovering = false
     @State private var isShowingInfoPopover = false
     @State private var isEditing = false
@@ -1323,11 +2282,11 @@ private struct TaskRow: View {
                             .foregroundStyle(useAdaptiveForegrounds ? AdaptiveColors.secondaryTextAuto.opacity(0.85) : .white.opacity(0.48))
                             .help(externalIconHelp)
                     }
-                    if let reminderListColor {
+                    if let sourceListColor {
                         Image(systemName: "list.bullet.circle.fill")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(reminderListColor.opacity(0.9))
-                            .help(reminderListHelp)
+                            .foregroundStyle(sourceListColor.opacity(0.9))
+                            .help(sourceListHelp)
                     }
                 }
             }
@@ -1609,16 +2568,26 @@ private struct TaskRow: View {
         }
     }
 
-    private var reminderListColor: Color? {
-        guard !isCalendarEvent else { return nil }
+    private var sourceListColor: Color? {
+        guard item.externalSource != nil else { return nil }
         return colorFromHex(item.externalListColorHex)
     }
 
-    private var reminderListHelp: String {
-        if let title = item.externalListTitle, !title.isEmpty {
-            return "Apple Reminders list: \(title)"
+    private var sourceListHelp: String {
+        switch item.externalSource {
+        case .calendar:
+            if let title = item.externalListTitle, !title.isEmpty {
+                return "Apple Calendar: \(title)"
+            }
+            return "Apple Calendar"
+        case .reminders:
+            if let title = item.externalListTitle, !title.isEmpty {
+                return "Apple Reminders list: \(title)"
+            }
+            return "Apple Reminders list"
+        case .none:
+            return ""
         }
-        return "Apple Reminders list"
     }
 
     private var hoverInfoPopoverContent: some View {
@@ -1699,11 +2668,16 @@ private struct TaskRow: View {
     private func colorFromHex(_ hex: String?) -> Color? {
         guard let hex else { return nil }
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
+        if let cached = Self.colorCache[trimmed] {
+            return cached
+        }
         guard trimmed.count == 6, let value = Int(trimmed, radix: 16) else { return nil }
         let red = Double((value >> 16) & 0xFF) / 255.0
         let green = Double((value >> 8) & 0xFF) / 255.0
         let blue = Double(value & 0xFF) / 255.0
-        return Color(red: red, green: green, blue: blue)
+        let color = Color(red: red, green: green, blue: blue)
+        Self.colorCache[trimmed] = color
+        return color
     }
 
     private func dueDateHasTime(_ date: Date) -> Bool {
@@ -1713,29 +2687,21 @@ private struct TaskRow: View {
 
     private func formattedDueDateText(_ date: Date) -> String {
         let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
         if dueDateHasTime(date) {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM jm")
+            return ToDoShelfFormatters.dueDateWithTimeFormatter.string(from: date)
         } else if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM")
+            return ToDoShelfFormatters.dueDateWithoutYearFormatter.string(from: date)
         } else {
-            formatter.setLocalizedDateFormatFromTemplate("d MMM yyyy")
+            return ToDoShelfFormatters.dueDateWithYearFormatter.string(from: date)
         }
-        return formatter.string(from: date)
     }
 
     private func formattedFullDueDateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone.current
         if dueDateHasTime(date) {
-            formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy jm")
+            return ToDoShelfFormatters.fullDueDateTimeFormatter.string(from: date)
         } else {
-            formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy")
+            return ToDoShelfFormatters.fullDueDateFormatter.string(from: date)
         }
-        return formatter.string(from: date)
     }
 
     private var isCalendarEvent: Bool {
@@ -1748,18 +2714,505 @@ private struct TaskRow: View {
 }
 
 private extension ToDoShelfBar {
-    var useSplitTaskCalendarLayout: Bool {
-        manager.isRemindersSyncEnabled && manager.isCalendarSyncEnabled
+    struct TimelineDaySection: Identifiable {
+        let dayStart: Date
+        let items: [ToDoItem]
+        var id: Date { dayStart }
     }
 
-    var showsBottomListScrim: Bool {
-        isListExpanded && manager.sortedItems.count > 4
+    enum TimelineContentMode {
+        case tasksOnly
+        case calendarOnly
+        case combined
+    }
+
+    var timelineContentMode: TimelineContentMode {
+        timelineSnapshot.mode
+    }
+
+    var timelineModeTitle: String {
+        switch timelineContentMode {
+        case .tasksOnly:
+            return "Tasks"
+        case .calendarOnly:
+            return "Calendar"
+        case .combined:
+            return "Tasks + Calendar"
+        }
+    }
+
+    var timelineEmptyLabel: String {
+        switch timelineContentMode {
+        case .tasksOnly:
+            return "No tasks for the next days"
+        case .calendarOnly:
+            return "No calendar events scheduled"
+        case .combined:
+            return "No tasks or events scheduled"
+        }
+    }
+
+    var timelineEmptyIcon: String {
+        switch timelineContentMode {
+        case .tasksOnly:
+            return "checklist"
+        case .calendarOnly:
+            return "calendar"
+        case .combined:
+            return "calendar.badge.clock"
+        }
+    }
+
+    var timelineVisibleItems: [ToDoItem] {
+        timelineSnapshot.visibleItems
+    }
+
+    var timelineDaySections: [TimelineDaySection] {
+        timelineSnapshot.daySections
+    }
+
+    var timelineSelectionSignature: Int {
+        timelineSnapshot.selectionSignature
+    }
+
+    var timelineDaySectionSignature: Int {
+        timelineSnapshot.daySectionSignature
+    }
+
+    var hasVisibleTaskItems: Bool {
+        timelineSnapshot.hasVisibleTaskItems
+    }
+
+    func refreshTimelineSnapshot(animation: Animation? = nil) {
+        let sourceItems = manager.sortedItems
+        let remindersByExternalID = manager.reminderItemsByExternalID(in: sourceItems)
+        let activeItems = sourceItems.filter {
+            shouldIncludeInTimeline($0, remindersByExternalID: remindersByExternalID)
+        }
+        let hasTaskItems = activeItems.contains { $0.externalSource != .calendar }
+        let mode: TimelineContentMode
+        if calendarSyncEnabled && hasTaskItems {
+            mode = .combined
+        } else if calendarSyncEnabled {
+            mode = .calendarOnly
+        } else {
+            mode = .tasksOnly
+        }
+
+        let visibleItems: [ToDoItem]
+        switch mode {
+        case .tasksOnly:
+            visibleItems = activeItems.filter { $0.externalSource != .calendar }
+        case .calendarOnly:
+            visibleItems = activeItems.filter { $0.externalSource == .calendar }
+        case .combined:
+            visibleItems = activeItems
+        }
+
+        let sections = buildTimelineDaySections(from: visibleItems)
+
+        var selectionHasher = Hasher()
+        selectionHasher.combine(visibleItems.count)
+        for item in visibleItems {
+            selectionHasher.combine(item.id)
+            selectionHasher.combine(item.isCompleted)
+            selectionHasher.combine(item.priority.rawValue)
+            selectionHasher.combine(item.dueDate?.timeIntervalSince1970 ?? 0)
+        }
+
+        var hasher = Hasher()
+        hasher.combine(sections.count)
+        for section in sections {
+            hasher.combine(section.dayStart.timeIntervalSince1970)
+            hasher.combine(section.items.count)
+            if let first = section.items.first?.id {
+                hasher.combine(first)
+            }
+            if let last = section.items.last?.id {
+                hasher.combine(last)
+            }
+        }
+
+        let nextSnapshot = TimelineSnapshot(
+            mode: mode,
+            hasVisibleTaskItems: hasTaskItems,
+            visibleItems: visibleItems,
+            daySections: sections,
+            selectionSignature: selectionHasher.finalize(),
+            daySectionSignature: hasher.finalize()
+        )
+        if let animation {
+            withAnimation(animation) {
+                timelineSnapshot = nextSnapshot
+            }
+        } else {
+            timelineSnapshot = nextSnapshot
+        }
+        let visibleIDs = Set(visibleItems.map(\.id))
+        completingTimelineItemIDs = completingTimelineItemIDs.intersection(visibleIDs)
+    }
+
+    func shouldIncludeInTimeline(
+        _ item: ToDoItem,
+        remindersByExternalID: [String: ToDoItem]
+    ) -> Bool {
+        !item.isCompleted &&
+        !isHiddenUndatedReminder(item, remindersByExternalID: remindersByExternalID)
+    }
+
+    func isHiddenUndatedReminder(
+        _ item: ToDoItem,
+        remindersByExternalID: [String: ToDoItem]
+    ) -> Bool {
+        manager.isHideUndatedRemindersEnabled &&
+        item.externalSource == .reminders &&
+        manager.effectiveDueDate(for: item, remindersByExternalID: remindersByExternalID) == nil
+    }
+
+    private func animateTimelineCompletion(for item: ToDoItem) {
+        guard !item.isCompleted else {
+            manager.toggleCompletion(for: item)
+            refreshTimelineSnapshot(animation: DroppyAnimation.itemInsertion)
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
+            return
+        }
+
+        let itemID = item.id
+        guard !completingTimelineItemIDs.contains(itemID) else { return }
+
+        withAnimation(DroppyAnimation.smooth(duration: 0.18)) {
+            _ = completingTimelineItemIDs.insert(itemID)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            manager.toggleCompletion(for: item)
+            refreshTimelineSnapshot(animation: DroppyAnimation.itemInsertion)
+            syncTimelineSelection()
+            syncDetailDraftFromSelection()
+        }
+    }
+
+    private func buildTimelineDaySections(from visibleItems: [ToDoItem]) -> [TimelineDaySection] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let maxVisibleDays = 120
+        let baselineDays = 10
+
+        var undatedItems: [ToDoItem] = []
+        var datedMap: [Date: [ToDoItem]] = [:]
+        let remindersByExternalID = manager.reminderItemsByExternalID(in: visibleItems)
+        for item in visibleItems {
+            guard let dueDate = manager.effectiveDueDate(
+                for: item,
+                remindersByExternalID: remindersByExternalID
+            ) else {
+                undatedItems.append(item)
+                continue
+            }
+            let rawDay = calendar.startOfDay(for: dueDate)
+            let effectiveDay = rawDay < today ? today : rawDay
+            datedMap[effectiveDay, default: []].append(item)
+        }
+
+        let farthestDay = datedMap.keys.max() ?? today
+        let baselineEnd = calendar.date(byAdding: .day, value: baselineDays, to: today) ?? today
+        let endDay = max(farthestDay, baselineEnd)
+        let dayDistance = calendar.dateComponents([.day], from: today, to: endDay).day ?? baselineDays
+        let renderDays = min(max(dayDistance, baselineDays), maxVisibleDays)
+
+        var sections: [TimelineDaySection] = []
+        for offset in 0...renderDays {
+            let day = calendar.date(byAdding: .day, value: offset, to: today) ?? today
+            var dayItems = datedMap[day] ?? []
+
+            if calendar.isDate(day, inSameDayAs: today) && !undatedItems.isEmpty {
+                dayItems = undatedItems + dayItems
+            }
+
+            if !dayItems.isEmpty || offset <= 2 {
+                sections.append(TimelineDaySection(dayStart: day, items: dayItems))
+            }
+        }
+
+        if sections.isEmpty {
+            sections.append(TimelineDaySection(dayStart: today, items: undatedItems))
+        }
+        return sections
+    }
+
+    var selectedTimelineItem: ToDoItem? {
+        guard let selectedTimelineItemID else { return nil }
+        return timelineVisibleItems.first(where: { $0.id == selectedTimelineItemID })
+    }
+
+    func syncTimelineSelection() {
+        guard isSplitViewEnabled else {
+            selectedTimelineItemID = nil
+            return
+        }
+
+        let currentIDs = Set(timelineVisibleItems.map(\.id))
+        if let selectedTimelineItemID, currentIDs.contains(selectedTimelineItemID) {
+            return
+        }
+        selectedTimelineItemID = timelineVisibleItems.first?.id
+    }
+
+    func alignSelectedStripDayWithTimeline() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        if !timelineDaySections.isEmpty,
+           !timelineDaySections.contains(where: { calendar.isDate($0.dayStart, inSameDayAs: selectedStripDayStart) }) {
+            selectedStripDayStart = today
+            stripWindowStartDay = today
+            timelineScrollTargetDay = today
+            timelineScrollTargetItemID = nil
+        }
+        ensureSelectedDayVisibleInStrip()
+    }
+
+    func resolvedTimelineScrollDay(for targetDay: Date) -> Date? {
+        guard !timelineDaySections.isEmpty else { return nil }
+        let calendar = Calendar.current
+        let desired = calendar.startOfDay(for: targetDay)
+        let orderedDays = timelineDaySections.map(\.dayStart)
+
+        if let exact = orderedDays.first(where: { calendar.isDate($0, inSameDayAs: desired) }) {
+            return exact
+        }
+        if let next = orderedDays.first(where: { $0 > desired }) {
+            return next
+        }
+        return orderedDays.last
+    }
+
+    func ensureSelectedDayVisibleInStrip() {
+        let calendar = Calendar.current
+        let stripEnd = calendar.date(byAdding: .day, value: 6, to: stripWindowStartDay) ?? stripWindowStartDay
+        if selectedStripDayStart < stripWindowStartDay || selectedStripDayStart > stripEnd {
+            stripWindowStartDay = selectedStripDayStart
+        }
+    }
+
+    func updateStripSelectionFromScroll(_ offsets: [Date: CGFloat]) {
+        guard !suppressStripSelectionFromScroll else { return }
+        guard !offsets.isEmpty else { return }
+
+        // Prefer the last header at/above top edge; else the next one below top.
+        let topAnchor: CGFloat = 8
+        var nearestAbove: (day: Date, offset: CGFloat)?
+        var nearestBelow: (day: Date, offset: CGFloat)?
+        for (day, offset) in offsets {
+            if offset <= topAnchor {
+                if nearestAbove == nil || offset > nearestAbove!.offset {
+                    nearestAbove = (day, offset)
+                }
+            } else if nearestBelow == nil || offset < nearestBelow!.offset {
+                nearestBelow = (day, offset)
+            }
+        }
+        guard let candidate = nearestAbove?.day ?? nearestBelow?.day else { return }
+
+        if candidate != selectedStripDayStart {
+            selectedStripDayStart = candidate
+            ensureSelectedDayVisibleInStrip()
+        }
+    }
+
+    func scheduleStripSelectionUpdate(with offsets: [Date: CGFloat]) {
+        pendingStripSelectionOffsets = offsets
+
+        let now = CACurrentMediaTime()
+        let minInterval: TimeInterval = 1.0 / 120.0
+        let elapsed = now - lastStripSelectionUpdateAt
+
+        if elapsed >= minInterval {
+            stripSelectionUpdateWorkItem?.cancel()
+            stripSelectionUpdateWorkItem = nil
+            lastStripSelectionUpdateAt = now
+            updateStripSelectionFromScroll(offsets)
+            return
+        }
+
+        guard stripSelectionUpdateWorkItem == nil else { return }
+        let delay = max(0.005, minInterval - elapsed)
+        let workItem = DispatchWorkItem {
+            stripSelectionUpdateWorkItem = nil
+            lastStripSelectionUpdateAt = CACurrentMediaTime()
+            updateStripSelectionFromScroll(pendingStripSelectionOffsets)
+        }
+        stripSelectionUpdateWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    func suspendStripSelectionSyncDuringProgrammaticScroll(duration: TimeInterval = 0.5) {
+        stripScrollSyncWorkItem?.cancel()
+        suppressStripSelectionFromScroll = true
+        let workItem = DispatchWorkItem {
+            suppressStripSelectionFromScroll = false
+        }
+        stripScrollSyncWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: workItem)
+    }
+
+    func timelineDayStart(for item: ToDoItem) -> Date {
+        let calendar = Calendar.current
+        if let dueDate = item.dueDate {
+            return calendar.startOfDay(for: dueDate)
+        }
+        return calendar.startOfDay(for: Date())
+    }
+
+    func shiftDisplayedWeek(by weeks: Int) {
+        guard weeks != 0 else { return }
+        let calendar = Calendar.current
+        let dayOffset = weeks * 7
+
+        if let shiftedStart = calendar.date(byAdding: .day, value: dayOffset, to: stripWindowStartDay) {
+            withAnimation(DroppyAnimation.smoothContent) {
+                stripWindowStartDay = calendar.startOfDay(for: shiftedStart)
+            }
+        }
+
+        let shiftedSelected = calendar.date(byAdding: .day, value: dayOffset, to: selectedStripDayStart) ?? stripWindowStartDay
+        withAnimation(DroppyAnimation.smoothContent) {
+            selectedStripDayStart = calendar.startOfDay(for: shiftedSelected)
+        }
+        timelineScrollTargetItemID = nil
+        withAnimation(DroppyAnimation.smoothContent) {
+            timelineScrollTargetDay = selectedStripDayStart
+        }
+        HapticFeedback.tap()
+    }
+
+    func navigateTimelineSelection(step: Int) {
+        guard step != 0, !timelineVisibleItems.isEmpty else { return }
+
+        let nextIndex: Int
+        if let selectedTimelineItemID,
+           let currentIndex = timelineVisibleItems.firstIndex(where: { $0.id == selectedTimelineItemID }) {
+            let target = currentIndex + step
+            nextIndex = min(max(target, 0), timelineVisibleItems.count - 1)
+            if nextIndex == currentIndex {
+                return
+            }
+        } else {
+            nextIndex = step > 0 ? 0 : timelineVisibleItems.count - 1
+        }
+
+        let nextItem = timelineVisibleItems[nextIndex]
+        let dayStart = timelineDayStart(for: nextItem)
+        withAnimation(DroppyAnimation.smoothContent) {
+            selectedTimelineItemID = nextItem.id
+            selectedStripDayStart = dayStart
+            timelineScrollTargetDay = dayStart
+            timelineScrollTargetItemID = TimelineRowRenderID(
+                id: nextItem.id,
+                isCompleted: nextItem.isCompleted,
+                priority: nextItem.priority
+            )
+        }
+        ensureSelectedDayVisibleInStrip()
+    }
+
+    func commitPendingDetailTitleEdit() {
+        guard let detailTitleCommitWorkItem else { return }
+        self.detailTitleCommitWorkItem = nil
+        guard !detailTitleCommitWorkItem.isCancelled else { return }
+        detailTitleCommitWorkItem.perform()
+    }
+
+    func syncDetailDraftFromSelection() {
+        guard isSplitViewEnabled else {
+            detailDraftSourceID = nil
+            detailTitleDraft = ""
+            detailDueDateDraft = nil
+            return
+        }
+
+        guard let item = selectedTimelineItem else {
+            detailDraftSourceID = nil
+            detailTitleDraft = ""
+            detailDueDateDraft = nil
+            return
+        }
+
+        if detailDraftSourceID != item.id || detailTitleDraft != item.title || detailDueDateDraft != item.dueDate {
+            detailDraftSourceID = item.id
+            detailTitleDraft = item.title
+            detailDueDateDraft = item.dueDate
+        }
+    }
+
+    func isCalendarEvent(_ item: ToDoItem) -> Bool {
+        item.externalSource == .calendar
+    }
+
+    func calendarTint(for item: ToDoItem) -> Color {
+        colorFromHex(item.externalListColorHex) ?? .blue
+    }
+
+    func colorFromHex(_ hex: String?) -> Color? {
+        guard let hex else { return nil }
+        let trimmed = hex
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "#", with: "")
+        guard trimmed.count == 6, let value = Int(trimmed, radix: 16) else { return nil }
+        let red = Double((value >> 16) & 0xFF) / 255.0
+        let green = Double((value >> 8) & 0xFF) / 255.0
+        let blue = Double(value & 0xFF) / 255.0
+        return Color(red: red, green: green, blue: blue)
+    }
+
+    func formattedTimelineTimeLabel(for item: ToDoItem) -> String {
+        guard let dueDate = item.dueDate else { return "Any time" }
+        if !dueDateHasTime(dueDate) {
+            return "All day"
+        }
+        return Self.timelineTimeFormatter.string(from: dueDate) + timezoneSuffix(for: dueDate)
+    }
+
+    func formattedDayHeader(for day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) {
+            return "Today"
+        }
+        if calendar.isDateInTomorrow(day) {
+            return "Tomorrow"
+        }
+
+        return Self.timelineDayHeaderFormatter.string(from: day)
+    }
+
+    func formattedDetailDate(for date: Date) -> String {
+        if dueDateHasTime(date) {
+            return Self.detailDateTimeFormatter.string(from: date) + timezoneSuffix(for: date)
+        } else {
+            return Self.detailDateFormatter.string(from: date)
+        }
+    }
+
+    func timezoneSuffix(for date: Date) -> String {
+        guard showTaskViewTimezone,
+              let abbreviation = TimeZone.autoupdatingCurrent.abbreviation(for: date) else {
+            return ""
+        }
+        return " \(abbreviation)"
+    }
+
+    func dueDateHasTime(_ date: Date) -> Bool {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return (components.hour ?? 0) != 0 || (components.minute ?? 0) != 0
     }
 
     var incompleteCount: Int {
-        manager.items.reduce(0) { count, item in
+        let sourceItems = manager.items
+        let remindersByExternalID = manager.reminderItemsByExternalID(in: sourceItems)
+        return sourceItems.reduce(0) { count, item in
             guard !item.isCompleted else { return count }
             guard item.externalSource != .calendar else { return count }
+            guard !isHiddenUndatedReminder(item, remindersByExternalID: remindersByExternalID) else { return count }
             return count + 1
         }
     }
@@ -1788,13 +3241,51 @@ private extension ToDoShelfBar {
         return undoInset
     }
 
-    var overviewTaskItems: [ToDoItem] {
-        manager.overviewTaskItems
+    var topToolbarLift: CGFloat {
+        guard notchHeight > 0 else { return 0 }
+        if isSplitViewEnabled {
+            // In split view, left/right toolbar controls sit outside the physical notch area,
+            // so we can safely lift them higher for tighter top alignment.
+            return min(44, notchHeight * 1.12)
+        }
+        return min(28, notchHeight * 0.72)
     }
 
-    var upcomingCalendarItems: [ToDoItem] {
-        manager.upcomingCalendarItems
+    var visibleStripWeekNumber: Int {
+        Calendar.current.component(.weekOfYear, from: stripWindowStartDay)
     }
+
+    private static let timelineTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
+
+    private static let timelineDayHeaderFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter
+    }()
+
+    private static let detailDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy jm")
+        return formatter
+    }()
+
+    private static let detailDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM yyyy")
+        return formatter
+    }()
 }
 
 // MARK: - Height Calculator
@@ -1813,11 +3304,11 @@ extension ToDoShelfBar {
         if itemCount == 0 {
             let spacingToInput = Layout.emptyListBottomSpacing
             let undoClearance: CGFloat = showsUndoToast ? Layout.undoToastEmptyStateClearance : 0
-            return Layout.emptyStateHeight + undoClearance + spacingToInput + collapsedHeight
+            return Layout.timelineHeaderHeight + Layout.emptyStateHeight + undoClearance + spacingToInput + collapsedHeight
         }
 
         let spacingToInput = Layout.listBottomSpacing
-        return Layout.listHeight + spacingToInput + collapsedHeight
+        return Layout.timelineHeaderHeight + Layout.listHeight + spacingToInput + collapsedHeight
     }
 }
 
