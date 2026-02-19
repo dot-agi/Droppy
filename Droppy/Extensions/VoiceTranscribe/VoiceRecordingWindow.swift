@@ -160,7 +160,7 @@ struct VoiceRecordingOverlayView: View {
             }
         }
         .padding(padding)
-        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+        .droppyTransparentBackground(useTransparentBackground)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -294,7 +294,7 @@ struct VoiceRecordingOverlayView: View {
                 .frame(maxWidth: .infinity)
                 
                 // Status text
-                Text(manager.transcriptionStatus.isEmpty ? (manager.transcriptionProgress < 0.2 ? "Loading model..." : "Processing audio...") : manager.transcriptionStatus)
+                Text(manager.transcriptionStatus.isEmpty ? (manager.transcriptionProgress < 0.2 ? "Loading model…" : "Processing audio…") : manager.transcriptionStatus)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

@@ -70,7 +70,7 @@ struct ToDoInfoView: View {
         }
         .frame(width: 675)
         .fixedSize(horizontal: true, vertical: true)
-        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+        .droppyTransparentBackground(useTransparentBackground)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .todo)
@@ -391,7 +391,7 @@ struct ToDoInfoView: View {
                                 quickOpenShortcut = newValue
                                 manager.setQuickOpenShortcut(newValue)
                             }
-                        ), recordButtonTitle: "Record", recordingButtonTitle: "Press...", recordButtonColor: .blue, recordButtonWidth: 70)
+                        ), recordButtonTitle: "Record", recordingButtonTitle: "Press…", recordButtonColor: .blue, recordButtonWidth: 70)
 
                         Button {
                             quickOpenShortcut = nil

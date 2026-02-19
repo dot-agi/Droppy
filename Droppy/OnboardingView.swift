@@ -109,7 +109,7 @@ struct OnboardingView: View {
         .frame(width: windowSize.width, height: windowSize.height)
         .background {
             if useTransparentBackground {
-                AnyView(Rectangle().fill(.ultraThinMaterial))
+                AnyView(Rectangle().droppyGlassFill())
             } else {
                 AnyView(AdaptiveColors.panelBackgroundAuto)
             }
@@ -1003,7 +1003,7 @@ private struct ExtensionsContent: View {
                         .frame(maxWidth: .infinity)
                 }
                 
-                Text("And many more...")
+                Text("And many more…")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }

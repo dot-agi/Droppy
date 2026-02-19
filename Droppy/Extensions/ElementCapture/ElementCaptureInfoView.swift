@@ -96,7 +96,7 @@ struct ElementCaptureInfoView: View {
         }
         .frame(width: 450)
         .fixedSize(horizontal: true, vertical: true)
-        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+        .droppyTransparentBackground(useTransparentBackground)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
         .onAppear {
             loadShortcuts()
@@ -521,7 +521,7 @@ struct ElementCaptureInfoView: View {
                         Circle()
                             .fill(Color.red)
                             .frame(width: 6, height: 6)
-                        Text("...")
+                        Text("…")
                             .font(.system(size: 10, weight: .medium))
                     } else if let shortcut = editorShortcuts[action] {
                         Text(shortcut.description)
@@ -622,7 +622,7 @@ struct ElementCaptureInfoView: View {
                     startRecording(for: mode)
                 }
             } label: {
-                Text(isRecording ? "Press..." : "Record")
+                Text(isRecording ? "Press…" : "Record")
                     .font(.system(size: 11, weight: .medium))
             }
             .buttonStyle(DroppyAccentButtonStyle(color: isRecording ? .red : .yellow, size: .small))

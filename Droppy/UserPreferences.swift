@@ -19,6 +19,9 @@ enum AppPreferenceKey {
     static let enableFloatingBasket = "enableFloatingBasket"
     static let enableClipboard = "enableClipboardBeta"
     static let enableHUDReplacement = "enableHUDReplacement"
+    static let enableVolumeHUDReplacement = "enableVolumeHUDReplacement"
+    static let enableBrightnessHUDReplacement = "enableBrightnessHUDReplacement"
+    static let enableVolumeKeyFeedbackSound = "enableVolumeKeyFeedbackSound"
     
     // MARK: - Appearance
     static let useDynamicIslandStyle = "useDynamicIslandStyle"
@@ -65,6 +68,7 @@ enum AppPreferenceKey {
     static let enableLockScreenHUD = "enableLockScreenHUD"
     static let enableDNDHUD = "enableDNDHUD"
     static let enableUpdateHUD = "enableUpdateHUD"
+    static let enableBetterDisplayCompatibility = "enableBetterDisplayCompatibility"
     static let mediaControlTargetMode = "mediaControlTargetMode"  // "mainMacBook" or "activeDisplay"
     
     // MARK: - Lock Screen Media Widget
@@ -117,6 +121,7 @@ enum AppPreferenceKey {
     
     // MARK: - System
     static let showInMenuBar = "showInMenuBar"
+    static let showInDock = "showInDock"
     static let showQuickshareInMenuBar = "showQuickshareInMenuBar"
     static let showQuickshareInSidebar = "showQuickshareInSidebar"
     static let quickshareRequireUploadConfirmation = "quickshareRequireUploadConfirmation"
@@ -219,6 +224,9 @@ enum PreferenceDefault {
     static let enableFloatingBasket = true
     static let enableClipboard = true
     static let enableHUDReplacement = true
+    static let enableVolumeHUDReplacement = true
+    static let enableBrightnessHUDReplacement = true
+    static let enableVolumeKeyFeedbackSound = true
     
     // MARK: - Appearance
     static let useDynamicIslandStyle = true
@@ -266,6 +274,7 @@ enum PreferenceDefault {
     static let enableLockScreenHUD = true  // Safe: uses separate-window architecture, main notch never delegated to SkyLight
     static let enableDNDHUD = false  // Requires Full Disk Access
     static let enableUpdateHUD = true  // Show HUD when update is available
+    static let enableBetterDisplayCompatibility = true  // Allow BetterDisplay to own brightness keys while Droppy mirrors HUD updates
     static let mediaControlTargetMode = "mainMacBook"  // Keep behavior focused on built-in display by default
     
     // MARK: - Lock Screen Media Widget
@@ -316,6 +325,7 @@ enum PreferenceDefault {
     
     // MARK: - System
     static let showInMenuBar = true
+    static let showInDock = false
     static let showQuickshareInMenuBar = true
     static let showQuickshareInSidebar = true  // On by default, can be turned off
     static let quickshareRequireUploadConfirmation = false  // Off by default to preserve current flow

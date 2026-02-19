@@ -159,7 +159,7 @@ struct QuickshareManagerView: View {
     @ViewBuilder
     private var backgroundStyle: some View {
         if useTransparentBackground {
-            Rectangle().fill(.ultraThinMaterial)
+            Rectangle().droppyGlassFill()
         } else {
             AdaptiveColors.panelBackgroundAuto
         }
@@ -237,7 +237,7 @@ struct QuickshareItemRow: View {
                 }
                 
                 Button(action: onShare) {
-                    Label("Share...", systemImage: "square.and.arrow.up")
+                    Label("Share…", systemImage: "square.and.arrow.up")
                 }
                 
                 Divider()

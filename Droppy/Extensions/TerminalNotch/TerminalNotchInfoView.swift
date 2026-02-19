@@ -57,7 +57,7 @@ struct TerminalNotchInfoView: View {
         }
         .frame(width: 450)
         .fixedSize(horizontal: true, vertical: true)
-        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+        .droppyTransparentBackground(useTransparentBackground)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .terminalNotch)
@@ -267,7 +267,7 @@ struct TerminalNotchInfoView: View {
                             startRecording()
                         }
                     } label: {
-                        Text(isRecordingShortcut ? "Press..." : "Record")
+                        Text(isRecordingShortcut ? "Press…" : "Record")
                     }
                     .buttonStyle(DroppyAccentButtonStyle(color: isRecordingShortcut ? .red : .green, size: .small))
                 }

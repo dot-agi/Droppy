@@ -107,10 +107,15 @@ final class MusicManager: ObservableObject {
                 
                 if !isSpotifyBundle {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        guard let self else { return }
                         SpotifyController.shared.isSpotifyPlaying { isSpotifyPlaying in
+                            // Track changes from browsers/web players can briefly report
+                            // paused while keeping previous metadata visible. Don't let
+                            // Spotify steal focus during that handoff.
+                            guard !self.hasVisibleTrackContext else { return }
                             if isSpotifyPlaying {
                                 // Spotify is playing in background - switch to it
-                                self?.forceUpdateFromSpotify()
+                                self.forceUpdateFromSpotify()
                             }
                         }
                     }
@@ -157,6 +162,7 @@ final class MusicManager: ObservableObject {
     private var currentContentItemIdentifier: String?
     private var lastArtworkTrackIdentity: String = ""
     private var lastArtworkContentItemIdentifier: String?
+    private var lastArtworkFingerprint: UInt64?
     private var lastParsedEventTimestampString: String?
     private var lastParsedEventTimestampDate: Date?
     private let iso8601DateFormatter = ISO8601DateFormatter()
@@ -800,6 +806,12 @@ final class MusicManager: ObservableObject {
     var tidalController: TidalController {
         TidalController.shared
     }
+
+    /// Whether the current media source is a browser-based player.
+    var isBrowserSource: Bool {
+        guard let bundleIdentifier else { return false }
+        return isBrowserBundle(bundleIdentifier)
+    }
     
     /// Temporarily suppress timing updates after Spotify commands to avoid stale data
     private var suppressTimingUpdatesUntil: Date = .distantPast
@@ -861,7 +873,7 @@ final class MusicManager: ObservableObject {
     /// FIX #95: Force switch to Spotify by fetching data directly via AppleScript
     /// This bypasses MediaRemote which may be stuck on a stale source (e.g., paused browser)
     func forceUpdateFromSpotify() {
-        print("🎵 MusicManager: Forcing update from Spotify via AppleScript...")
+        print("🎵 MusicManager: Forcing update from Spotify via AppleScript…")
         
         SpotifyController.shared.fetchCurrentTrackInfo { [weak self] title, artist, album, duration, position in
             guard let self = self,
@@ -915,6 +927,12 @@ final class MusicManager: ObservableObject {
     /// Whether playback stopped recently (within 5 seconds) - keeps UI visible
     @Published private(set) var wasRecentlyPlaying: Bool = false
     private var recentlyPlayingTimer: Timer?
+
+    private var hasVisibleTrackContext: Bool {
+        !songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !albumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     
     /// Whether a player is active (even if paused)
     var isPlayerIdle: Bool {
@@ -936,6 +954,8 @@ final class MusicManager: ObservableObject {
     private var isSpotifyPausedSourceReacquireFetchInFlight = false
     private let spotifyPausedSourceReacquireInterval: TimeInterval = 0.7
     private let spotifyPausedSourceReacquireWindow: TimeInterval = 6.0
+    private var transientIdleGraceDeadline: Date = .distantPast
+    private let transientIdleGraceWindow: TimeInterval = 3.0
 
     // Defer high-frequency media updates while NSMenu is actively tracking.
     // This keeps status-item menu highlight responsive.
@@ -1050,17 +1070,19 @@ final class MusicManager: ObservableObject {
         currentContentItemIdentifier = nil
         lastArtworkTrackIdentity = ""
         lastArtworkContentItemIdentifier = nil
+        lastArtworkFingerprint = nil
         lastParsedEventTimestampString = nil
         lastParsedEventTimestampDate = nil
         wasRecentlyPlaying = false
         isMediaHUDForced = false
+        transientIdleGraceDeadline = .distantPast
         stopAppleMusicMetadataSyncTimer()
         stopFallbackTimingSync()
     }
     
     /// Called when screen wakes from sleep - restart the adapter to prevent frozen HUD
     @objc private func handleScreenWake() {
-        print("MusicManager: Screen woke - restarting adapter process to refresh media stream...")
+        print("MusicManager: Screen woke - restarting adapter process to refresh media stream…")
         restartAdapterProcess()
     }
     
@@ -1251,6 +1273,14 @@ final class MusicManager: ObservableObject {
         menuTrackingDepth = 0
         deferredUpdateDuringMenuTracking = nil
     }
+
+    private func hasVisibleMenuWindow() -> Bool {
+        NSApp.windows.contains { window in
+            guard window.isVisible else { return false }
+            guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
+            return NSStringFromClass(type(of: window)).lowercased().contains("menu")
+        }
+    }
     
     // MARK: - Process Management
     
@@ -1309,7 +1339,7 @@ final class MusicManager: ObservableObject {
                 
                 if !lineData.isEmpty {
                     if let lineStr = String(data: lineData, encoding: .utf8) {
-                        musicManagerLog("MusicManager: JSON line: \(lineStr.prefix(200))...")
+                        musicManagerLog("MusicManager: JSON line: \(lineStr.prefix(200))…")
                     }
                     self?.processJSONLine(lineData)
                 }
@@ -1434,15 +1464,17 @@ final class MusicManager: ObservableObject {
         if menuTrackingDepth > 0 {
             // Safety net: if tracking notifications became unbalanced, recover automatically.
             if RunLoop.main.currentMode != .eventTracking {
-                let hasVisibleMenuWindow = NSApp.windows.contains { window in
-                    guard window.isVisible else { return false }
-                    guard window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue else { return false }
-                    return NSStringFromClass(type(of: window)).lowercased().contains("menu")
-                }
-                if !hasVisibleMenuWindow {
+                if !hasVisibleMenuWindow() {
                     menuTrackingDepth = 0
                 }
             }
+        }
+
+        // Fallback for panels where NSMenu tracking notifications are not reliably delivered.
+        // If a menu window is currently visible, defer media updates to avoid menu flicker.
+        if menuTrackingDepth == 0, hasVisibleMenuWindow() {
+            deferredUpdateDuringMenuTracking = update
+            return
         }
 
         if menuTrackingDepth > 0 {
@@ -1484,10 +1516,32 @@ final class MusicManager: ObservableObject {
         }
 
         // MARK: - Track + Timing State
-        let incomingTitle = payload.title ?? songTitle
-        let incomingArtist = payload.artist ?? artistName
-        let incomingAlbum = payload.album ?? albumName
-        let incomingBundleId = payload.launchableBundleIdentifier ?? bundleIdentifier
+        let previousBundleIdentifier = bundleIdentifier
+        let incomingBundleFromPayload = payload.launchableBundleIdentifier
+        let incomingBundleId = incomingBundleFromPayload ?? previousBundleIdentifier
+        let sourceChanged = incomingBundleFromPayload != nil && incomingBundleFromPayload != previousBundleIdentifier
+        let pausedSpotifyTakeoverSnapshot =
+            sourceChanged &&
+            incomingBundleFromPayload == SpotifyController.spotifyBundleId &&
+            previousBundleIdentifier != nil &&
+            previousBundleIdentifier != SpotifyController.spotifyBundleId &&
+            !payload.isPlaying
+
+        // Ignore transient paused Spotify snapshots while a non-Spotify source
+        // is actively transitioning tracks. This prevents brief Spotify flashes.
+        if pausedSpotifyTakeoverSnapshot && hasVisibleTrackContext {
+            musicManagerLog("MusicManager: Ignoring paused Spotify takeover snapshot during active non-Spotify context")
+            return
+        }
+        let payloadContentItemChanged = payload.contentItemIdentifier != nil &&
+            payload.contentItemIdentifier != currentContentItemIdentifier
+
+        // Never carry text metadata from an old source/track into a new source snapshot.
+        // This prevents mixed state such as "new artwork + old YouTube title".
+        let incomingTitle = (sourceChanged || payloadContentItemChanged) ? (payload.title ?? "") : (payload.title ?? songTitle)
+        let incomingArtist = (sourceChanged || payloadContentItemChanged) ? (payload.artist ?? "") : (payload.artist ?? artistName)
+        let incomingAlbum = (sourceChanged || payloadContentItemChanged) ? (payload.album ?? "") : (payload.album ?? albumName)
+
         let incomingIdentity = makeTrackIdentity(
             title: incomingTitle,
             artist: incomingArtist,
@@ -1496,6 +1550,44 @@ final class MusicManager: ObservableObject {
         )
         let metadataChanged = !currentTrackIdentity.isEmpty && incomingIdentity != currentTrackIdentity
         let rawElapsed = payload.elapsedTimeNow ?? payload.elapsedTime
+        let payloadLooksIdle = payload.title == nil &&
+            payload.artist == nil &&
+            payload.album == nil &&
+            payload.contentItemIdentifier == nil &&
+            (payload.duration ?? 0) <= 0 &&
+            rawElapsed == nil &&
+            !payload.isPlaying &&
+            (payload.playbackRate ?? 0) <= 0
+
+        if payloadLooksIdle && hasVisibleTrackContext {
+            let now = Date()
+            if transientIdleGraceDeadline == .distantPast {
+                transientIdleGraceDeadline = now.addingTimeInterval(transientIdleGraceWindow)
+                musicManagerLog("MusicManager: Entering transient idle grace window")
+                return
+            }
+            if now < transientIdleGraceDeadline {
+                musicManagerLog("MusicManager: Preserving display during transient idle grace")
+                return
+            }
+        } else {
+            transientIdleGraceDeadline = .distantPast
+        }
+
+        // Source switched (or current source went idle) but payload has no active media:
+        // clear stale metadata so the notch can collapse instead of staying "stuck".
+        if payloadLooksIdle && (sourceChanged || (!songTitle.isEmpty || !artistName.isEmpty || !albumName.isEmpty)) {
+            clearMediaDisplay()
+            updateFallbackTimingSyncState()
+            return
+        }
+
+        let hasReadableMetadata = !incomingTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !incomingArtist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !incomingAlbum.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasStrongMediaIdentity = payload.contentItemIdentifier != nil || (payload.duration ?? 0) > 0 || rawElapsed != nil
+        let shouldAcceptArtworkForPayload = !sourceChanged || hasReadableMetadata || hasStrongMediaIdentity
+
         let incomingElapsed = rawElapsed
         let elapsedRestarted = (incomingElapsed ?? elapsedTime) + 1.0 < elapsedTime
         let implicitBoundary = !isTimingSuppressed && payload.isPlaying && elapsedRestarted && elapsedTime > 5
@@ -1673,23 +1765,27 @@ final class MusicManager: ObservableObject {
             stopSpotifyPausedSourceReacquire()
         }
         
-        // Handle artwork only when track identity changes or when artwork is missing.
-        if let base64Art = payload.artworkData {
+        // Handle artwork on track/context changes and when the payload art itself changes.
+        if let base64Art = payload.artworkData, shouldAcceptArtworkForPayload {
             let contentItemChanged = payload.contentItemIdentifier != nil &&
                 payload.contentItemIdentifier != lastArtworkContentItemIdentifier
             let artworkTrackChanged = incomingIdentity != lastArtworkTrackIdentity
             let hasNoArtwork = albumArt.size.width <= 0 || albumArt.size.height <= 0
+            let artworkFingerprint = fingerprintArtworkPayload(base64Art)
+            let artworkPayloadChanged = artworkFingerprint != lastArtworkFingerprint
 
-            if isTrackChange || contentItemChanged || artworkTrackChanged || hasNoArtwork,
+            if isTrackChange || contentItemChanged || artworkTrackChanged || artworkPayloadChanged || hasNoArtwork,
                let artData = Data(base64Encoded: base64Art),
                let image = NSImage(data: artData) {
                 albumArt = image
                 lastArtworkTrackIdentity = incomingIdentity
                 lastArtworkContentItemIdentifier = payload.contentItemIdentifier
+                lastArtworkFingerprint = artworkFingerprint
             }
         } else if isTrackChange {
             lastArtworkTrackIdentity = ""
             lastArtworkContentItemIdentifier = nil
+            lastArtworkFingerprint = nil
         }
         
         // Debug: Log the update
@@ -1711,6 +1807,16 @@ final class MusicManager: ObservableObject {
         lastParsedEventTimestampString = rawTimestamp
         lastParsedEventTimestampDate = parsed
         return parsed
+    }
+
+    /// Tracks artwork changes even when metadata stays constant (common for radio streams).
+    private func fingerprintArtworkPayload(_ payload: String) -> UInt64 {
+        var hash: UInt64 = 1469598103934665603
+        for byte in payload.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1099511628211
+        }
+        return hash
     }
     
     // MARK: - Cached Visualizer Color
@@ -1926,10 +2032,8 @@ final class MusicManager: ObservableObject {
         
         guard let bundleId = bundleIdentifier else {
             // Fallback to Apple Music
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") {
-                print("MusicManager: Fallback to Apple Music")
-                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-            }
+            print("MusicManager: Fallback to Apple Music")
+            _ = bringAppToFront(bundleId: "com.apple.Music")
             return
         }
         
@@ -1953,19 +2057,86 @@ final class MusicManager: ObservableObject {
         } else {
             // For non-browser apps (Spotify, SoundCloud app, etc.), just open the app
             // This works universally for any bundle ID
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-                print("MusicManager: Opening source app: \(bundleId)")
-                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-            } else {
-                // Last resort: try to find running app by bundle ID and activate it
-                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
-                    print("MusicManager: Activating running app: \(bundleId)")
-                    app.activate()
-                } else {
-                    print("MusicManager: Could not find app with bundleId: \(bundleId)")
-                }
+            if !bringAppToFront(bundleId: bundleId) {
+                print("MusicManager: Could not find app with bundleId: \(bundleId)")
             }
         }
+    }
+
+    /// Strongly activate an app and bring its windows to the front.
+    @discardableResult
+    private func bringAppToFront(bundleId: String) -> Bool {
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
+            print("MusicManager: Bringing running app to front: \(bundleId)")
+            app.unhide()
+            let activated = app.activate(options: [.activateAllWindows])
+            if !activated {
+                print("MusicManager: Initial activate() returned false for \(bundleId)")
+            }
+
+            // For web-wrapper/process-hosted apps, a reopen event often brings the
+            // user-facing window forward more reliably than activate() alone.
+            forceFrontmostActivation(bundleId: bundleId, appName: app.localizedName, includeReopen: true)
+
+            // Retry once on the next runloop tick to beat race conditions with
+            // non-activating panels and transient focus changes.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                app.unhide()
+                _ = app.activate(options: [.activateAllWindows])
+            }
+            return true
+        }
+
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+            return false
+        }
+
+        print("MusicManager: Opening and activating app: \(bundleId)")
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+            if let error {
+                print("MusicManager: Failed to open app \(bundleId): \(error.localizedDescription)")
+                return
+            }
+            if let app {
+                app.unhide()
+                _ = app.activate(options: [.activateAllWindows])
+                self.forceFrontmostActivation(bundleId: bundleId, appName: app.localizedName, includeReopen: true)
+            }
+        }
+        return true
+    }
+
+    /// Extra activation nudge for apps that ignore standard NSRunningApplication.activate.
+    private func forceFrontmostActivation(bundleId: String, appName: String?, includeReopen: Bool) {
+        let escapedBundle = escapeForAppleScript(bundleId)
+        let escapedName = escapeForAppleScript(appName ?? "")
+        let reopenLine = includeReopen ? "reopen" : ""
+
+        let script: String
+        if escapedName.isEmpty {
+            script = """
+            tell application id "\(escapedBundle)"
+                activate
+                \(reopenLine)
+            end tell
+            """
+        } else {
+            script = """
+            tell application id "\(escapedBundle)"
+                activate
+                \(reopenLine)
+            end tell
+            tell application "System Events"
+                if exists process "\(escapedName)" then
+                    set frontmost of process "\(escapedName)" to true
+                end if
+            end tell
+            """
+        }
+
+        runAppleScriptAsync(script)
     }
     
     // MARK: - Browser Tab Activation
@@ -2009,7 +2180,7 @@ final class MusicManager: ObservableObject {
         """
         
         print("MusicManager: Safari AppleScript searching for title='\(titleMatch)' or artist='\(artistMatch)'")
-        runAppleScript(script, appName: "Safari")
+        runAppleScript(script, appName: "Safari", bundleId: "com.apple.Safari")
     }
     
     /// Activate Chrome tab matching the current song title or artist
@@ -2063,14 +2234,9 @@ final class MusicManager: ObservableObject {
     
     /// Activate Firefox/Zen tab - limited AppleScript support, just activate the app
     private func activateFirefoxTab(bundleId: String = "org.mozilla.firefox") {
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-            let appName = getAppName(from: bundleId) ?? "Firefox"
-            print("MusicManager: Activating \(appName) (limited tab support)")
-            NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-        } else if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
-            print("MusicManager: Activating running Firefox-based browser: \(bundleId)")
-            app.activate()
-        }
+        let appName = getAppName(from: bundleId) ?? "Firefox"
+        print("MusicManager: Activating \(appName) (limited tab support)")
+        _ = bringAppToFront(bundleId: bundleId)
     }
     
     /// Activate Brave tab (Chromium-based, same AppleScript as Chrome)
@@ -2106,7 +2272,7 @@ final class MusicManager: ObservableObject {
         end tell
         """
         
-        runAppleScript(script, appName: "Arc")
+        runAppleScript(script, appName: "Arc", bundleId: "company.thebrowser.Browser")
     }
     
     /// Escape string for AppleScript embedding
@@ -2124,7 +2290,7 @@ final class MusicManager: ObservableObject {
         return nil
     }
     
-    /// Run AppleScript asynchronously with fallback to just opening the app
+    /// Run AppleScript asynchronously, then force source-app activation.
     private func runAppleScript(_ source: String, appName: String, bundleId: String? = nil) {
         // Use serial queue to prevent concurrent AppleScript execution
         // NSAppleScript is NOT thread-safe and concurrent calls crash the runtime
@@ -2143,19 +2309,17 @@ final class MusicManager: ObservableObject {
 
             if let errorDescription {
                 print("MusicManager: AppleScript error for \(appName): \(errorDescription)")
-                // Fallback: just activate the app
-                DispatchQueue.main.async {
-                    let targetBundleId = bundleId ?? self?.bundleIdentifier
-                    if let bundleId = targetBundleId {
-                        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-                            NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-                        } else if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
-                            app.activate()
-                        }
-                    }
-                }
             } else {
                 print("MusicManager: AppleScript result for \(appName): \(resultString ?? "success")")
+            }
+
+            // Always force app activation afterwards. If tab matching failed, users still
+            // expect the source app/window to come to the front from an album-art click.
+            DispatchQueue.main.async {
+                let targetBundleId = bundleId ?? self?.bundleIdentifier
+                if let bundleId = targetBundleId {
+                    _ = self?.bringAppToFront(bundleId: bundleId)
+                }
             }
         }
     }

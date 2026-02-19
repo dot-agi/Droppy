@@ -417,6 +417,18 @@ struct MediaHUDView: View {
         .animation(DroppyAnimation.smooth(duration: 0.35, for: targetScreen), value: isHovered)
         .allowsHitTesting(true)
         .onTapGesture {
+            let shelfEnabled = UserDefaults.standard.preference(
+                AppPreferenceKey.enableNotchShelf,
+                default: PreferenceDefault.enableNotchShelf
+            )
+
+            // When shelf is disabled, mini media taps should open the source app
+            // instead of trying to expand a surface that isn't available.
+            guard shelfEnabled else {
+                MusicManager.shared.openMusicApp()
+                return
+            }
+
             withAnimation(DroppyAnimation.state) {
                 // Show media player when expanding from mini HUD
                 MusicManager.shared.isMediaHUDForced = true
@@ -547,6 +559,8 @@ struct SubtleScrollingText: View {
     
     /// Points per second for marquee movement.
     private let marqueeSpeed: CGFloat = 34
+    /// Visual gap between repeated marquee copies to avoid merged words at wrap boundaries.
+    private let marqueeGap: CGFloat = 18
     
     /// Whether text overflows the container (needs fade/scrolling)
     private var needsScroll: Bool {
@@ -577,7 +591,7 @@ struct SubtleScrollingText: View {
                 Group {
                     if (isActiveHover || isReturningToStart) && needsScroll {
                         // Seamless marquee: duplicate label back-to-back and wrap offset continuously.
-                        HStack(spacing: 0) {
+                        HStack(spacing: marqueeGap) {
                             Text(text)
                                 .font(font)
                                 .foregroundStyle(foregroundStyle)
@@ -759,7 +773,7 @@ struct SubtleScrollingText: View {
                 let dt = min(max(now - lastTick, 0), 0.05)
                 lastTick = now
                 
-                let cycleWidth = max(1, textWidth)
+                let cycleWidth = max(1, textWidth + marqueeGap)
                 scrollOffset += CGFloat(dt) * marqueeSpeed
                 if scrollOffset >= cycleWidth {
                     scrollOffset.formTruncatingRemainder(dividingBy: cycleWidth)
@@ -886,7 +900,7 @@ struct ProgressSlider: View {
             ZStack(alignment: .leading) {
                 // Track background - concave glass well (matches LiquidSlider)
                 Capsule()
-                    .fill(.ultraThinMaterial)
+                    .droppyGlassFill()
                     .overlay(
                         Capsule()
                             .fill(AdaptiveColors.overlayAuto(0.05))

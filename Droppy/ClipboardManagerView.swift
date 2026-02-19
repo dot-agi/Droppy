@@ -275,7 +275,7 @@ struct ClipboardManagerView: View {
                     }
             }
         }
-        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+        .droppyTransparentBackground(useTransparentBackground)
         .frame(minWidth: 1040, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
         .background(pasteShortcutButton)
         .background(navigationShortcutButtons)
@@ -402,12 +402,12 @@ struct ClipboardManagerView: View {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-                Text("Copied to Clipboard & Pasting...")
+                Text("Copied to Clipboard & Pasting…")
                     .font(.system(size: 13, weight: .medium))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+            .droppyTransparentBackground(useTransparentBackground)
             .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous)
@@ -591,7 +591,7 @@ struct ClipboardManagerView: View {
                         .foregroundStyle(.secondary)
                         .font(.system(size: 14))
                     
-                    TextField("Search history...", text: $searchText)
+                    TextField("Search history…", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .medium))
                         .focused($isSearchFocused)
@@ -1876,7 +1876,7 @@ struct ClipboardPreviewView: View {
                                     } else {
                                         Image(systemName: "text.viewfinder")
                                     }
-                                    Text(isExtractingText ? "Extracting..." : "Extract Text")
+                                    Text(isExtractingText ? "Extracting…" : "Extract Text")
                                 }
                             }
                             .buttonStyle(DroppyPillButtonStyle(size: .small))
@@ -2286,7 +2286,7 @@ struct ClipboardPreviewView: View {
                         }
                         .padding(DroppySpacing.sm)
                         .frame(minWidth: 140)
-                        .background(.ultraThinMaterial)
+                        .background { Rectangle().droppyGlassFill() }
                     }
                 }
                 
@@ -2707,7 +2707,7 @@ struct ZoomedDocumentPreviewSheet: View {
                                 .padding(DroppySpacing.sm)
                                 .background(
                                     RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous)
-                                        .fill(.ultraThinMaterial)
+                                        .droppyGlassFill()
                                 )
                             }
                             .padding(DroppySpacing.md)
@@ -3112,7 +3112,7 @@ struct StackedCardView: View {
         .frame(width: 130, height: 120)
         .background(
             RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .droppyGlassFill()
         )
         .overlay(
             RoundedRectangle(cornerRadius: DroppyRadius.large, style: .continuous)
@@ -3179,7 +3179,7 @@ struct URLPreviewCard: View {
             if isLoading {
                 VStack(spacing: 12) {
                     ProgressView().controlSize(.regular)
-                    Text("Fetching preview...")
+                    Text("Fetching preview…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -3323,7 +3323,7 @@ struct URLTypeBadge: View {
             .foregroundStyle(AdaptiveColors.primaryTextAuto)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            .background { Rectangle().droppyGlassFill() }
             .background(AdaptiveColors.overlayAuto(0.2))
             .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.ml, style: .continuous))
             .overlay(
@@ -3486,7 +3486,7 @@ struct TagManagementSheet: View {
                         .font(.system(size: 14))
                         .animation(.easeInOut(duration: 0.2), value: selectedColorIndex)
                     
-                    TextField("New tag name...", text: $newTagName)
+                    TextField("New tag name…", text: $newTagName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(AdaptiveColors.primaryTextAuto)

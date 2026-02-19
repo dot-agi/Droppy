@@ -18,9 +18,9 @@ enum AIInstallStep: Int, CaseIterable {
     
     var title: String {
         switch self {
-        case .checking: return "Checking Python..."
-        case .downloading: return "Downloading packages..."
-        case .installing: return "Installing dependencies..."
+        case .checking: return "Checking Python…"
+        case .downloading: return "Downloading packages…"
+        case .installing: return "Installing dependencies…"
         case .complete: return "Installation Complete!"
         }
     }
@@ -102,7 +102,7 @@ struct AIInstallView: View {
         }
         .frame(width: 450)
         .fixedSize(horizontal: true, vertical: true)
-        .background(useTransparentBackground ? AnyShapeStyle(.ultraThinMaterial) : AdaptiveColors.panelBackgroundOpaqueStyle)
+        .droppyTransparentBackground(useTransparentBackground)
         .clipShape(RoundedRectangle(cornerRadius: DroppyRadius.xl, style: .continuous))
         .sheet(isPresented: $showReviewsSheet) {
             ExtensionReviewsSheet(extensionType: .aiBackgroundRemoval)
@@ -239,7 +239,7 @@ struct AIInstallView: View {
         } else if manager.isInstalled && !manager.isInstalling {
             return "Installed & Ready"
         } else if manager.isInstalling {
-            return "Installing..."
+            return "Installing…"
         } else {
             return "AI Background Removal"
         }

@@ -40,7 +40,7 @@ struct QuickShareSuccessView: View {
         .frame(width: 500, height: 330)
         .background {
             if useTransparentBackground {
-                Rectangle().fill(.ultraThinMaterial)
+                Rectangle().droppyGlassFill()
             } else {
                 AdaptiveColors.panelBackgroundAuto
             }
@@ -77,7 +77,7 @@ struct QuickShareSuccessView: View {
                 Text("Droppy Quickshare")
                     .font(.system(size: 22, weight: .bold))
                 
-                Text(fileCount > 1 ? "Uploading \(fileCount) items..." : "Uploading file...")
+                Text(fileCount > 1 ? "Uploading \(fileCount) items…" : "Uploading file…")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
