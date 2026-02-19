@@ -3,9 +3,7 @@
 </p>
 
 <h1 align="center">Droppy</h1>
-
 <p align="center">
-  
   <b>The native productivity layer macOS is missing.</b><br>
   <sub>100% Swift • Signed & Notarized • Source-Available</sub>
 </p>
